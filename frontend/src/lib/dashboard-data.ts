@@ -1,0 +1,115 @@
+import {
+  BadgeIndianRupee,
+  Cpu,
+  Megaphone,
+  Scale,
+  Target,
+  TimerReset,
+  TrendingUp,
+  Users,
+  WandSparkles,
+} from "lucide-react";
+import { AgentReport, Memory, Task } from "@/lib/api";
+
+export const starterPrompts = [
+  "I have Rs 2 lakh. I want to start an online business.",
+  "Challenge my idea: an AI resume builder for freshers.",
+  "Create a 30-day launch plan for a micro SaaS.",
+];
+
+export const agentMeta: Record<string, { icon: React.ElementType; tone: string; orbit: string }> = {
+  "Market Research": { icon: TrendingUp, tone: "bg-basil/10 text-basil", orbit: "Demand" },
+  CFO: { icon: BadgeIndianRupee, tone: "bg-ember/10 text-ember", orbit: "Runway" },
+  CTO: { icon: Cpu, tone: "bg-ink/10 text-ink", orbit: "Build" },
+  "Product Manager": { icon: Target, tone: "bg-chartreuse/25 text-ink", orbit: "Scope" },
+  Marketing: { icon: Megaphone, tone: "bg-steel/10 text-steel", orbit: "Growth" },
+  Legal: { icon: Scale, tone: "bg-ink/10 text-ink", orbit: "Risk" },
+  Sales: { icon: Users, tone: "bg-basil/10 text-basil", orbit: "Pilots" },
+  Designer: { icon: WandSparkles, tone: "bg-ember/10 text-ember", orbit: "UX" },
+  "Executive Assistant": { icon: TimerReset, tone: "bg-chartreuse/25 text-ink", orbit: "Rhythm" },
+};
+
+export const operatingPhases = [
+  "Core chat",
+  "Agent graph",
+  "Long-term memory",
+  "Reports",
+  "Voice",
+  "Board meetings",
+];
+
+export type TaskFilter = "All" | "Open" | "Done" | "High";
+
+export const fallbackReports: AgentReport[] = [
+  {
+    agent: "Market Research",
+    report_type: "agent",
+    title: "Demand exists, but niche selection matters",
+    summary: "Start with a painful, frequent workflow for one customer segment before broad automation.",
+    bullets: ["Interview users already paying with time or money.", "Reject broad markets until there is a sharper wedge."],
+    score: 84,
+  },
+  {
+    agent: "CFO",
+    report_type: "agent",
+    title: "Keep first validation under Rs 25k",
+    summary: "Spend on interviews, landing page tests, and one paid channel experiment before product build.",
+    bullets: ["Cap validation spend.", "Define CAC ceiling before ads."],
+    score: 78,
+  },
+  {
+    agent: "CTO",
+    report_type: "agent",
+    title: "Ship the narrowest workflow first",
+    summary: "Build the loop that proves repeat value: input, CEO decision, report, task, and memory.",
+    bullets: ["Instrument conversion.", "Avoid background automation until board review works."],
+    score: 86,
+  },
+];
+
+export const fallbackTasks: Task[] = [
+  {
+    id: "1",
+    title: "Interview 10 target customers",
+    description: "Capture exact pain language and willingness to pay.",
+    priority: "High",
+    status: "Not started",
+    created_by_agent: "Market Research",
+    completed_at: null,
+  },
+  {
+    id: "2",
+    title: "Draft landing page offer",
+    description: "Test one audience and one promise.",
+    priority: "High",
+    status: "Ready",
+    created_by_agent: "Marketing",
+    completed_at: null,
+  },
+  {
+    id: "3",
+    title: "List 5 competitor pricing models",
+    description: "Look for pricing gaps and weak reviews.",
+    priority: "Medium",
+    status: "Ready",
+    created_by_agent: "CFO",
+    completed_at: null,
+  },
+];
+
+export const fallbackMemories: Memory[] = [
+  {
+    id: "memory-1",
+    kind: "decision",
+    content: "The CEO will block full product buildout until validation evidence exists.",
+    importance: 0.9,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "memory-2",
+    kind: "strategy",
+    content: "The strongest wedge is a narrow, painful workflow with clear willingness to pay.",
+    importance: 0.8,
+    created_at: new Date().toISOString(),
+  },
+];
