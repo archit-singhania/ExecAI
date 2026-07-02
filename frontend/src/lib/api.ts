@@ -6,6 +6,7 @@ export type AgentReport = {
   summary: string;
   bullets: string[];
   score: number;
+  created_at?: string | null;
 };
 
 export type ChatMessage = {
@@ -49,6 +50,17 @@ export type Memory = {
   content: string;
   importance: number;
   created_at: string;
+};
+
+export type ReportExport = {
+  id: string;
+  filename: string;
+  markdown: string;
+};
+
+export type MemorySearch = {
+  query: string;
+  results: Memory[];
 };
 
 export type CEOResponse = {
@@ -95,6 +107,12 @@ export const api = {
     request<ChatMessage[]>(`/api/sessions/${sessionId}/messages`),
   getReports: (sessionId: string) =>
     request<AgentReport[]>(`/api/sessions/${sessionId}/reports`),
+  getReport: (reportId: string) =>
+    request<AgentReport>(`/api/reports/${reportId}`),
+  exportReport: (reportId: string) =>
+    request<ReportExport>(`/api/reports/${reportId}/export`),
+  getBoardMeetings: (sessionId: string) =>
+    request<AgentReport[]>(`/api/sessions/${sessionId}/board-meetings`),
   getTasks: (sessionId: string) =>
     request<Task[]>(`/api/sessions/${sessionId}/tasks`),
   updateTask: (taskId: string, status: string) =>
@@ -104,6 +122,8 @@ export const api = {
     }),
   getMemories: (sessionId: string) =>
     request<Memory[]>(`/api/sessions/${sessionId}/memories`),
+  searchMemories: (sessionId: string, query: string) =>
+    request<MemorySearch>(`/api/sessions/${sessionId}/memories/search?q=${encodeURIComponent(query)}`),
   generateBoardMeeting: (sessionId: string) =>
     request<AgentReport>(`/api/sessions/${sessionId}/board-meeting`, {
       method: "POST",

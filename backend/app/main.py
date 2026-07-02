@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -12,8 +12,10 @@ from app.schemas import (
     AgentReportOut,
     DashboardOut,
     MemoryOut,
+    MemorySearchOut,
     MessageCreate,
     MessageOut,
+    ReportExportOut,
     SessionCreate,
     SessionOut,
     TaskOut,
@@ -98,9 +100,45 @@ def list_reports(session_id: str, db: Session = Depends(get_db)):
             "summary": report.summary,
             "bullets": report.bullets.splitlines(),
             "score": report.score,
+            "created_at": report.created_at,
         }
         for report in reports
     ]
+
+
+@app.get("/api/reports/{report_id}", response_model=AgentReportOut)
+def get_report(report_id: str, db: Session = Depends(get_db)):
+    report = db.get(AgentReport, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {
+        "id": report.id,
+        "agent": report.agent,
+        "report_type": report.report_type,
+        "title": report.title,
+        "summary": report.summary,
+        "bullets": report.bullets.splitlines(),
+        "score": report.score,
+        "created_at": report.created_at,
+    }
+
+
+@app.get("/api/reports/{report_id}/export", response_model=ReportExportOut)
+def export_report(report_id: str, db: Session = Depends(get_db)):
+    report = db.get(AgentReport, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    bullets = "\n".join(f"- {bullet}" for bullet in report.bullets.splitlines())
+    markdown = (
+        f"# {report.title}\n\n"
+        f"**Agent:** {report.agent}\n\n"
+        f"**Type:** {report.report_type}\n\n"
+        f"**Score:** {report.score}/100\n\n"
+        f"## Summary\n\n{report.summary}\n\n"
+        f"## Key Points\n\n{bullets if bullets else '- No bullet points recorded.'}\n"
+    )
+    filename = f"{report.title.lower().replace(' ', '-')[:48]}.md"
+    return {"id": report.id, "filename": filename, "markdown": markdown}
 
 
 @app.get("/api/sessions/{session_id}/tasks", response_model=list[TaskOut])
@@ -140,6 +178,26 @@ def list_memories(session_id: str, db: Session = Depends(get_db)):
         .limit(20)
         .all()
     )
+
+
+@app.get("/api/sessions/{session_id}/memories/search", response_model=MemorySearchOut)
+def search_memories(session_id: str, q: str = Query(min_length=1, max_length=200), db: Session = Depends(get_db)):
+    session = db.get(BusinessSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    needle = q.lower()
+    memories = (
+        db.query(BusinessMemory)
+        .filter(BusinessMemory.session_id == session_id)
+        .order_by(desc(BusinessMemory.importance), desc(BusinessMemory.created_at))
+        .all()
+    )
+    results = [
+        memory
+        for memory in memories
+        if needle in memory.content.lower() or needle in memory.kind.lower()
+    ][:10]
+    return {"query": q, "results": results}
 
 
 @app.post("/api/sessions/{session_id}/messages", response_model=MessageOut)
@@ -226,6 +284,7 @@ def send_message(session_id: str, payload: MessageCreate, db: Session = Depends(
                 "summary": report.summary,
                 "bullets": report.bullets.splitlines(),
                 "score": report.score,
+                "created_at": report.created_at,
             }
             for report in reports
         ],
@@ -278,10 +337,37 @@ def dashboard(db: Session = Depends(get_db)):
                 "summary": report.summary,
                 "bullets": report.bullets.splitlines(),
                 "score": report.score,
+                "created_at": report.created_at,
             }
             for report in reports
         ],
     }
+
+
+@app.get("/api/sessions/{session_id}/board-meetings", response_model=list[AgentReportOut])
+def list_board_meetings(session_id: str, db: Session = Depends(get_db)):
+    session = db.get(BusinessSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    reports = (
+        db.query(AgentReport)
+        .filter(AgentReport.session_id == session.id, AgentReport.report_type == "board")
+        .order_by(desc(AgentReport.created_at))
+        .all()
+    )
+    return [
+        {
+            "id": report.id,
+            "agent": report.agent,
+            "report_type": report.report_type,
+            "title": report.title,
+            "summary": report.summary,
+            "bullets": report.bullets.splitlines(),
+            "score": report.score,
+            "created_at": report.created_at,
+        }
+        for report in reports
+    ]
 
 
 @app.post("/api/sessions/{session_id}/board-meeting", response_model=AgentReportOut)
@@ -326,4 +412,5 @@ def generate_board_meeting(session_id: str, db: Session = Depends(get_db)):
         "summary": report.summary,
         "bullets": report.bullets.splitlines(),
         "score": report.score,
+        "created_at": report.created_at,
     }

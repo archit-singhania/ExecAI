@@ -34,6 +34,11 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+textarea,
+input {
+  min-width: 0;
+}
+
 ::selection {
   background: #101317;
   color: #f6f4ee;
@@ -74,6 +79,13 @@ button {
   background: rgba(255, 255, 255, 0.66);
   box-shadow: 0 24px 80px rgba(16, 19, 23, 0.12);
   backdrop-filter: blur(22px);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass,
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.92);
+  }
 }
 
 .glass-strong {
@@ -124,6 +136,14 @@ button {
   animation: reverse-spin 18s linear infinite;
 }
 
+.premium-focus:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(29, 111, 95, 0.65);
+  outline-offset: 2px;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -155,5 +175,22 @@ button {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ambient-grid {
+    background-size: 28px 28px;
+    opacity: 0.42;
+  }
+
+  .scanline {
+    opacity: 0.12;
+  }
+
+  .glass,
+  .glass-strong {
+    box-shadow: 0 16px 44px rgba(16, 19, 23, 0.1);
+    backdrop-filter: blur(16px);
   }
 }

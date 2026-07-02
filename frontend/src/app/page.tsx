@@ -31,7 +31,7 @@ import {
   Volume2,
   WandSparkles,
 } from "lucide-react";
-import { api, AgentReport, ChatMessage, DashboardSummary, Memory, Session, Task } from "@/lib/api";
+import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +62,8 @@ const operatingPhases = [
   "Board meetings",
 ];
 
+type TaskFilter = "All" | "Open" | "Done" | "High";
+
 export default function Home() {
   const [goal, setGoal] = useState(starterPrompts[0]);
   const [session, setSession] = useState<Session | null>(null);
@@ -73,6 +75,12 @@ export default function Home() {
   const [error, setError] = useState("");
   const [boardReport, setBoardReport] = useState<AgentReport | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [boardHistory, setBoardHistory] = useState<AgentReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<AgentReport | null>(null);
+  const [reportExport, setReportExport] = useState<ReportExport | null>(null);
+  const [memoryQuery, setMemoryQuery] = useState("");
+  const [memoryResults, setMemoryResults] = useState<Memory[]>([]);
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>("All");
 
   useEffect(() => {
     async function load() {
@@ -83,6 +91,7 @@ export default function Home() {
           setSession(summary.active_session);
           setMessages(await api.getMessages(summary.active_session.id));
           setMemories(await api.getMemories(summary.active_session.id));
+          setBoardHistory(await api.getBoardMeetings(summary.active_session.id));
         }
       } catch {
         setError("Backend is not reachable yet. Start FastAPI on port 8000.");
@@ -99,6 +108,12 @@ export default function Home() {
   }, [messages, dashboard]);
 
   const activeTasks = dashboard?.tasks ?? fallbackTasks;
+  const filteredTasks = activeTasks.filter((task) => {
+    if (taskFilter === "Done") return task.status.toLowerCase() === "done";
+    if (taskFilter === "Open") return task.status.toLowerCase() !== "done";
+    if (taskFilter === "High") return task.priority === "High";
+    return true;
+  });
   const doneTasks = activeTasks.filter((task) => task.status.toLowerCase() === "done").length;
   const healthScore = session?.health_score ?? 82;
   const runway = session?.runway_months ?? 6;
@@ -109,6 +124,7 @@ export default function Home() {
   async function refreshSession(sessionId: string) {
     setDashboard(await api.dashboard());
     setMemories(await api.getMemories(sessionId));
+    setBoardHistory(await api.getBoardMeetings(sessionId));
   }
 
   async function startSession(event?: FormEvent) {
@@ -191,6 +207,39 @@ export default function Home() {
     }
   }
 
+  async function openReport(report: AgentReport) {
+    if (!report.id) {
+      setSelectedReport(report);
+      setReportExport(null);
+      return;
+    }
+
+    setError("");
+    try {
+      const [freshReport, exported] = await Promise.all([
+        api.getReport(report.id),
+        api.exportReport(report.id),
+      ]);
+      setSelectedReport(freshReport);
+      setReportExport(exported);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to open report.");
+    }
+  }
+
+  async function searchMemory(event: FormEvent) {
+    event.preventDefault();
+    if (!session || !memoryQuery.trim()) return;
+
+    setError("");
+    try {
+      const result = await api.searchMemories(session.id, memoryQuery.trim());
+      setMemoryResults(result.results);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to search memory.");
+    }
+  }
+
   function speak(text: string) {
     if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
@@ -241,23 +290,23 @@ export default function Home() {
       <div className="ambient-grid absolute inset-0" />
       <div className="scanline pointer-events-none absolute inset-0" />
 
-      <div className="relative mx-auto flex max-w-[1540px] flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
-        <header className="glass-strong sticky top-4 z-30 flex flex-col gap-4 rounded-lg px-4 py-3 md:flex-row md:items-center md:justify-between">
+      <div className="relative mx-auto flex max-w-[1540px] flex-col gap-4 px-3 py-3 sm:gap-5 sm:px-6 sm:py-4 lg:px-8">
+        <header className="glass-strong sticky top-2 z-30 flex flex-col gap-4 rounded-lg px-3 py-3 sm:top-4 sm:px-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative grid h-12 w-12 place-items-center rounded-lg bg-ink text-fog shadow-glow">
+            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-ink text-fog shadow-glow sm:h-12 sm:w-12">
               <BriefcaseBusiness size={23} />
               <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-chartreuse ring-4 ring-fog" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-steel">CEO.ai</p>
-              <h1 className="text-xl font-black sm:text-2xl">Autonomous executive command center</h1>
+              <h1 className="text-lg font-black leading-tight sm:text-2xl">Autonomous executive command center</h1>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <StatusPill icon={Radio} label={booting ? "Connecting" : "Live system"} pulse />
             <StatusPill icon={ShieldCheck} label="Human approval mode" />
-            <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !session}>
+            <Button variant="ghost" className="col-span-2 sm:col-span-1" onClick={generateBoardMeeting} disabled={loading || !session}>
               Board Review <Volume2 size={16} />
             </Button>
           </div>
@@ -266,14 +315,14 @@ export default function Home() {
         <section className="grid gap-5 xl:grid-cols-[1.03fr_0.97fr]">
           <div className="glass-strong relative overflow-hidden rounded-lg">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-ember via-chartreuse to-basil" />
-            <div className="grid min-h-[620px] lg:grid-cols-[0.92fr_1.08fr]">
-              <div className="flex flex-col justify-between border-b border-ink/10 p-5 sm:p-7 lg:border-b-0 lg:border-r">
+            <div className="grid lg:min-h-[620px] lg:grid-cols-[0.92fr_1.08fr]">
+              <div className="flex flex-col justify-between border-b border-ink/10 p-4 sm:p-7 lg:border-b-0 lg:border-r">
                 <div>
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-2 text-sm font-black shadow-line">
+                  <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-2 text-xs font-black shadow-line sm:text-sm">
                     <Sparkles size={16} />
                     CEO + 9 specialist agents
                   </div>
-                  <h2 className="max-w-xl text-4xl font-black leading-[0.98] sm:text-6xl">
+                  <h2 className="max-w-xl text-[2.65rem] font-black leading-[0.96] sm:text-6xl">
                     A boardroom that thinks, argues, and executes.
                   </h2>
                   <p className="mt-5 max-w-xl text-base leading-7 text-steel">
@@ -283,11 +332,11 @@ export default function Home() {
                 </div>
 
                 <form onSubmit={startSession} className="mt-8 space-y-3">
-                  <div className="rounded-lg border border-ink/10 bg-white/70 p-2 shadow-line">
+                  <div className="rounded-lg border border-ink/10 bg-white/75 p-2 shadow-line">
                     <textarea
                       value={goal}
                       onChange={(event) => setGoal(event.target.value)}
-                      className="min-h-32 w-full resize-none rounded-md bg-transparent p-3 text-base font-semibold leading-7 outline-none"
+                      className="min-h-32 w-full resize-none rounded-md bg-transparent p-3 text-sm font-semibold leading-7 outline-none sm:text-base"
                     />
                     <div className="flex flex-wrap gap-2 border-t border-ink/10 p-2">
                       {starterPrompts.map((prompt) => (
@@ -295,7 +344,7 @@ export default function Home() {
                           key={prompt}
                           type="button"
                           onClick={() => setGoal(prompt)}
-                          className="rounded-md bg-fog px-3 py-2 text-xs font-bold text-steel transition hover:bg-chartreuse/30 hover:text-ink"
+                          className="rounded-md bg-fog px-3 py-2 text-left text-xs font-bold leading-5 text-steel transition hover:bg-chartreuse/30 hover:text-ink"
                         >
                           {prompt}
                         </button>
@@ -337,12 +386,22 @@ export default function Home() {
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-          <AgentBriefing reports={latestReports.length ? latestReports : fallbackReports} />
+          <AgentBriefing
+            reports={latestReports.length ? latestReports : fallbackReports}
+            selectedReport={selectedReport}
+            reportExport={reportExport}
+            openReport={openReport}
+          />
           <div className="grid gap-5 lg:grid-cols-2">
-            <TaskBoard tasks={activeTasks} completeTask={completeTask} />
+            <TaskBoard tasks={filteredTasks} taskFilter={taskFilter} setTaskFilter={setTaskFilter} completeTask={completeTask} />
             <BoardTheater
               boardReport={boardReport}
+              boardHistory={boardHistory}
               memories={memories.length ? memories.slice(0, 4) : fallbackMemories}
+              memoryQuery={memoryQuery}
+              memoryResults={memoryResults}
+              setMemoryQuery={setMemoryQuery}
+              searchMemory={searchMemory}
               loading={loading}
               session={session}
               generateBoardMeeting={generateBoardMeeting}
@@ -375,7 +434,7 @@ function ExecutiveGraph({
   const orbitAgents = Object.entries(agentMeta);
 
   return (
-    <div className="relative min-h-[520px] overflow-hidden bg-ink p-5 text-fog">
+    <div className="relative min-h-[520px] overflow-hidden bg-ink p-4 text-fog sm:p-5">
       <div className="executive-gradient absolute inset-0" />
       <div className="absolute inset-0 bg-[linear-gradient(rgba(246,244,238,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(246,244,238,0.06)_1px,transparent_1px)] bg-[size:42px_42px]" />
       <div className="relative grid h-full content-between gap-5">
@@ -386,15 +445,15 @@ function ExecutiveGraph({
           <DarkMetric icon={CheckCircle2} label="Tasks" value={`${doneTasks}/${taskCount}`} />
         </div>
 
-        <div className="relative mx-auto grid aspect-square w-full max-w-[430px] place-items-center">
+        <div className="relative mx-auto grid aspect-square w-full max-w-[330px] place-items-center sm:max-w-[430px]">
           <div className="absolute inset-8 rounded-full border border-white/10" />
           <div className="absolute inset-16 rounded-full border border-dashed border-white/15" />
           <div className="absolute inset-0 animate-spin-slow rounded-full border border-transparent border-t-chartreuse/70" />
           <div className="absolute inset-12 animate-reverse-spin rounded-full border border-transparent border-r-ember/70" />
-          <div className="absolute grid h-36 w-36 place-items-center rounded-full border border-white/15 bg-white/10 text-center shadow-[0_0_80px_rgba(183,202,93,0.22)] backdrop-blur-xl">
+          <div className="absolute grid h-28 w-28 place-items-center rounded-full border border-white/15 bg-white/10 text-center shadow-[0_0_80px_rgba(183,202,93,0.22)] backdrop-blur-xl sm:h-36 sm:w-36">
             <div>
-              <Brain className="mx-auto mb-2 text-chartreuse" size={30} />
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-fog/55">CEO Core</p>
+              <Brain className="mx-auto mb-2 text-chartreuse" size={26} />
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-fog/55 sm:text-xs">CEO Core</p>
               <p className="mt-1 text-2xl font-black">{healthScore}</p>
             </div>
           </div>
@@ -409,7 +468,7 @@ function ExecutiveGraph({
             return (
               <div
                 key={name}
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/12 bg-white/12 px-3 py-2 shadow-glass backdrop-blur-md"
+                className="absolute hidden -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/12 bg-white/12 px-3 py-2 shadow-glass backdrop-blur-md sm:block"
                 style={{ left: `${x}%`, top: `${y}%` }}
               >
                 <div className="flex items-center gap-2">
@@ -419,6 +478,18 @@ function ExecutiveGraph({
                     <p className="text-[10px] font-semibold text-fog/50">{name}</p>
                   </div>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:hidden">
+          {orbitAgents.slice(0, 6).map(([name, meta]) => {
+            const Icon = meta.icon;
+            return (
+              <div key={name} className="rounded-md border border-white/10 bg-white/10 px-2 py-2 text-center backdrop-blur">
+                <Icon className="mx-auto mb-1 text-chartreuse" size={15} />
+                <p className="text-[10px] font-black">{meta.orbit}</p>
               </div>
             );
           })}
@@ -451,7 +522,7 @@ function CommandPanel({
   sendMessage: (event: FormEvent) => void;
 }) {
   return (
-    <section className="glass-strong flex min-h-[620px] flex-col rounded-lg p-4 sm:p-5">
+    <section className="glass-strong flex min-h-[560px] flex-col rounded-lg p-4 sm:min-h-[620px] sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Command Center</p>
@@ -467,7 +538,7 @@ function CommandPanel({
           <div className="grid h-full place-items-center py-10 text-center">
             <div className="max-w-sm">
               <Brain className="mx-auto mb-3 text-steel" size={38} />
-              <p className="text-lg font-black">Start with a business goal.</p>
+            <p className="text-lg font-black">Start with a business goal.</p>
               <p className="mt-2 text-sm leading-6 text-steel">
                 The CEO will route it through the agent floor and return a board-style brief.
               </p>
@@ -502,7 +573,7 @@ function CommandPanel({
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask the CEO to challenge, plan, analyze, or create tasks..."
-          className="h-12 rounded-md border border-ink/10 bg-white/70 px-4 font-semibold outline-none ring-ink/10 transition focus:ring-4"
+          className="h-12 min-w-0 rounded-md border border-ink/10 bg-white/70 px-4 text-sm font-semibold outline-none ring-ink/10 transition focus:ring-4 sm:text-base"
         />
         <Button disabled={loading} className="h-12">
           <Send size={17} />
@@ -514,48 +585,141 @@ function CommandPanel({
   );
 }
 
-function AgentBriefing({ reports }: { reports: AgentReport[] }) {
+function AgentBriefing({
+  reports,
+  selectedReport,
+  reportExport,
+  openReport,
+}: {
+  reports: AgentReport[];
+  selectedReport: AgentReport | null;
+  reportExport: ReportExport | null;
+  openReport: (report: AgentReport) => void;
+}) {
+  const [agentFilter, setAgentFilter] = useState("All");
+  const agents = ["All", ...Array.from(new Set(reports.map((report) => report.agent)))];
+  const filteredReports = agentFilter === "All" ? reports : reports.filter((report) => report.agent === agentFilter);
+
   return (
-    <section className="glass-strong rounded-lg p-5">
+    <section className="glass-strong rounded-lg p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Agent Floor</p>
-          <h2 className="text-2xl font-black">Specialist briefings</h2>
+          <h2 className="text-xl font-black sm:text-2xl">Specialist briefings</h2>
         </div>
         <div className="rounded-md bg-chartreuse/25 px-3 py-2 text-sm font-black">
-          {reports.length} active
+          {filteredReports.length} active
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        {reports.map((report, index) => (
-          <AgentCard key={`${report.agent}-${report.title}-${index}`} report={report} index={index} />
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+        {agents.map((agent) => (
+          <button
+            key={agent}
+            onClick={() => setAgentFilter(agent)}
+            className={cn(
+              "shrink-0 rounded-md border px-3 py-2 text-xs font-black transition",
+              agentFilter === agent ? "border-ink bg-ink text-fog" : "border-ink/10 bg-white/65 text-steel hover:bg-white",
+            )}
+          >
+            {agent}
+          </button>
         ))}
       </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {filteredReports.map((report, index) => (
+          <AgentCard key={`${report.agent}-${report.title}-${index}`} report={report} index={index} openReport={openReport} />
+        ))}
+      </div>
+      <ReportInspector report={selectedReport} reportExport={reportExport} />
     </section>
   );
 }
 
-function TaskBoard({ tasks, completeTask }: { tasks: Task[]; completeTask: (taskId: string) => void }) {
+function ReportInspector({ report, reportExport }: { report: AgentReport | null; reportExport: ReportExport | null }) {
+  if (!report) {
+    return (
+      <div className="mt-4 rounded-lg border border-dashed border-ink/15 bg-white/45 p-4 text-sm font-semibold leading-6 text-steel">
+        Select any specialist briefing to open a board-ready report preview and markdown export.
+      </div>
+    );
+  }
+
   return (
-    <section className="glass-strong rounded-lg p-5">
+    <div className="mt-4 rounded-lg border border-ink/10 bg-ink p-4 text-fog">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-fog/50">{report.agent}</p>
+          <h3 className="mt-2 text-xl font-black leading-tight">{report.title}</h3>
+        </div>
+        <span className="w-fit rounded-md bg-chartreuse px-2 py-1 text-xs font-black text-ink">{report.score}/100</span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-fog/75">{report.summary}</p>
+      {report.bullets.length ? (
+        <div className="mt-4 grid gap-2">
+          {report.bullets.map((bullet) => (
+            <p key={bullet} className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm font-bold">
+              {bullet}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {reportExport ? (
+        <details className="mt-4 rounded-md border border-white/10 bg-white/8 p-3">
+          <summary className="cursor-pointer text-sm font-black">Markdown export: {reportExport.filename}</summary>
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 p-3 text-xs leading-5 text-fog/80">
+            {reportExport.markdown}
+          </pre>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function TaskBoard({
+  tasks,
+  taskFilter,
+  setTaskFilter,
+  completeTask,
+}: {
+  tasks: Task[];
+  taskFilter: TaskFilter;
+  setTaskFilter: (filter: TaskFilter) => void;
+  completeTask: (taskId: string) => void;
+}) {
+  return (
+    <section className="glass-strong rounded-lg p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Execution</p>
-          <h2 className="text-2xl font-black">Priority tasks</h2>
+          <h2 className="text-xl font-black sm:text-2xl">Priority tasks</h2>
         </div>
         <Check className="text-basil" size={24} />
+      </div>
+      <div className="mb-4 grid grid-cols-4 gap-2">
+        {(["All", "Open", "High", "Done"] as TaskFilter[]).map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setTaskFilter(filter)}
+            className={cn(
+              "rounded-md px-2 py-2 text-xs font-black transition",
+              taskFilter === filter ? "bg-ink text-fog" : "bg-white/70 text-steel hover:bg-white",
+            )}
+          >
+            {filter}
+          </button>
+        ))}
       </div>
       <div className="space-y-3">
         {tasks.map((task) => (
           <div key={task.id} className="group rounded-lg border border-ink/10 bg-white/62 p-4 transition hover:-translate-y-0.5 hover:shadow-soft">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <p className="font-black leading-6">{task.title}</p>
-              <span className={cn("rounded-md px-2 py-1 text-xs font-black", task.priority === "High" ? "bg-ember text-white" : "bg-ink text-fog")}>
+              <span className={cn("w-fit rounded-md px-2 py-1 text-xs font-black", task.priority === "High" ? "bg-ember text-white" : "bg-ink text-fog")}>
                 {task.priority}
               </span>
             </div>
             {task.description ? <p className="mt-2 text-sm leading-6 text-steel">{task.description}</p> : null}
-            <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-steel">{task.created_by_agent}</p>
               {task.status.toLowerCase() !== "done" ? (
                 <button
@@ -577,23 +741,33 @@ function TaskBoard({ tasks, completeTask }: { tasks: Task[]; completeTask: (task
 
 function BoardTheater({
   boardReport,
+  boardHistory,
   memories,
+  memoryQuery,
+  memoryResults,
+  setMemoryQuery,
+  searchMemory,
   loading,
   session,
   generateBoardMeeting,
 }: {
   boardReport: AgentReport | null;
+  boardHistory: AgentReport[];
   memories: Memory[];
+  memoryQuery: string;
+  memoryResults: Memory[];
+  setMemoryQuery: (value: string) => void;
+  searchMemory: (event: FormEvent) => void;
   loading: boolean;
   session: Session | null;
   generateBoardMeeting: () => void;
 }) {
   return (
-    <section className="glass-strong rounded-lg p-5">
+    <section className="glass-strong rounded-lg p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Board Room</p>
-          <h2 className="text-2xl font-black">Weekly review</h2>
+          <h2 className="text-xl font-black sm:text-2xl">Weekly review</h2>
         </div>
         <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !session}>
           <Volume2 size={16} />
@@ -624,10 +798,38 @@ function BoardTheater({
         </div>
       </div>
 
+      {boardHistory.length ? (
+        <div className="mt-4 rounded-lg border border-ink/10 bg-white/58 p-4">
+          <h3 className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-steel">Board history</h3>
+          <div className="space-y-2">
+            {boardHistory.slice(0, 3).map((report) => (
+              <div key={report.id ?? report.title} className="flex items-start justify-between gap-3 rounded-md bg-fog px-3 py-2">
+                <div>
+                  <p className="text-sm font-black">{report.title}</p>
+                  <p className="text-xs font-semibold text-steel">
+                    {report.created_at ? new Date(report.created_at).toLocaleString() : "Recent"}
+                  </p>
+                </div>
+                <span className="rounded-md bg-ink px-2 py-1 text-xs font-black text-fog">{report.score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-4 rounded-lg border border-ink/10 bg-white/58 p-4">
         <h3 className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-steel">Memory trail</h3>
+        <form onSubmit={searchMemory} className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <input
+            value={memoryQuery}
+            onChange={(event) => setMemoryQuery(event.target.value)}
+            placeholder="Search CEO memory..."
+            className="h-10 rounded-md border border-ink/10 bg-white/70 px-3 text-sm font-semibold outline-none"
+          />
+          <button className="rounded-md bg-ink px-3 py-2 text-xs font-black text-fog">Search</button>
+        </form>
         <div className="space-y-2">
-          {memories.map((memory) => (
+          {(memoryResults.length ? memoryResults : memories).map((memory) => (
             <div key={memory.id} className="rounded-md bg-fog px-3 py-2">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-steel">{memory.kind}</p>
               <p className="mt-1 line-clamp-2 text-sm font-semibold leading-6">{memory.content}</p>
@@ -641,10 +843,10 @@ function BoardTheater({
 
 function OperatingPhases() {
   return (
-    <section className="glass-strong rounded-lg p-5">
+    <section className="glass-strong rounded-lg p-4 sm:p-5">
       <div className="mb-5">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Roadmap</p>
-        <h2 className="text-2xl font-black">Operating phases</h2>
+        <h2 className="text-xl font-black sm:text-2xl">Operating phases</h2>
       </div>
       <div className="space-y-3">
         {operatingPhases.map((phase, index) => (
@@ -667,18 +869,18 @@ function KpiRunway({ reports, opportunityScore }: { reports: AgentReport[]; oppo
   const sorted = [...reports].sort((a, b) => b.score - a.score).slice(0, 6);
 
   return (
-    <section className="glass-strong rounded-lg p-5">
+    <section className="glass-strong rounded-lg p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Business Intelligence</p>
-          <h2 className="text-2xl font-black">Signal map</h2>
+          <h2 className="text-xl font-black sm:text-2xl">Signal map</h2>
         </div>
         <div className="rounded-md bg-ink px-3 py-2 text-sm font-black text-fog">{opportunityScore}/100</div>
       </div>
       <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-lg bg-ink p-5 text-fog">
           <p className="text-sm font-bold text-fog/60">Executive read</p>
-          <p className="mt-3 text-3xl font-black leading-tight">Validation approved. Full build blocked until proof.</p>
+          <p className="mt-3 text-2xl font-black leading-tight sm:text-3xl">Validation approved. Full build blocked until proof.</p>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <Signal icon={Files} label="Reports" value={`${reports.length}`} />
             <Signal icon={Activity} label="Cadence" value="Weekly" />
@@ -704,21 +906,21 @@ function KpiRunway({ reports, opportunityScore }: { reports: AgentReport[]; oppo
 
 function StatusPill({ icon: Icon, label, pulse = false }: { icon: React.ElementType; label: string; pulse?: boolean }) {
   return (
-    <div className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white/60 px-3 text-sm font-black shadow-line">
+    <div className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white/60 px-3 text-xs font-black shadow-line sm:text-sm">
       <span className={cn("grid h-5 w-5 place-items-center rounded-full", pulse ? "bg-basil/10 text-basil" : "text-ink")}>
         <Icon size={14} />
       </span>
-      {label}
+      <span className="truncate">{label}</span>
     </div>
   );
 }
 
 function DarkMetric({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/12 bg-white/10 p-4 backdrop-blur">
+    <div className="rounded-lg border border-white/12 bg-white/10 p-3 backdrop-blur sm:p-4">
       <Icon className="mb-3 text-chartreuse" size={20} />
       <p className="text-xs font-black uppercase tracking-[0.16em] text-fog/50">{label}</p>
-      <p className="mt-2 text-2xl font-black">{value}</p>
+      <p className="mt-2 text-xl font-black sm:text-2xl">{value}</p>
     </div>
   );
 }
@@ -733,12 +935,24 @@ function Signal({ icon: Icon, label, value }: { icon: React.ElementType; label: 
   );
 }
 
-function AgentCard({ report, index }: { report: AgentReport; index: number }) {
+function AgentCard({
+  report,
+  index,
+  openReport,
+}: {
+  report: AgentReport;
+  index: number;
+  openReport: (report: AgentReport) => void;
+}) {
   const meta = agentMeta[report.agent] ?? { icon: Brain, tone: "bg-ink/10 text-ink", orbit: "Signal" };
   const Icon = meta.icon;
 
   return (
-    <div className="animate-rise rounded-lg border border-ink/10 bg-white/62 p-4 transition hover:-translate-y-0.5 hover:shadow-soft" style={{ animationDelay: `${index * 35}ms` }}>
+    <button
+      onClick={() => openReport(report)}
+      className="animate-rise rounded-lg border border-ink/10 bg-white/62 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-soft"
+      style={{ animationDelay: `${index * 35}ms` }}
+    >
       <div className="flex items-start gap-3">
         <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-md", meta.tone)}>
           <Icon size={20} />
@@ -764,7 +978,7 @@ function AgentCard({ report, index }: { report: AgentReport; index: number }) {
           ) : null}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

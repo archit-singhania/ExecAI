@@ -30,6 +30,7 @@ class AgentReportOut(BaseModel):
     summary: str
     bullets: list[str]
     score: int
+    created_at: datetime | None = None
 
 
 class MessageOut(BaseModel):
@@ -73,3 +74,14 @@ class DashboardOut(BaseModel):
     recommendations: list[str]
     tasks: list[TaskOut]
     reports: list[AgentReportOut]
+
+
+class ReportExportOut(BaseModel):
+    id: str
+    filename: str
+    markdown: str
+
+
+class MemorySearchOut(BaseModel):
+    query: str
+    results: list[MemoryOut]

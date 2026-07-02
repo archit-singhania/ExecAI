@@ -62,3 +62,20 @@ def test_tasks_reports_memories_and_board_meeting():
     board = client.post(f"/api/sessions/{session_id}/board-meeting")
     assert board.status_code == 200
     assert board.json()["report_type"] == "board"
+
+    board_history = client.get(f"/api/sessions/{session_id}/board-meetings")
+    assert board_history.status_code == 200
+    assert len(board_history.json()) == 1
+
+    report_id = reports.json()[0]["id"]
+    report_detail = client.get(f"/api/reports/{report_id}")
+    assert report_detail.status_code == 200
+    assert report_detail.json()["id"] == report_id
+
+    exported = client.get(f"/api/reports/{report_id}/export")
+    assert exported.status_code == 200
+    assert "# " in exported.json()["markdown"]
+
+    memory_search = client.get(f"/api/sessions/{session_id}/memories/search?q=validation")
+    assert memory_search.status_code == 200
+    assert "results" in memory_search.json()
