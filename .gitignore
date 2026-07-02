@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+ceo_ai.db
+
+# Node
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Local tooling
+.DS_Store
+Thumbs.db

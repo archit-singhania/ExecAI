@@ -1,0 +1,14 @@
+{
+  "name": "ceo-ai",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "lint": "npm run lint --workspace frontend",
+    "backend:dev": "python -m uvicorn app.main:app --reload --app-dir backend",
+    "backend:test": "python -m pytest backend/tests"
+  },
+  "workspaces": [
+    "frontend"
+  ]
+}
