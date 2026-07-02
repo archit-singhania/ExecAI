@@ -5,9 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from app.agents import run_ceo_agents
+from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.config import get_settings
 from app.database import Base, engine, get_db
-from app.models import AgentReport, BusinessMemory, BusinessSession, Message, Task
+from app.models import AgentReport, BusinessMemory, BusinessSession, Message, Task, User
 from app.schemas import (
     AgentReportOut,
     DashboardOut,
@@ -20,6 +21,10 @@ from app.schemas import (
     SessionOut,
     TaskOut,
     TaskUpdate,
+    TokenOut,
+    UserCreate,
+    UserLogin,
+    UserOut,
 )
 
 
@@ -41,10 +46,50 @@ def health():
     return {"status": "ok"}
 
 
+@app.post("/api/auth/signup", response_model=TokenOut)
+def signup(payload: UserCreate, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == payload.email.lower()).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+
+    user = User(
+        name=payload.name.strip(),
+        email=payload.email.lower(),
+        hashed_password=hash_password(payload.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(user.id)
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.post("/api/auth/login", response_model=TokenOut)
+def login(payload: UserLogin, db: Session = Depends(get_db)):
+    invalid = HTTPException(status_code=401, detail="Incorrect email or password.")
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if not user or not verify_password(payload.password, user.hashed_password):
+        raise invalid
+
+    token = create_access_token(user.id)
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.get("/api/auth/me", response_model=UserOut)
+def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
 @app.post("/api/sessions", response_model=SessionOut)
-def create_session(payload: SessionCreate, db: Session = Depends(get_db)):
+def create_session(
+    payload: SessionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     title = payload.business_goal.strip()[:72]
     session = BusinessSession(
+        user_id=current_user.id,
         title=title,
         business_goal=payload.business_goal,
         health_score=72,
@@ -57,20 +102,37 @@ def create_session(payload: SessionCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/api/sessions", response_model=list[SessionOut])
-def list_sessions(db: Session = Depends(get_db)):
-    return db.query(BusinessSession).order_by(desc(BusinessSession.updated_at)).all()
+def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return (
+        db.query(BusinessSession)
+        .filter(BusinessSession.user_id == current_user.id)
+        .order_by(desc(BusinessSession.updated_at))
+        .all()
+    )
 
 
 @app.get("/api/sessions/{session_id}", response_model=SessionOut)
-def get_session(session_id: str, db: Session = Depends(get_db)):
+def get_session(session_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     session = db.get(BusinessSession, session_id)
-    if not session:
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+def _owned_session(session_id: str, db: Session, current_user: User) -> BusinessSession:
+    session = db.get(BusinessSession, session_id)
+    if not session or session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
 
 
 @app.get("/api/sessions/{session_id}/messages", response_model=list[MessageOut])
-def list_messages(session_id: str, db: Session = Depends(get_db)):
+def list_messages(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _owned_session(session_id, db, current_user)
     messages = (
         db.query(Message)
         .filter(Message.session_id == session_id)
@@ -81,10 +143,12 @@ def list_messages(session_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/sessions/{session_id}/reports", response_model=list[AgentReportOut])
-def list_reports(session_id: str, db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def list_reports(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _owned_session(session_id, db, current_user)
     reports = (
         db.query(AgentReport)
         .filter(AgentReport.session_id == session_id)
@@ -107,10 +171,15 @@ def list_reports(session_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/reports/{report_id}", response_model=AgentReportOut)
-def get_report(report_id: str, db: Session = Depends(get_db)):
+def get_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     report = db.get(AgentReport, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    _owned_session(report.session_id, db, current_user)
     return {
         "id": report.id,
         "agent": report.agent,
@@ -124,10 +193,15 @@ def get_report(report_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/reports/{report_id}/export", response_model=ReportExportOut)
-def export_report(report_id: str, db: Session = Depends(get_db)):
+def export_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     report = db.get(AgentReport, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    _owned_session(report.session_id, db, current_user)
     bullets = "\n".join(f"- {bullet}" for bullet in report.bullets.splitlines())
     markdown = (
         f"# {report.title}\n\n"
@@ -142,10 +216,12 @@ def export_report(report_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/sessions/{session_id}/tasks", response_model=list[TaskOut])
-def list_tasks(session_id: str, db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def list_tasks(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _owned_session(session_id, db, current_user)
     return (
         db.query(Task)
         .filter(Task.session_id == session_id)
@@ -155,10 +231,16 @@ def list_tasks(session_id: str, db: Session = Depends(get_db)):
 
 
 @app.patch("/api/tasks/{task_id}", response_model=TaskOut)
-def update_task(task_id: str, payload: TaskUpdate, db: Session = Depends(get_db)):
+def update_task(
+    task_id: str,
+    payload: TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    _owned_session(task.session_id, db, current_user)
     task.status = payload.status
     task.completed_at = datetime.utcnow() if payload.status.lower() in {"done", "complete", "completed"} else None
     db.commit()
@@ -167,10 +249,12 @@ def update_task(task_id: str, payload: TaskUpdate, db: Session = Depends(get_db)
 
 
 @app.get("/api/sessions/{session_id}/memories", response_model=list[MemoryOut])
-def list_memories(session_id: str, db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def list_memories(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _owned_session(session_id, db, current_user)
     return (
         db.query(BusinessMemory)
         .filter(BusinessMemory.session_id == session_id)
@@ -181,10 +265,13 @@ def list_memories(session_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/sessions/{session_id}/memories/search", response_model=MemorySearchOut)
-def search_memories(session_id: str, q: str = Query(min_length=1, max_length=200), db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def search_memories(
+    session_id: str,
+    q: str = Query(min_length=1, max_length=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _owned_session(session_id, db, current_user)
     needle = q.lower()
     memories = (
         db.query(BusinessMemory)
@@ -201,10 +288,13 @@ def search_memories(session_id: str, q: str = Query(min_length=1, max_length=200
 
 
 @app.post("/api/sessions/{session_id}/messages", response_model=MessageOut)
-def send_message(session_id: str, payload: MessageCreate, db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def send_message(
+    session_id: str,
+    payload: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = _owned_session(session_id, db, current_user)
 
     user_message = Message(session_id=session.id, role="user", content=payload.content)
     db.add(user_message)
@@ -292,8 +382,13 @@ def send_message(session_id: str, payload: MessageCreate, db: Session = Depends(
 
 
 @app.get("/api/dashboard", response_model=DashboardOut)
-def dashboard(db: Session = Depends(get_db)):
-    active_session = db.query(BusinessSession).order_by(desc(BusinessSession.updated_at)).first()
+def dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    active_session = (
+        db.query(BusinessSession)
+        .filter(BusinessSession.user_id == current_user.id)
+        .order_by(desc(BusinessSession.updated_at))
+        .first()
+    )
     if not active_session:
         return {
             "active_session": None,
@@ -345,10 +440,12 @@ def dashboard(db: Session = Depends(get_db)):
 
 
 @app.get("/api/sessions/{session_id}/board-meetings", response_model=list[AgentReportOut])
-def list_board_meetings(session_id: str, db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def list_board_meetings(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = _owned_session(session_id, db, current_user)
     reports = (
         db.query(AgentReport)
         .filter(AgentReport.session_id == session.id, AgentReport.report_type == "board")
@@ -371,10 +468,12 @@ def list_board_meetings(session_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/sessions/{session_id}/board-meeting", response_model=AgentReportOut)
-def generate_board_meeting(session_id: str, db: Session = Depends(get_db)):
-    session = db.get(BusinessSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def generate_board_meeting(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = _owned_session(session_id, db, current_user)
 
     tasks = db.query(Task).filter(Task.session_id == session.id).all()
     reports = db.query(AgentReport).filter(AgentReport.session_id == session.id).all()

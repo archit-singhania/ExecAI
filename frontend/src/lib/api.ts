@@ -77,15 +77,31 @@ export type CEOResponse = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+function authHeader(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = window.localStorage.getItem("ceoai-auth-token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...authHeader(),
       ...(options?.headers ?? {}),
     },
     cache: "no-store",
   });
+
+  if (response.status === 401) {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("ceoai-auth-token");
+      window.localStorage.removeItem("ceoai-auth-user");
+      window.location.href = "/login";
+    }
+    throw new Error("Session expired. Please log in again.");
+  }
 
   if (!response.ok) {
     const detail = await response.text();

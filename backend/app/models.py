@@ -9,10 +9,23 @@ def uuid_str() -> str:
     return str(uuid.uuid4())
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    sessions: Mapped[list["BusinessSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
 class BusinessSession(Base):
     __tablename__ = "business_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     title: Mapped[str] = mapped_column(String(180))
     business_goal: Mapped[str] = mapped_column(Text)
     health_score: Mapped[int] = mapped_column(Integer, default=72)
@@ -23,6 +36,7 @@ class BusinessSession(Base):
     messages: Mapped[list["Message"]] = relationship(back_populates="session", cascade="all, delete-orphan")
     reports: Mapped[list["AgentReport"]] = relationship(back_populates="session", cascade="all, delete-orphan")
     tasks: Mapped[list["Task"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+    user: Mapped["User | None"] = relationship(back_populates="sessions")
 
 
 class Message(Base):

@@ -40,6 +40,8 @@ export const operatingPhases = [
 
 export type TaskFilter = "All" | "Open" | "Done" | "High";
 
+export type DashboardTab = "overview" | "chat" | "agents" | "tasks" | "board" | "operations";
+
 export const fallbackReports: AgentReport[] = [
   {
     agent: "Market Research",
