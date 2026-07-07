@@ -7,13 +7,17 @@ import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Sparkles, User } from "l
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/animated-background";
+import { ThemeModeToggle, ThemeConfigurator } from "@/components/ui/theme-controls";
+import { LanguagePicker } from "@/components/ui/language-picker";
 import { authApi, storeSession } from "@/lib/auth";
 import { agentMeta } from "@/lib/dashboard-data";
+import { useLocale } from "@/lib/i18n";
 
 const SHOWCASE_AGENTS: Array<keyof typeof agentMeta> = ["Market Research", "CFO", "CTO", "Sales", "Marketing", "Legal"];
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,6 +48,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       <div className="scanline pointer-events-none absolute inset-0" />
       <AnimatedBackground />
 
+      <div className="relative flex items-center justify-end gap-2 px-4 pt-4 sm:px-6">
+        <ThemeModeToggle />
+        <ThemeConfigurator />
+        <LanguagePicker />
+      </div>
+
       <div className="relative flex flex-1 items-center justify-center px-4 py-6 sm:px-6">
         <div className="glass-strong animate-rise grid w-full max-w-4xl overflow-hidden rounded-xl shadow-glow lg:grid-cols-[1.05fr_0.95fr]">
           <div className="p-6 sm:p-8 lg:p-10">
@@ -53,18 +63,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </div>
 
             <h1 className="text-[1.7rem] font-black leading-[1.05] sm:text-3xl">
-              {isSignup ? "Start your free trial" : "Welcome back"}
+              {isSignup ? t("auth.signupTitle") : t("auth.loginTitle")}
             </h1>
             <p className="mt-2 text-sm leading-6 text-steel">
-              {isSignup
-                ? "Nine specialist agents and a CEO, ready to challenge your next move."
-                : "Log in to pick up where your boardroom left off."}
+              {isSignup ? t("auth.signupSubtitle") : t("auth.loginSubtitle")}
             </p>
 
             <form onSubmit={onSubmit} className="mt-7 space-y-3.5">
               {isSignup ? (
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-bold text-steel">Name</span>
+                  <span className="mb-1.5 block text-xs font-bold text-steel">{t("auth.nameLabel")}</span>
                   <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-fog/10 dark:bg-white/5">
                     <User size={16} className="shrink-0 text-steel" />
                     <input
@@ -79,7 +87,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               ) : null}
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-steel">Email</span>
+                <span className="mb-1.5 block text-xs font-bold text-steel">{t("auth.emailLabel")}</span>
                 <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-fog/10 dark:bg-white/5">
                   <Mail size={16} className="shrink-0 text-steel" />
                   <input
@@ -94,7 +102,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-steel">Password</span>
+                <span className="mb-1.5 block text-xs font-bold text-steel">{t("auth.passwordLabel")}</span>
                 <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-fog/10 dark:bg-white/5">
                   <Lock size={16} className="shrink-0 text-steel" />
                   <input
@@ -121,23 +129,23 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
               <Button disabled={loading} className="h-12 w-full accent-glow">
                 {loading ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={16} />}
-                {isSignup ? "Create free account" : "Log in"}
+                {isSignup ? t("auth.signupButton") : t("auth.loginButton")}
               </Button>
             </form>
 
             <p className="mt-6 text-center text-xs text-steel">
               {isSignup ? (
                 <>
-                  Already have an account?{" "}
+                  {t("auth.alreadyAccount")}{" "}
                   <Link href="/login" className="font-bold text-ink hover:text-accent">
-                    Log in
+                    {t("auth.loginLink")}
                   </Link>
                 </>
               ) : (
                 <>
-                  New here?{" "}
+                  {t("auth.newHere")}{" "}
                   <Link href="/signup" className="font-bold text-ink hover:text-accent">
-                    Start a free trial
+                    {t("auth.signupLink")}
                   </Link>
                 </>
               )}

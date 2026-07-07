@@ -292,7 +292,7 @@ export default function DashboardPage() {
                 <div className="glass-strong relative overflow-hidden rounded-lg">
                   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-ember via-accent to-basil" />
                   <div className="grid lg:min-h-[520px] lg:grid-cols-[0.92fr_1.08fr]">
-                    <div className="flex flex-col justify-between border-b border-ink/10 p-4 dark:border-fog/10 sm:p-6 lg:border-b-0 lg:border-r">
+                    <div className="flex flex-col justify-between border-b border-ink/10 p-4 dark:border-fog/10 sm:p-6 lg:border-b-0 lg:border-e">
                       <div>
                         <div className="mb-4 inline-flex max-w-full items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-2 text-xs font-black shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark">
                           <Sparkles size={16} className="text-accent" />

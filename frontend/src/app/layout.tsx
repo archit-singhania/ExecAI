@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { LocaleProvider } from "@/lib/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,15 @@ const noFlashScript = `
 
     var storedAccent = window.localStorage.getItem("ceoai-theme-accent");
     if (storedAccent) document.documentElement.style.setProperty("--color-accent", storedAccent);
+
+    var storedSurfaceKey = mode === "dark" ? "ceoai-theme-surface-dark" : "ceoai-theme-surface-light";
+    var storedSurface = window.localStorage.getItem(storedSurfaceKey);
+    if (storedSurface) document.documentElement.style.setProperty("--color-surface", storedSurface);
+
+    var storedLocale = window.localStorage.getItem("ceoai-locale") || "en";
+    var storedRtl = window.localStorage.getItem("ceoai-rtl-override");
+    document.documentElement.lang = storedLocale;
+    document.documentElement.dir = storedRtl === null ? (storedLocale === "ar" ? "rtl" : "ltr") : (storedRtl === "true" ? "rtl" : "ltr");
   } catch (e) {}
 })();
 `;
@@ -32,7 +42,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
       </head>
       <body suppressHydrationWarning>
-        <ThemeProvider>{children}</ThemeProvider>
+        <LocaleProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

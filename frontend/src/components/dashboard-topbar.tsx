@@ -1,7 +1,8 @@
 import { Radio, ShieldCheck, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
-import { ThemeModeToggle, AccentPicker } from "@/components/ui/theme-controls";
+import { ThemeModeToggle, ThemeConfigurator } from "@/components/ui/theme-controls";
+import { LanguagePicker } from "@/components/ui/language-picker";
 
 export function DashboardTopbar({
   title,
@@ -30,7 +31,8 @@ export function DashboardTopbar({
 
         <div className="flex items-center gap-2">
           <ThemeModeToggle />
-          <AccentPicker />
+          <ThemeConfigurator />
+          <LanguagePicker />
           <Button variant="ghost" onClick={onBoardReview} disabled={loading || !hasSession}>
             Board Review <Volume2 size={16} />
           </Button>

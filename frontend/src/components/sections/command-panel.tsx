@@ -52,8 +52,8 @@ export function CommandPanel({
             className={cn(
               "animate-rise rounded-lg px-4 py-3",
               message.role === "user"
-                ? "ml-auto max-w-[88%] bg-ink text-fog"
-                : "mr-auto max-w-[94%] border border-ink/10 bg-white text-ink shadow-line dark:bg-[#171b20] dark:shadow-line-dark",
+                ? "ms-auto max-w-[88%] bg-ink text-fog"
+                : "me-auto max-w-[94%] border border-ink/10 bg-white text-ink shadow-line dark:bg-[#171b20] dark:shadow-line-dark",
             )}
           >
             <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
@@ -61,7 +61,7 @@ export function CommandPanel({
         ))}
 
         {loading && (
-          <div className="mr-auto inline-flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black text-ink shadow-line dark:bg-[#171b20] dark:shadow-line-dark">
+          <div className="me-auto inline-flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black text-ink shadow-line dark:bg-[#171b20] dark:shadow-line-dark">
             <Loader2 className="animate-spin" size={16} />
             Agents are debating the plan
           </div>
