@@ -1,5 +1,5 @@
 import {
-  BadgeIndianRupee,
+  Coins,
   Cpu,
   Megaphone,
   Scale,
@@ -12,14 +12,14 @@ import {
 import { AgentReport, Memory, Task } from "@/lib/api";
 
 export const starterPrompts = [
-  "I have Rs 2 lakh. I want to start an online business.",
-  "Challenge my idea: an AI resume builder for freshers.",
+  "I have $25,000 (€23K / £20K / ₹20L). I want to start an online business.",
+  "Challenge my idea: an AI resume builder for new grads.",
   "Create a 30-day launch plan for a micro SaaS.",
 ];
 
 export const agentMeta: Record<string, { icon: React.ElementType; tone: string; orbit: string }> = {
   "Market Research": { icon: TrendingUp, tone: "bg-basil/10 text-basil", orbit: "Demand" },
-  CFO: { icon: BadgeIndianRupee, tone: "bg-ember/10 text-ember", orbit: "Runway" },
+  CFO: { icon: Coins, tone: "bg-ember/10 text-ember", orbit: "Runway" },
   CTO: { icon: Cpu, tone: "bg-ink/10 text-ink", orbit: "Build" },
   "Product Manager": { icon: Target, tone: "bg-chartreuse/25 text-ink", orbit: "Scope" },
   Marketing: { icon: Megaphone, tone: "bg-steel/10 text-steel", orbit: "Growth" },
@@ -54,7 +54,7 @@ export const fallbackReports: AgentReport[] = [
   {
     agent: "CFO",
     report_type: "agent",
-    title: "Keep first validation under Rs 25k",
+    title: "Keep first validation under $2,500 (€2.3K / £2K / ₹2L)",
     summary: "Spend on interviews, landing page tests, and one paid channel experiment before product build.",
     bullets: ["Cap validation spend.", "Define CAC ceiling before ads."],
     score: 78,

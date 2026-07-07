@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
 import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
+import { AnimatedBackground } from "@/components/ui/animated-background";
 import { agentMeta } from "@/lib/dashboard-data";
 
 const FEATURED_AGENTS: Array<{ name: keyof typeof agentMeta; pitch: string }> = [
   {
     name: "Market Research",
-    pitch: "Pressure-tests demand before you spend a rupee building.",
+    pitch: "Pressure-tests demand before you spend a cent building.",
   },
   {
     name: "CFO",
@@ -30,6 +31,7 @@ export default function LandingPage() {
     <main className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto overflow-x-hidden bg-radial-ui text-ink">
       <div className="ambient-grid absolute inset-0" />
       <div className="scanline pointer-events-none absolute inset-0" />
+      <AnimatedBackground />
 
       <div className="relative flex min-h-full flex-col">
         <MarketingNav />
@@ -41,7 +43,7 @@ export default function LandingPage() {
             </div>
 
             <h1 className="max-w-xl text-[2.15rem] font-black leading-[1.02] sm:text-5xl lg:text-[3.1rem]">
-              A boardroom that thinks, argues, and executes — before you spend a rupee.
+              A boardroom that thinks, argues, and executes — before your money moves.
             </h1>
 
             <p className="max-w-lg text-sm leading-6 text-steel sm:text-base sm:leading-7">

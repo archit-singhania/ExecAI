@@ -30,7 +30,6 @@ export function Logo({ size = 44 }: { size?: number }) {
         className={cn("object-cover transition-opacity duration-150", mode === "dark" ? "opacity-100" : "opacity-0")}
         priority
       />
-      <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-chartreuse ring-4 ring-fog dark:ring-[#0c0e11]" />
     </div>
   );
 }
