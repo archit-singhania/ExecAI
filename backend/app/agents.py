@@ -1,6 +1,7 @@
 from typing import TypedDict
 from langgraph.graph import END, StateGraph
 from app.config import get_settings
+from app.llm import generate_agent_report
 
 
 class AgentBrief(TypedDict):
@@ -31,6 +32,10 @@ def _score(text: str, base: int) -> int:
 
 def market_agent(state: CEOState) -> CEOState:
     goal = state["message"] or state["goal"]
+    llm_report = generate_agent_report("market", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     score = _score(goal, 78)
     report: AgentBrief = {
         "agent": "Market Research",
@@ -48,6 +53,11 @@ def market_agent(state: CEOState) -> CEOState:
 
 
 def cfo_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("cfo", state["goal"], state["message"])
+    if llm_report:
+        state["runway_months"] = 7 if llm_report["score"] >= 75 else 4
+        state["reports"].append(llm_report)
+        return state
     score = _score(state["goal"], 74)
     report: AgentBrief = {
         "agent": "CFO",
@@ -66,6 +76,10 @@ def cfo_agent(state: CEOState) -> CEOState:
 
 
 def cto_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("cto", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "CTO",
         "title": "Build a thin MVP with measurable workflows",
@@ -82,6 +96,10 @@ def cto_agent(state: CEOState) -> CEOState:
 
 
 def product_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("product", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "Product Manager",
         "title": "Define success around decisions, not chat length",
@@ -98,6 +116,10 @@ def product_agent(state: CEOState) -> CEOState:
 
 
 def marketing_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("marketing", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "Marketing",
         "title": "Lead with the contrarian CEO positioning",
@@ -114,6 +136,10 @@ def marketing_agent(state: CEOState) -> CEOState:
 
 
 def legal_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("legal", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "Legal",
         "title": "Use approval gates for external actions",
@@ -130,6 +156,10 @@ def legal_agent(state: CEOState) -> CEOState:
 
 
 def sales_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("sales", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "Sales",
         "title": "Sell the pilot before scaling the product",
@@ -146,6 +176,10 @@ def sales_agent(state: CEOState) -> CEOState:
 
 
 def designer_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("designer", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "Designer",
         "title": "Make the product feel like an operating room",
@@ -162,6 +196,10 @@ def designer_agent(state: CEOState) -> CEOState:
 
 
 def assistant_agent(state: CEOState) -> CEOState:
+    llm_report = generate_agent_report("assistant", state["goal"], state["message"])
+    if llm_report:
+        state["reports"].append(llm_report)
+        return state
     report: AgentBrief = {
         "agent": "Executive Assistant",
         "title": "Convert strategy into a weekly operating rhythm",

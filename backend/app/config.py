@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ceo_ai.db"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    llm_provider: str = "none"  
+    groq_api_key: str | None = None
+    groq_model: str = "llama-3.1-8b-instant"
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "llama3.1"
     cors_origins: str = "http://localhost:3000"
     jwt_secret: str = "dev-only-change-me-in-prod"
     jwt_algorithm: str = "HS256"
