@@ -9,6 +9,7 @@
   --color-steel: 96 113 124;
   --color-surface: 255 255 255;
   --color-accent: 183 202 93; 
+  --corner-clearance: 84px;
 
   background: rgb(var(--color-fog));
   color: rgb(var(--color-ink));
@@ -456,10 +457,8 @@ textarea:focus-visible {
   opacity: 0.85;
 }
 
-/* Top brackets sit below the nav row so they never collide with the logo
-   or the theme/language/auth controls in the header. */
 .corner-accents .corner-tl {
-  top: 84px;
+  top: var(--corner-clearance);
   left: 16px;
   border-top: 2px solid;
   border-left: 2px solid;
@@ -467,7 +466,7 @@ textarea:focus-visible {
 }
 
 .corner-accents .corner-tr {
-  top: 84px;
+  top: var(--corner-clearance);
   right: 16px;
   border-top: 2px solid;
   border-right: 2px solid;
@@ -491,9 +490,8 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .corner-accents .corner-tl,
-  .corner-accents .corner-tr {
-    top: 96px;
+  :root {
+    --corner-clearance: 96px;
   }
 }
 

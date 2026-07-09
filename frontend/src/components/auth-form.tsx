@@ -59,6 +59,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <div className="mb-7 flex items-center gap-2.5">
               <Logo size={38} />
               <span className="text-sm font-black tracking-tight">CEO.ai</span>
+              <span className="nav-live-dot" aria-hidden title="Live system" />
             </div>
 
             <h1 className="text-[1.7rem] font-black leading-[1.05] sm:text-3xl">
