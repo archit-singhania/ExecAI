@@ -34,7 +34,6 @@ export default function LandingPage() {
 
   return (
     <main className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto overflow-x-hidden bg-radial-ui text-ink">
-      <div className="ambient-grid absolute inset-0" />
       <div className="scanline pointer-events-none absolute inset-0" />
       <AnimatedBackground />
 

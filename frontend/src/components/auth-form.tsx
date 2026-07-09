@@ -44,7 +44,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   return (
     <main className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto bg-radial-ui text-ink">
-      <div className="ambient-grid absolute inset-0" />
       <div className="scanline pointer-events-none absolute inset-0" />
       <AnimatedBackground />
 
@@ -73,7 +72,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               {isSignup ? (
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-steel">{t("auth.nameLabel")}</span>
-                  <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-fog/10 dark:bg-white/5">
+                  <div className="flex items-center gap-2 rounded-md border border-ink/15 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-ink/25 dark:bg-ink/[0.08]">
                     <User size={16} className="shrink-0 text-steel" />
                     <input
                       required
@@ -88,7 +87,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-steel">{t("auth.emailLabel")}</span>
-                <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-fog/10 dark:bg-white/5">
+                <div className="flex items-center gap-2 rounded-md border border-ink/15 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-ink/25 dark:bg-ink/[0.08]">
                   <Mail size={16} className="shrink-0 text-steel" />
                   <input
                     required
@@ -103,7 +102,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-steel">{t("auth.passwordLabel")}</span>
-                <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-fog/10 dark:bg-white/5">
+                <div className="flex items-center gap-2 rounded-md border border-ink/15 bg-white/75 px-3 transition focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 dark:border-ink/25 dark:bg-ink/[0.08]">
                   <Lock size={16} className="shrink-0 text-steel" />
                   <input
                     required

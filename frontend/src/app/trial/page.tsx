@@ -145,7 +145,6 @@ export default function TrialPage() {
 
   return (
     <main className="relative flex h-[100dvh] min-h-[560px] flex-col overflow-hidden bg-radial-ui p-2.5 text-ink sm:p-3.5 lg:p-4">
-      <div className="ambient-grid absolute inset-0" />
       <div className="scanline pointer-events-none absolute inset-0" />
 
       <div className="relative mb-2.5 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-bold text-ink sm:mb-3.5">

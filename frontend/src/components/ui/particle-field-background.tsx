@@ -7,6 +7,7 @@ export function ParticleFieldBackground() {
   const mountRef = useRef<HTMLDivElement>(null);
   const { mode, accent } = useTheme();
   const [reducedMotion, setReducedMotion] = useState(true);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -17,8 +18,14 @@ export function ParticleFieldBackground() {
   }, []);
 
   useEffect(() => {
+    const handleVisibility = () => setVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  useEffect(() => {
     const mount = mountRef.current;
-    if (reducedMotion || !mount) return;
+    if (reducedMotion || !visible || !mount) return;
 
     let cancelled = false;
     let cleanup: (() => void) | undefined;
@@ -35,11 +42,10 @@ export function ParticleFieldBackground() {
       camera.position.z = 17;
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(width, height);
       mount.appendChild(renderer.domElement);
 
-      // Soft circular glow sprite, drawn once on a canvas
       const spriteCanvas = document.createElement("canvas");
       spriteCanvas.width = 64;
       spriteCanvas.height = 64;
@@ -56,7 +62,7 @@ export function ParticleFieldBackground() {
       const accentColor = new THREE.Color(r / 255, g / 255, b / 255);
       const secondaryColor = mode === "dark" ? new THREE.Color(0xf6f4ee) : new THREE.Color(0x101317);
 
-      const count = 640;
+      const count = 260;
       const positions = new Float32Array(count * 3);
       const colorAttr = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
@@ -92,11 +98,17 @@ export function ParticleFieldBackground() {
       let targetX = 0;
       let targetY = 0;
 
+      let pointerThrottled = false;
       function onPointerMove(event: PointerEvent) {
+        if (pointerThrottled) return;
+        pointerThrottled = true;
+        setTimeout(() => {
+          pointerThrottled = false;
+        }, 33);
         targetX = (event.clientX / window.innerWidth - 0.5) * 1.4;
         targetY = (event.clientY / window.innerHeight - 0.5) * 1.4;
       }
-      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
 
       function onResize() {
         if (!mount) return;
@@ -140,7 +152,7 @@ export function ParticleFieldBackground() {
       cancelled = true;
       cleanup?.();
     };
-  }, [mode, accent, reducedMotion]);
+  }, [mode, accent, reducedMotion, visible]);
 
   if (reducedMotion) return null;
 

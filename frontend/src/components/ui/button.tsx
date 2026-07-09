@@ -21,7 +21,7 @@ export function Button({ className, variant = "primary", onMouseDown, children, 
         "relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-md px-4 text-sm font-semibold transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
         variant === "primary" && "bg-ink text-fog shadow-soft hover:opacity-90",
         variant === "ghost" &&
-          "border border-ink/10 bg-white/55 text-ink hover:bg-white dark:bg-white/5 dark:hover:bg-white/10",
+          "border border-ink/10 bg-white/55 text-ink hover:bg-white dark:border-ink/20 dark:bg-ink/[0.08] dark:hover:bg-ink/[0.14]",
         variant === "quiet" && "text-ink/70 hover:bg-ink/5 hover:text-ink",
         className
       )}

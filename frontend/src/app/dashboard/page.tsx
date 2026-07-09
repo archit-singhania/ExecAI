@@ -59,10 +59,16 @@ export default function DashboardPage() {
         const summary = await api.dashboard();
         setDashboard(summary);
         if (summary.active_session) {
+          const sessionId = summary.active_session.id;
           setSession(summary.active_session);
-          setMessages(await api.getMessages(summary.active_session.id));
-          setMemories(await api.getMemories(summary.active_session.id));
-          setBoardHistory(await api.getBoardMeetings(summary.active_session.id));
+          const [msgs, mems, history] = await Promise.all([
+            api.getMessages(sessionId),
+            api.getMemories(sessionId),
+            api.getBoardMeetings(sessionId),
+          ]);
+          setMessages(msgs);
+          setMemories(mems);
+          setBoardHistory(history);
         }
       } catch {
         setError("Backend is not reachable yet. Start FastAPI on port 8000.");
@@ -93,9 +99,14 @@ export default function DashboardPage() {
     : 84;
 
   async function refreshSession(sessionId: string) {
-    setDashboard(await api.dashboard());
-    setMemories(await api.getMemories(sessionId));
-    setBoardHistory(await api.getBoardMeetings(sessionId));
+    const [summary, mems, history] = await Promise.all([
+      api.dashboard(),
+      api.getMemories(sessionId),
+      api.getBoardMeetings(sessionId),
+    ]);
+    setDashboard(summary);
+    setMemories(mems);
+    setBoardHistory(history);
   }
 
   async function startSession(event?: FormEvent) {
@@ -265,7 +276,6 @@ export default function DashboardPage() {
 
   return (
     <main className="relative flex h-[100dvh] min-h-[560px] overflow-hidden bg-radial-ui p-2.5 text-ink sm:p-3.5 lg:p-4">
-      <div className="ambient-grid absolute inset-0" />
       <div className="scanline pointer-events-none absolute inset-0" />
 
       <div className="relative flex h-full w-full gap-3 sm:gap-4">

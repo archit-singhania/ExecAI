@@ -5,16 +5,17 @@ import { useTheme } from "@/components/theme-provider";
 
 type VantaEffectInstance = { destroy: () => void };
 
-function hexFromAccent(accent: string): number {
-  const [r, g, b] = accent.split(" ").map((channel) => Number(channel.trim()) || 0);
-  return (r << 16) + (g << 8) + b;
-}
+const NET_COLOR_LIGHT = 0x10131a; 
+const NET_COLOR_DARK = 0xf2f4ff; 
 
 export function VantaNetworkBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
   const effectRef = useRef<VantaEffectInstance | null>(null);
-  const { mode, accent } = useTheme();
+  const threeModRef = useRef<typeof import("three") | null>(null);
+  const netFactoryRef = useRef<((opts: Record<string, unknown>) => VantaEffectInstance) | null>(null);
+  const { mode } = useTheme();
   const [reducedMotion, setReducedMotion] = useState(true);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -25,21 +26,31 @@ export function VantaNetworkBackground() {
   }, []);
 
   useEffect(() => {
-    if (reducedMotion || !containerRef.current) return;
+    const handleVisibility = () => setVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion || !visible || !containerRef.current) return;
 
     let cancelled = false;
 
     async function init() {
-      const [THREE, { default: NET }] = await Promise.all([
-        import("three"),
-        import("vanta/dist/vanta.net.min"),
-      ]);
+      if (!threeModRef.current || !netFactoryRef.current) {
+        const [THREE, { default: NET }] = await Promise.all([
+          import("three"),
+          import("vanta/dist/vanta.net.min"),
+        ]);
+        threeModRef.current = THREE;
+        netFactoryRef.current = NET as unknown as (opts: Record<string, unknown>) => VantaEffectInstance;
+      }
 
       if (cancelled || !containerRef.current) return;
 
-      effectRef.current = NET({
+      effectRef.current = netFactoryRef.current({
         el: containerRef.current,
-        THREE,
+        THREE: threeModRef.current,
         mouseControls: true,
         touchControls: true,
         gyroControls: false,
@@ -47,14 +58,14 @@ export function VantaNetworkBackground() {
         minWidth: 200.0,
         scale: 1.0,
         scaleMobile: 1.0,
-        points: 8.0,
-        maxDistance: 22.0,
+        points: 7.0,
+        maxDistance: 18.0,
         spacing: 20.0,
         showDots: true,
         backgroundAlpha: 0,
-        color: hexFromAccent(accent),
+        color: mode === "dark" ? NET_COLOR_DARK : NET_COLOR_LIGHT,
         backgroundColor: mode === "dark" ? 0x0c0e11 : 0xf6f4ee,
-      }) as VantaEffectInstance;
+      });
     }
 
     init();
@@ -64,14 +75,14 @@ export function VantaNetworkBackground() {
       effectRef.current?.destroy();
       effectRef.current = null;
     };
-  }, [mode, accent, reducedMotion]);
+  }, [mode, reducedMotion, visible]);
 
   if (reducedMotion) return null;
 
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none absolute inset-0 opacity-[0.4] dark:opacity-[0.5]"
+      className="pointer-events-none absolute inset-0 opacity-[0.55] dark:opacity-[0.6]"
       aria-hidden
     />
   );

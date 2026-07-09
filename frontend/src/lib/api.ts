@@ -84,6 +84,7 @@ function authHeader(): Record<string, string> {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const isMutation = !!options?.method && options.method !== "GET";
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -91,7 +92,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...authHeader(),
       ...(options?.headers ?? {}),
     },
-    cache: "no-store",
+    // Mutations must always hit the server fresh. GETs can reuse a very
+    // recent response instead of forcing a full round-trip on every render.
+    cache: isMutation ? "no-store" : options?.cache ?? "default",
   });
 
   if (response.status === 401) {

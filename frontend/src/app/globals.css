@@ -75,22 +75,6 @@ input {
     linear-gradient(135deg, rgb(var(--color-surface)) 0%, rgb(var(--color-surface) / 0.85) 48%, rgb(var(--color-surface)) 100%);
 }
 
-.ambient-grid {
-  opacity: 0.62;
-  background-image:
-    linear-gradient(rgba(16, 19, 23, 0.052) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(16, 19, 23, 0.052) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(circle at center, black, transparent 78%);
-}
-
-.dark .ambient-grid {
-  opacity: 0.5;
-  background-image:
-    linear-gradient(rgba(246, 244, 238, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(246, 244, 238, 0.06) 1px, transparent 1px);
-}
-
 .scanline {
   opacity: 0.22;
   background: repeating-linear-gradient(
@@ -442,11 +426,6 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .ambient-grid {
-    background-size: 28px 28px;
-    opacity: 0.42;
-  }
-
   .scanline {
     opacity: 0.12;
   }
