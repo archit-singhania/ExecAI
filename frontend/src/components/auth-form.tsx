@@ -161,7 +161,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               <h2 className="mt-5 text-2xl font-black leading-tight">
                 A boardroom that challenges you back — before your money moves.
               </h2>
-              <p className="mt-3 text-sm leading-6 text-fog/70">
+              <p
+                className="mt-3 text-sm leading-6"
+                style={{ color: "rgb(194 202 213 / 70%)" }}
+              >
                 Nine specialist agents pressure-test demand, guard runway, and scope the build — with a CEO holding
                 it all to one weekly rhythm.
               </p>
@@ -182,14 +185,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-xs font-black leading-none">{name}</p>
-                      <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-wide text-fog/50">{meta.orbit}</p>
+                      <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-wide text-[rgb(152,162,175)]">{meta.orbit}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <p className="relative text-[0.7rem] text-fog/50">No credit card required for the free trial.</p>
+            <p className="relative text-[0.7rem] text-[rgb(152,162,175)]">No credit card required for the free trial.</p>
           </div>
         </div>
       </div>

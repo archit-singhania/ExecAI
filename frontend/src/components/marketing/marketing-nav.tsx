@@ -15,6 +15,7 @@ export function MarketingNav() {
       <div className="flex items-center gap-2.5">
         <Logo size={36} />
         <span className="text-sm font-black tracking-tight sm:text-base">CEO.ai</span>
+        <span className="nav-live-dot" aria-hidden title="Live system" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">

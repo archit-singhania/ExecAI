@@ -298,6 +298,16 @@ textarea:focus-visible {
   animation: orb-float-c 30s ease-in-out infinite;
 }
 
+.ambient-orbs .orb-4 {
+  top: 34%;
+  left: 50%;
+  height: 46rem;
+  width: 46rem;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgb(var(--color-accent) / 0.22), transparent 72%);
+  animation: orb-float-d 38s ease-in-out infinite;
+}
+
 .dark .ambient-orbs .orb {
   opacity: 0.32;
 }
@@ -332,6 +342,11 @@ textarea:focus-visible {
 @keyframes orb-float-c {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(4%, -7%) scale(1.1); }
+}
+
+@keyframes orb-float-d {
+  0%, 100% { transform: translate(-50%, 0) scale(1); }
+  50% { transform: translate(-50%, 5%) scale(1.12); }
 }
 
 @keyframes grain-shift {
@@ -402,10 +417,142 @@ textarea:focus-visible {
   transform: scaleX(-1);
 }
 
+.net-node-pulse {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: net-pulse 4.2s ease-in-out infinite;
+}
+
+@keyframes net-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+}
+
+.cursor-spotlight {
+  --spot-x: 50%;
+  --spot-y: 28%;
+  background: radial-gradient(480px circle at var(--spot-x) var(--spot-y), rgb(var(--color-accent) / 0.14), transparent 72%);
+}
+
+.dark .cursor-spotlight {
+  background: radial-gradient(520px circle at var(--spot-x) var(--spot-y), rgb(var(--color-accent) / 0.2), transparent 72%);
+}
+
+.corner-accents {
+  z-index: 1;
+}
+
+.corner-accents .corner {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-color: rgb(var(--color-accent) / 0.6);
+  opacity: 0.85;
+}
+
+/* Top brackets sit below the nav row so they never collide with the logo
+   or the theme/language/auth controls in the header. */
+.corner-accents .corner-tl {
+  top: 84px;
+  left: 16px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+  border-top-left-radius: 6px;
+}
+
+.corner-accents .corner-tr {
+  top: 84px;
+  right: 16px;
+  border-top: 2px solid;
+  border-right: 2px solid;
+  border-top-right-radius: 6px;
+}
+
+.corner-accents .corner-bl {
+  bottom: 16px;
+  left: 16px;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+  border-bottom-left-radius: 6px;
+}
+
+.corner-accents .corner-br {
+  bottom: 16px;
+  right: 16px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+  border-bottom-right-radius: 6px;
+}
+
+@media (max-width: 640px) {
+  .corner-accents .corner-tl,
+  .corner-accents .corner-tr {
+    top: 96px;
+  }
+}
+
+.top-beam {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgb(var(--color-accent) / 0.95), transparent);
+  background-size: 200% 100%;
+  box-shadow: 0 0 18px 2px rgb(var(--color-accent) / 0.45);
+  animation: beam-sweep 7s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bottom-beam {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(var(--color-accent) / 0.5), transparent);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.nav-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: rgb(var(--color-accent));
+  box-shadow: 0 0 0 rgb(var(--color-accent) / 0.5);
+  animation: nav-live-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes nav-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--color-accent) / 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(var(--color-accent) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--color-accent) / 0);
+  }
+}
+
+@keyframes beam-sweep {
+  0%, 100% { background-position: 0% 0; }
+  50% { background-position: 100% 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ambient-orbs .orb,
   .ambient-orbs .grain,
-  .ambient-particles span {
+  .ambient-particles span,
+  .top-beam,
+  .nav-live-dot {
     animation: none !important;
   }
 
