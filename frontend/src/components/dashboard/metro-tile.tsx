@@ -5,12 +5,12 @@ import { cn } from "@/lib/utils";
 export type MetroTone = "ink" | "accent" | "ember" | "basil" | "chartreuse" | "steel";
 
 const TONE_CLASSES: Record<MetroTone, string> = {
-  ink: "bg-ink text-fog",
-  accent: "bg-accent text-ink",
-  ember: "bg-ember text-fog",
-  basil: "bg-basil text-fog",
-  chartreuse: "bg-chartreuse text-ink",
-  steel: "bg-steel text-fog",
+  ink: "bg-gradient-to-br from-[#2a2f37] via-ink to-[#0b0d10] text-fog",
+  accent: "bg-gradient-to-br from-[#e2edb0] via-accent to-[#8a9c3f] text-ink",
+  ember: "bg-gradient-to-br from-[#ed9a7c] via-ember to-[#9c3f1f] text-fog",
+  basil: "bg-gradient-to-br from-[#39ab96] via-basil to-[#0c352c] text-fog",
+  chartreuse: "bg-gradient-to-br from-[#e9f1c4] via-chartreuse to-[#8fa23f] text-ink",
+  steel: "bg-gradient-to-br from-[#9dadb7] via-steel to-[#333f47] text-fog",
 };
 
 export type MetroTileSize = "1x1" | "wide" | "2x2";
@@ -43,20 +43,22 @@ export function MetroTile({
       type="button"
       onClick={onClick}
       className={cn(
-        "metro-tile group flex flex-col justify-between p-3 text-left sm:p-4",
+        "metro-tile group relative flex flex-col justify-between overflow-hidden p-3 text-left sm:p-4",
         TONE_CLASSES[tone],
         SIZE_CLASSES[size],
         className,
       )}
     >
-      <Icon size={size === "2x2" ? 30 : 22} className="opacity-90" />
-      <div>
-        <p className={cn("font-black leading-tight", size === "2x2" ? "text-lg sm:text-xl" : "text-xs sm:text-sm")}>
-          {label}
-        </p>
-        {stat ? (
-          <p className="mt-1 text-[0.7rem] font-bold uppercase tracking-wide opacity-75 sm:text-xs">{stat}</p>
-        ) : null}
+      <div className="relative z-10 flex h-full flex-col justify-between">
+        <Icon size={size === "2x2" ? 30 : 22} className="drop-shadow-sm" />
+        <div>
+          <p className={cn("font-black leading-tight drop-shadow-sm", size === "2x2" ? "text-lg sm:text-xl" : "text-xs sm:text-sm")}>
+            {label}
+          </p>
+          {stat ? (
+            <p className="mt-1 text-[0.7rem] font-bold uppercase tracking-wide opacity-85 sm:text-xs">{stat}</p>
+          ) : null}
+        </div>
       </div>
     </button>
   );
