@@ -1,13 +1,12 @@
 "use client";
 
-import { LayoutDashboard, MessagesSquare, Users2, ListChecks, Presentation, Activity, LogOut } from "lucide-react";
+import { MessagesSquare, Users2, ListChecks, Presentation, Activity, LogOut } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import { DashboardTab } from "@/lib/dashboard-data";
 import { AuthUser } from "@/lib/auth";
 
 const NAV_ITEMS: Array<{ tab: DashboardTab; label: string; icon: React.ElementType }> = [
-  { tab: "overview", label: "Overview", icon: LayoutDashboard },
   { tab: "chat", label: "Chat", icon: MessagesSquare },
   { tab: "agents", label: "Agents", icon: Users2 },
   { tab: "tasks", label: "Tasks", icon: ListChecks },

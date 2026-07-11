@@ -8,15 +8,19 @@ import { Button } from "@/components/ui/button";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { DashboardTopbar } from "@/components/dashboard-topbar";
 import { ExecutiveGraph } from "@/components/sections/executive-graph";
+import { MetroHome } from "@/components/dashboard/metro-home";
+import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
 import { CommandPanel } from "@/components/sections/command-panel";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
 import { BoardTheater } from "@/components/sections/board-theater";
 import { OperatingPhases } from "@/components/sections/operating-phases";
 import { KpiRunway } from "@/components/sections/kpi-runway";
-import { clearSession, getStoredUser } from "@/lib/auth";
+import { clearSession, getStoredUser, isDemoSession } from "@/lib/auth";
 import {
   DashboardTab,
+  demoBoardMeeting,
+  demoBoardReply,
   fallbackMemories,
   fallbackReports,
   fallbackTasks,
@@ -25,7 +29,6 @@ import {
 } from "@/lib/dashboard-data";
 
 const TAB_TITLES: Record<DashboardTab, string> = {
-  overview: "Overview",
   chat: "Chat with the CEO",
   agents: "Agent briefing",
   tasks: "Task board",
@@ -35,7 +38,8 @@ const TAB_TITLES: Record<DashboardTab, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+  const [isDemo] = useState(() => isDemoSession());
+  const [activeTab, setActiveTab] = useState<DashboardTab | null>(null);
   const [goal, setGoal] = useState(starterPrompts[0]);
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -52,9 +56,14 @@ export default function DashboardPage() {
   const [memoryQuery, setMemoryQuery] = useState("");
   const [memoryResults, setMemoryResults] = useState<Memory[]>([]);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("All");
+  const [demoTasks, setDemoTasks] = useState<Task[]>(fallbackTasks);
 
   useEffect(() => {
     async function load() {
+      if (isDemo) {
+        setBooting(false);
+        return;
+      }
       try {
         const summary = await api.dashboard();
         setDashboard(summary);
@@ -84,7 +93,7 @@ export default function DashboardPage() {
     return fromMessages.length ? fromMessages.slice(-9) : dashboard?.reports ?? [];
   }, [messages, dashboard]);
 
-  const activeTasks = dashboard?.tasks ?? fallbackTasks;
+  const activeTasks = isDemo ? demoTasks : dashboard?.tasks ?? fallbackTasks;
   const filteredTasks = activeTasks.filter((task: Task) => {
     if (taskFilter === "Done") return task.status.toLowerCase() === "done";
     if (taskFilter === "Open") return task.status.toLowerCase() !== "done";
@@ -113,6 +122,31 @@ export default function DashboardPage() {
     event?.preventDefault();
     setLoading(true);
     setError("");
+
+    if (isDemo) {
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: goal,
+        created_at: new Date().toISOString(),
+      };
+      window.setTimeout(() => {
+        const reply: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: demoBoardReply,
+          created_at: new Date().toISOString(),
+          reports: fallbackReports,
+        };
+        setMessages((current) => [...current, reply]);
+        setLoading(false);
+      }, 700);
+      setMessages([userMessage]);
+      setInput("");
+      setActiveTab("chat");
+      return;
+    }
+
     try {
       const created = await api.createSession(goal);
       setSession(created);
@@ -128,11 +162,22 @@ export default function DashboardPage() {
     }
   }
 
+  function startNewSessionFromHome() {
+    setSession(null);
+    setMessages([]);
+    setBoardReport(null);
+    setSelectedReport(null);
+    setReportExport(null);
+    setInput("");
+    setError("");
+    setActiveTab("chat");
+  }
+
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     if (!input.trim()) return;
 
-    if (!session) {
+    if (!session && !isDemo) {
       setGoal(input);
       await startSession();
       return;
@@ -157,11 +202,28 @@ export default function DashboardPage() {
     setMessages((current) => [...current, optimistic, placeholder]);
     const contentToSend = input;
     setInput("");
+
+    if (isDemo) {
+      setLoading(true);
+      window.setTimeout(() => {
+        const reply: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: demoBoardReply,
+          created_at: new Date().toISOString(),
+          reports: fallbackReports,
+        };
+        setMessages((current) => [...current, reply]);
+        setLoading(false);
+      }, 700);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      await streamMessage(session.id, contentToSend, (streamEvent) => {
+      await streamMessage(session!.id, contentToSend, (streamEvent) => {
         if (streamEvent.type === "agent_report") {
           setMessages((current) =>
             current.map((message) =>
@@ -182,7 +244,7 @@ export default function DashboardPage() {
           setError(streamEvent.message);
         }
       });
-      await refreshSession(session.id);
+      await refreshSession(session!.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setMessages((current) => current.filter((message) => message.id !== assistantId));
@@ -193,6 +255,14 @@ export default function DashboardPage() {
 
   async function completeTask(taskId: string) {
     setError("");
+
+    if (isDemo) {
+      setDemoTasks((current) =>
+        current.map((task) => (task.id === taskId ? { ...task, status: "Done", completed_at: new Date().toISOString() } : task)),
+      );
+      return;
+    }
+
     try {
       await api.updateTask(taskId, "Done");
       setDashboard(await api.dashboard());
@@ -202,6 +272,18 @@ export default function DashboardPage() {
   }
 
   async function generateBoardMeeting() {
+    if (isDemo) {
+      setLoading(true);
+      window.setTimeout(() => {
+        setBoardReport(demoBoardMeeting);
+        setBoardHistory((current) => [demoBoardMeeting, ...current]);
+        speak(`${demoBoardMeeting.title}. ${demoBoardMeeting.summary}. ${demoBoardMeeting.bullets.join(". ")}`);
+        setActiveTab("board");
+        setLoading(false);
+      }, 700);
+      return;
+    }
+
     if (!session) {
       setError("Start a CEO session before generating a board meeting.");
       return;
@@ -244,7 +326,15 @@ export default function DashboardPage() {
 
   async function searchMemory(event: FormEvent) {
     event.preventDefault();
-    if (!session || !memoryQuery.trim()) return;
+    if (!memoryQuery.trim()) return;
+
+    if (isDemo) {
+      const query = memoryQuery.trim().toLowerCase();
+      setMemoryResults(fallbackMemories.filter((memory) => memory.content.toLowerCase().includes(query)));
+      return;
+    }
+
+    if (!session) return;
 
     setError("");
     try {
@@ -264,41 +354,6 @@ export default function DashboardPage() {
     window.speechSynthesis.speak(utterance);
   }
 
-  function startVoiceInput() {
-    type SpeechRecognitionLike = {
-      lang: string;
-      interimResults: boolean;
-      maxAlternatives: number;
-      start: () => void;
-      onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
-      onerror: (() => void) | null;
-    };
-    type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-    const browserWindow = window as typeof window & {
-      SpeechRecognition?: SpeechRecognitionConstructor;
-      webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    };
-    const Recognition = browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      setError("Voice input is not supported in this browser yet. Chrome or Edge works best.");
-      return;
-    }
-
-    const recognition = new Recognition();
-    recognition.lang = "en-IN";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript;
-      if (transcript) {
-        setInput(transcript);
-        setGoal(transcript);
-      }
-    };
-    recognition.onerror = () => setError("Voice capture failed. Try again or type the prompt.");
-    recognition.start();
-  }
 
   function logout() {
     clearSession();
@@ -309,92 +364,30 @@ export default function DashboardPage() {
     <main className="relative flex h-[100dvh] min-h-[560px] overflow-hidden bg-radial-ui p-2.5 text-ink sm:p-3.5 lg:p-4">
       <div className="scanline pointer-events-none absolute inset-0" />
 
-      <div className="relative flex h-full w-full gap-3 sm:gap-4">
-        <DashboardSidebar activeTab={activeTab} onSelectTab={setActiveTab} user={getStoredUser()} onLogout={logout} />
-
-        <div className="flex h-full min-w-0 flex-1 flex-col gap-3 sm:gap-4">
-          <DashboardTopbar
+      <div className="relative flex h-full w-full">
+        {activeTab === null ? (
+          <MetroHome
+            user={getStoredUser()}
+            isDemo={isDemo}
+            onLogout={logout}
+            onSelectTab={setActiveTab}
+            onStartNewSession={startNewSessionFromHome}
+            healthScore={healthScore}
+            runway={runway}
+            doneTasks={doneTasks}
+            taskCount={activeTasks.length}
+          />
+        ) : (
+          <MetroSectionShell
             title={TAB_TITLES[activeTab]}
             booting={booting}
             loading={loading}
-            hasSession={!!session}
+            hasSession={!!session || isDemo}
+            isDemo={isDemo}
+            error={error}
             onBoardReview={generateBoardMeeting}
-          />
-
-          {error ? (
-            <div className="glass shrink-0 rounded-md border border-ember/30 px-3 py-2 text-xs font-semibold text-ember">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="command-scroll min-h-0 flex-1 overflow-y-auto rounded-lg">
-            {activeTab === "overview" ? (
-              <div className="grid gap-4 xl:grid-cols-[1.03fr_0.97fr]">
-                <div className="glass-strong relative overflow-hidden rounded-lg">
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-ember via-accent to-basil" />
-                  <div className="grid lg:min-h-[520px] lg:grid-cols-[0.92fr_1.08fr]">
-                    <div className="flex flex-col justify-between border-b border-ink/10 p-4 dark:border-fog/10 sm:p-6 lg:border-b-0 lg:border-e">
-                      <div>
-                        <div className="mb-4 inline-flex max-w-full items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-2 text-xs font-black shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark">
-                          <Sparkles size={16} className="text-accent" />
-                          CEO + 9 specialist agents
-                        </div>
-                        <h2 className="max-w-xl text-3xl font-black leading-[1.02] sm:text-4xl">
-                          A boardroom that thinks, argues, and executes.
-                        </h2>
-                        <p className="mt-4 max-w-xl text-sm leading-6 text-steel sm:text-base sm:leading-7">
-                          Give it capital, a rough idea, or a weak assumption. The AI CEO coordinates specialists,
-                          challenges the strategy, creates proof tasks, stores memory, and runs board reviews.
-                        </p>
-                      </div>
-
-                      <form onSubmit={startSession} className="mt-6 space-y-3">
-                        <div className="rounded-lg border border-ink/10 bg-white/75 p-2 shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark">
-                          <textarea
-                            value={goal}
-                            onChange={(event) => setGoal(event.target.value)}
-                            className="min-h-24 w-full resize-none rounded-md bg-transparent p-3 text-sm font-semibold leading-7 outline-none"
-                          />
-                          <div className="flex flex-wrap gap-2 border-t border-ink/10 p-2 dark:border-fog/10">
-                            {starterPrompts.map((prompt) => (
-                              <button
-                                key={prompt}
-                                type="button"
-                                onClick={() => setGoal(prompt)}
-                                className="rounded-md bg-fog px-3 py-2 text-left text-xs font-bold leading-5 text-steel transition hover:bg-chartreuse/30 hover:text-ink dark:bg-white/5 dark:hover:bg-white/10"
-                              >
-                                {prompt}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-3 sm:flex-row">
-                          <Button disabled={loading} className="h-12 w-full sm:w-auto">
-                            {loading ? <Loader2 className="animate-spin" size={17} /> : <Brain size={17} />}
-                            Start CEO Session
-                          </Button>
-                          <Button type="button" variant="ghost" className="h-12 w-full sm:w-auto" onClick={startVoiceInput}>
-                            <Mic size={17} />
-                            Voice Capture
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
-
-                    <ExecutiveGraph
-                      healthScore={healthScore}
-                      opportunityScore={opportunityScore}
-                      runway={runway}
-                      doneTasks={doneTasks}
-                      taskCount={activeTasks.length}
-                    />
-                  </div>
-                </div>
-
-                <KpiRunway reports={latestReports.length ? latestReports : fallbackReports} opportunityScore={opportunityScore} />
-              </div>
-            ) : null}
-
+            onBack={() => setActiveTab(null)}
+          >
             {activeTab === "chat" ? (
               <CommandPanel
                 session={session}
@@ -430,7 +423,7 @@ export default function DashboardPage() {
                 setMemoryQuery={setMemoryQuery}
                 searchMemory={searchMemory}
                 loading={loading}
-                session={session}
+                canRunBoard={!!session || isDemo}
                 generateBoardMeeting={generateBoardMeeting}
               />
             ) : null}
@@ -441,8 +434,8 @@ export default function DashboardPage() {
                 <KpiRunway reports={latestReports.length ? latestReports : fallbackReports} opportunityScore={opportunityScore} />
               </div>
             ) : null}
-          </div>
-        </div>
+          </MetroSectionShell>
+        )}
       </div>
     </main>
   );

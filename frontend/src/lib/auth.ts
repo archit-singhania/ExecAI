@@ -1,5 +1,6 @@
 const TOKEN_KEY = "ceoai-auth-token";
 const USER_KEY = "ceoai-auth-user";
+const DEMO_KEY = "ceoai-demo-session";
 
 export type AuthUser = {
   id: string;
@@ -30,7 +31,6 @@ async function authRequest<T>(path: string, body: unknown): Promise<T> {
       const parsed = await response.json();
       if (typeof parsed.detail === "string") detail = parsed.detail;
     } catch {
-      // ignore parse errors, keep default detail
     }
     throw new Error(detail);
   }
@@ -62,6 +62,22 @@ export function storeSession(auth: AuthResponse) {
 export function clearSession() {
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
+  window.localStorage.removeItem(DEMO_KEY);
+}
+
+export function startDemoSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DEMO_KEY, "1");
+}
+
+export function isDemoSession(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(DEMO_KEY) === "1";
+}
+
+export function clearDemoSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(DEMO_KEY);
 }
 
 export const authApi = {

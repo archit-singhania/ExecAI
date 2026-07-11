@@ -40,7 +40,7 @@ export const operatingPhases = [
 
 export type TaskFilter = "All" | "Open" | "Done" | "High";
 
-export type DashboardTab = "overview" | "chat" | "agents" | "tasks" | "board" | "operations";
+export type DashboardTab = "chat" | "agents" | "tasks" | "board" | "operations";
 
 export const fallbackReports: AgentReport[] = [
   {
@@ -115,3 +115,20 @@ export const fallbackMemories: Memory[] = [
     created_at: new Date().toISOString(),
   },
 ];
+
+export const demoBoardReply =
+  "Here's how the boardroom would open this up: Market Research would pressure-test demand with real interviews before any build, CFO would cap validation spend and track runway, and CTO would scope the narrowest workflow that still proves repeat value. Sign up free to run this for real, with memory, tasks, and weekly board reviews.";
+
+export const demoBoardMeeting: AgentReport = {
+  agent: "CEO",
+  report_type: "board",
+  title: "Board review \u2014 demo mode",
+  summary: "This is a sample board review. Sign up free to generate real weekly reviews grounded in your session's memory and tasks.",
+  bullets: [
+    "Validation spend is on pace, keep it under the CFO's ceiling.",
+    "CTO's narrow workflow is still the right first build.",
+    "Book five more customer interviews before widening scope.",
+  ],
+  score: 81,
+};
+

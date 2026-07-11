@@ -1,6 +1,6 @@
 import { FormEvent } from "react";
 import { Volume2 } from "lucide-react";
-import { AgentReport, Memory, Session } from "@/lib/api";
+import { AgentReport, Memory } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 export function BoardTheater({
@@ -12,7 +12,7 @@ export function BoardTheater({
   setMemoryQuery,
   searchMemory,
   loading,
-  session,
+  canRunBoard,
   generateBoardMeeting,
 }: {
   boardReport: AgentReport | null;
@@ -23,7 +23,7 @@ export function BoardTheater({
   setMemoryQuery: (value: string) => void;
   searchMemory: (event: FormEvent) => void;
   loading: boolean;
-  session: Session | null;
+  canRunBoard: boolean;
   generateBoardMeeting: () => void;
 }) {
   return (
@@ -33,7 +33,7 @@ export function BoardTheater({
           <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Board Room</p>
           <h2 className="text-xl font-black sm:text-2xl">Weekly review</h2>
         </div>
-        <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !session}>
+        <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !canRunBoard}>
           <Volume2 size={16} />
           Run
         </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Radio, ShieldCheck, Sparkles, Volume2 } from "lucide-react";
+import { ArrowRight, Feather, Radio, ShieldCheck, Sparkles, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
@@ -101,8 +101,16 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <footer className="shrink-0 px-4 pb-4 text-center text-[0.65rem] text-steel sm:px-6 sm:text-xs">
-          {t("hero.footerNote")}
+        <footer className="relative flex shrink-0 items-center justify-center gap-3 px-4 pb-4 text-center text-[0.65rem] text-steel sm:px-6 sm:text-xs">
+          <span>{t("hero.footerNote")}</span>
+          <Link
+            href="/about-author"
+            title="About the author"
+            aria-label="About the author"
+            className="group inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-white/60 text-steel shadow-line backdrop-blur transition hover:border-accent/50 hover:text-accent dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark"
+          >
+            <Feather size={12} className="transition group-hover:scale-110" />
+          </Link>
         </footer>
       </div>
     </main>

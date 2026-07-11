@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { ThemeModeToggle, ThemeConfigurator } from "@/components/ui/theme-controls";
 import { LanguagePicker } from "@/components/ui/language-picker";
-import { authApi, storeSession } from "@/lib/auth";
+import { authApi, startDemoSession, storeSession } from "@/lib/auth";
 import { agentMeta } from "@/lib/dashboard-data";
 import { useLocale } from "@/lib/i18n";
 
@@ -26,6 +26,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [error, setError] = useState("");
 
   const isSignup = mode === "signup";
+
+  function enterDemo() {
+    startDemoSession();
+    router.push("/dashboard");
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -131,6 +136,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 {loading ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={16} />}
                 {isSignup ? t("auth.signupButton") : t("auth.loginButton")}
               </Button>
+
+              {!isSignup ? (
+                <button
+                  type="button"
+                  onClick={enterDemo}
+                  className="h-11 w-full rounded-md border border-ink/15 bg-transparent text-xs font-bold text-steel transition hover:border-ink/30 hover:text-ink dark:border-fog/15 dark:hover:border-fog/30"
+                >
+                  Skip sign-in — explore a live demo
+                </button>
+              ) : null}
             </form>
 
             <p className="mt-6 text-center text-xs text-steel">
