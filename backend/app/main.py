@@ -1,13 +1,16 @@
 from datetime import datetime
+import json
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
-from app.agents import run_ceo_agents
+from app.agents import run_ceo_agents, run_ceo_agents_stream
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.config import get_settings
-from app.database import Base, engine, get_db
+from app.database import Base, engine, get_db, SessionLocal
+from app.memory import retrieve_relevant_memories, search_memory_rows, store_memory
 from app.models import AgentReport, BusinessMemory, BusinessSession, Message, Task, User
 from app.schemas import (
     AgentReportOut,
@@ -124,6 +127,21 @@ def _owned_session(session_id: str, db: Session, current_user: User) -> Business
     if not session or session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+def _recent_history(db: Session, session_id: str, limit: int = 6) -> list[str]:
+    """Last few turns of this conversation, oldest first, so agents have
+    short-term context on top of the long-term RAG memory search."""
+    recent = (
+        db.query(Message)
+        .filter(Message.session_id == session_id)
+        .order_by(desc(Message.created_at))
+        .limit(limit)
+        .all()
+    )
+    recent.reverse()
+    speaker = {"user": "Founder", "assistant": "CEO"}
+    return [f"{speaker.get(m.role, m.role)}: {m.content[:300]}" for m in recent]
 
 
 @app.get("/api/sessions/{session_id}/messages", response_model=list[MessageOut])
@@ -272,18 +290,7 @@ def search_memories(
     current_user: User = Depends(get_current_user),
 ):
     _owned_session(session_id, db, current_user)
-    needle = q.lower()
-    memories = (
-        db.query(BusinessMemory)
-        .filter(BusinessMemory.session_id == session_id)
-        .order_by(desc(BusinessMemory.importance), desc(BusinessMemory.created_at))
-        .all()
-    )
-    results = [
-        memory
-        for memory in memories
-        if needle in memory.content.lower() or needle in memory.kind.lower()
-    ][:10]
+    results = search_memory_rows(db, session_id, q, limit=10)
     return {"query": q, "results": results}
 
 
@@ -299,7 +306,8 @@ def send_message(
     user_message = Message(session_id=session.id, role="user", content=payload.content)
     db.add(user_message)
 
-    result = run_ceo_agents(session.business_goal, payload.content)
+    memory_context = _recent_history(db, session.id) + retrieve_relevant_memories(db, session.id, payload.content)
+    result = run_ceo_agents(session.business_goal, payload.content, memory_context)
     session.health_score = result["health_score"]
     session.runway_months = result["runway_months"]
 
@@ -339,24 +347,8 @@ def send_message(
                 )
             )
 
-    db.add(
-        BusinessMemory(
-            session_id=session.id,
-            kind="user_question",
-            content=f"User asked: {payload.content}",
-            importance=0.65,
-            embedding_text=payload.content,
-        )
-    )
-    db.add(
-        BusinessMemory(
-            session_id=session.id,
-            kind="ceo_decision",
-            content=result["final"],
-            importance=0.9,
-            embedding_text=result["final"],
-        )
-    )
+    store_memory(db, session.id, "user_question", f"User asked: {payload.content}", importance=0.65)
+    store_memory(db, session.id, "ceo_decision", result["final"], importance=0.9)
     db.commit()
     db.refresh(response)
 
@@ -379,6 +371,95 @@ def send_message(
             for report in reports
         ],
     )
+
+
+@app.post("/api/sessions/{session_id}/messages/stream")
+def send_message_stream(
+    session_id: str,
+    payload: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Same as POST /messages, but streams each agent's report to the client
+    over Server-Sent Events as soon as it's ready, instead of waiting for
+    all 9 agents to finish. Event payloads:
+      {"type": "agent_report", "node": "cfo", "report": {...}}   (x9)
+      {"type": "done", "message_id": ..., "final": ..., "health_score": ..., "runway_months": ...}
+    """
+    session = _owned_session(session_id, db, current_user)
+    business_goal = session.business_goal
+    session_id_value = session.id
+
+    user_message = Message(session_id=session_id_value, role="user", content=payload.content)
+    db.add(user_message)
+    db.commit()
+
+    memory_context = _recent_history(db, session_id_value) + retrieve_relevant_memories(db, session_id_value, payload.content)
+
+    def event_stream():
+        stream_db = SessionLocal()
+        try:
+            seen = 0
+            final_state = None
+            for node_name, state in run_ceo_agents_stream(business_goal, payload.content, memory_context):
+                if node_name != "ceo":
+                    for report in state["reports"][seen:]:
+                        yield f"data: {json.dumps({'type': 'agent_report', 'node': node_name, 'report': report})}\n\n"
+                    seen = len(state["reports"])
+                final_state = state
+
+            session_row = stream_db.get(BusinessSession, session_id_value)
+            session_row.health_score = final_state["health_score"]
+            session_row.runway_months = final_state["runway_months"]
+
+            response = Message(session_id=session_id_value, role="assistant", content=final_state["final"])
+            stream_db.add(response)
+            stream_db.flush()
+
+            for item in final_state["reports"]:
+                stream_db.add(
+                    AgentReport(
+                        session_id=session_id_value,
+                        agent=item["agent"],
+                        report_type="agent",
+                        title=item["title"],
+                        summary=item["summary"],
+                        bullets="\n".join(item["bullets"]),
+                        score=item["score"],
+                    )
+                )
+
+            for item in final_state["tasks"]:
+                exists = (
+                    stream_db.query(Task)
+                    .filter(Task.session_id == session_id_value, Task.title == item["title"])
+                    .first()
+                )
+                if not exists:
+                    stream_db.add(
+                        Task(
+                            session_id=session_id_value,
+                            title=item["title"],
+                            description=item.get("description", ""),
+                            priority=item["priority"],
+                            status=item["status"],
+                            created_by_agent=item["created_by_agent"],
+                        )
+                    )
+
+            store_memory(stream_db, session_id_value, "user_question", f"User asked: {payload.content}", importance=0.65)
+            store_memory(stream_db, session_id_value, "ceo_decision", final_state["final"], importance=0.9)
+            stream_db.commit()
+            stream_db.refresh(response)
+
+            yield f"data: {json.dumps({'type': 'done', 'message_id': response.id, 'final': final_state['final'], 'health_score': final_state['health_score'], 'runway_months': final_state['runway_months']})}\n\n"
+        except Exception as exc:
+            stream_db.rollback()
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            stream_db.close()
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/api/dashboard", response_model=DashboardOut)

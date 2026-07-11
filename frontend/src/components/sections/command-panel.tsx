@@ -21,6 +21,11 @@ export function CommandPanel({
   setInput: (value: string) => void;
   sendMessage: (event: FormEvent) => void;
 }) {
+  const lastMessage = messages[messages.length - 1];
+  const streamingCount =
+    lastMessage?.role === "assistant" && !lastMessage.content ? lastMessage.reports?.length ?? 0 : 0;
+  const visibleMessages = messages.filter((message) => message.content || message.role === "user");
+
   return (
     <section className="glass-strong flex min-h-[560px] flex-col rounded-lg p-4 sm:min-h-[620px] sm:p-5 3xl:min-h-[680px] 3xl:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -34,7 +39,7 @@ export function CommandPanel({
       </div>
 
       <div className="command-scroll flex-1 space-y-3 overflow-y-auto rounded-lg border border-ink/10 bg-white/48 p-3 dark:bg-white/5">
-        {!messages.length && (
+        {!visibleMessages.length && (
           <div className="grid h-full place-items-center py-10 text-center">
             <div className="max-w-sm">
               <Brain className="mx-auto mb-3 text-steel" size={38} />
@@ -46,7 +51,7 @@ export function CommandPanel({
           </div>
         )}
 
-        {messages.map((message) => (
+        {visibleMessages.map((message) => (
           <div
             key={message.id}
             className={cn(
@@ -63,7 +68,7 @@ export function CommandPanel({
         {loading && (
           <div className="me-auto inline-flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black text-ink shadow-line dark:bg-[#171b20] dark:shadow-line-dark">
             <Loader2 className="animate-spin" size={16} />
-            Agents are debating the plan
+            {streamingCount > 0 ? `${streamingCount}/9 agents reported` : "Agents are debating the plan"}
           </div>
         )}
       </div>

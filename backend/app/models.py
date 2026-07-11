@@ -92,4 +92,5 @@ class BusinessMemory(Base):
     content: Mapped[str] = mapped_column(Text)
     importance: Mapped[float] = mapped_column(Float, default=0.5)
     embedding_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embedding: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

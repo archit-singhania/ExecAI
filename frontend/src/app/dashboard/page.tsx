@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Brain, Loader2, Mic, Sparkles } from "lucide-react";
-import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task } from "@/lib/api";
+import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task, streamMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { DashboardTopbar } from "@/components/dashboard-topbar";
@@ -145,16 +145,47 @@ export default function DashboardPage() {
       created_at: new Date().toISOString(),
     };
 
-    setMessages((current) => [...current, optimistic]);
+    const assistantId = crypto.randomUUID();
+    const placeholder: ChatMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      created_at: new Date().toISOString(),
+      reports: [],
+    };
+
+    setMessages((current) => [...current, optimistic, placeholder]);
+    const contentToSend = input;
     setInput("");
     setLoading(true);
     setError("");
+
     try {
-      const response = await api.sendMessage(session.id, optimistic.content);
-      setMessages((current) => [...current, response]);
+      await streamMessage(session.id, contentToSend, (streamEvent) => {
+        if (streamEvent.type === "agent_report") {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, reports: [...(message.reports ?? []), streamEvent.report] }
+                : message,
+            ),
+          );
+        } else if (streamEvent.type === "done") {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, id: streamEvent.message_id, content: streamEvent.final }
+                : message,
+            ),
+          );
+        } else if (streamEvent.type === "error") {
+          setError(streamEvent.message);
+        }
+      });
       await refreshSession(session.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
+      setMessages((current) => current.filter((message) => message.id !== assistantId));
     } finally {
       setLoading(false);
     }

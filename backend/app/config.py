@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     groq_model: str = "llama-3.1-8b-instant"
     ollama_base_url: str = "http://localhost:11434/v1"
     ollama_model: str = "llama3.1"
+    ollama_embed_model: str = "nomic-embed-text"
     cors_origins: str = "http://localhost:3000"
     jwt_secret: str = "dev-only-change-me-in-prod"
     jwt_algorithm: str = "HS256"

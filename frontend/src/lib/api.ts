@@ -92,8 +92,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...authHeader(),
       ...(options?.headers ?? {}),
     },
-    // Mutations must always hit the server fresh. GETs can reuse a very
-    // recent response instead of forcing a full round-trip on every render.
     cache: isMutation ? "no-store" : options?.cache ?? "default",
   });
 
@@ -176,4 +174,53 @@ export async function sendMessage(sessionId: string, content: string): Promise<C
       verdict: report.title,
     })),
   };
+}
+
+export type StreamEvent =
+  | { type: "agent_report"; node: string; report: AgentReport }
+  | { type: "done"; message_id: string; final: string; health_score: number; runway_months: number }
+  | { type: "error"; message: string };
+
+export async function streamMessage(
+  sessionId: string,
+  content: string,
+  onEvent: (event: StreamEvent) => void,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/api/sessions/${sessionId}/messages/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader(),
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(detail || `Request failed: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const rawEvent = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const dataLine = rawEvent.split("\n").find((line) => line.startsWith("data: "));
+      if (dataLine) {
+        try {
+          onEvent(JSON.parse(dataLine.slice(6)) as StreamEvent);
+        } catch {
+        }
+      }
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
 }

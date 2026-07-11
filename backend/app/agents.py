@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Iterator, TypedDict
 from langgraph.graph import END, StateGraph
 from app.config import get_settings
 from app.llm import generate_agent_report
@@ -15,6 +15,7 @@ class AgentBrief(TypedDict):
 class CEOState(TypedDict):
     goal: str
     message: str
+    memory_context: list[str]
     reports: list[AgentBrief]
     final: str
     tasks: list[dict[str, str]]
@@ -32,7 +33,7 @@ def _score(text: str, base: int) -> int:
 
 def market_agent(state: CEOState) -> CEOState:
     goal = state["message"] or state["goal"]
-    llm_report = generate_agent_report("market", state["goal"], state["message"])
+    llm_report = generate_agent_report("market", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -53,7 +54,7 @@ def market_agent(state: CEOState) -> CEOState:
 
 
 def cfo_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("cfo", state["goal"], state["message"])
+    llm_report = generate_agent_report("cfo", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["runway_months"] = 7 if llm_report["score"] >= 75 else 4
         state["reports"].append(llm_report)
@@ -76,7 +77,7 @@ def cfo_agent(state: CEOState) -> CEOState:
 
 
 def cto_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("cto", state["goal"], state["message"])
+    llm_report = generate_agent_report("cto", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -96,7 +97,7 @@ def cto_agent(state: CEOState) -> CEOState:
 
 
 def product_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("product", state["goal"], state["message"])
+    llm_report = generate_agent_report("product", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -116,7 +117,7 @@ def product_agent(state: CEOState) -> CEOState:
 
 
 def marketing_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("marketing", state["goal"], state["message"])
+    llm_report = generate_agent_report("marketing", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -136,7 +137,7 @@ def marketing_agent(state: CEOState) -> CEOState:
 
 
 def legal_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("legal", state["goal"], state["message"])
+    llm_report = generate_agent_report("legal", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -156,7 +157,7 @@ def legal_agent(state: CEOState) -> CEOState:
 
 
 def sales_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("sales", state["goal"], state["message"])
+    llm_report = generate_agent_report("sales", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -176,7 +177,7 @@ def sales_agent(state: CEOState) -> CEOState:
 
 
 def designer_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("designer", state["goal"], state["message"])
+    llm_report = generate_agent_report("designer", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -196,7 +197,7 @@ def designer_agent(state: CEOState) -> CEOState:
 
 
 def assistant_agent(state: CEOState) -> CEOState:
-    llm_report = generate_agent_report("assistant", state["goal"], state["message"])
+    llm_report = generate_agent_report("assistant", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
         state["reports"].append(llm_report)
         return state
@@ -292,20 +293,33 @@ def build_ceo_graph():
     return graph.compile()
 
 
-def run_ceo_agents(goal: str, message: str) -> CEOState:
+def _initial_state(goal: str, message: str, memory_context: list[str] | None) -> CEOState:
+    return {
+        "goal": goal,
+        "message": message,
+        "memory_context": memory_context or [],
+        "reports": [],
+        "final": "",
+        "tasks": [],
+        "health_score": 75,
+        "runway_months": 6,
+    }
+
+
+def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = None) -> CEOState:
     settings = get_settings()
-    # The deterministic graph keeps the app fully functional without paid keys.
-    # A real LLM node can be added here when OPENAI_API_KEY is configured.
     _ = settings.openai_api_key
     graph = build_ceo_graph()
-    return graph.invoke(
-        {
-            "goal": goal,
-            "message": message,
-            "reports": [],
-            "final": "",
-            "tasks": [],
-            "health_score": 75,
-            "runway_months": 6,
-        }
-    )
+    return graph.invoke(_initial_state(goal, message, memory_context))
+
+
+def run_ceo_agents_stream(
+    goal: str, message: str, memory_context: list[str] | None = None
+) -> Iterator[tuple[str, CEOState]]:
+    """Yield (node_name, state_so_far) after each agent finishes, for SSE
+    streaming. `node_name` is one of the graph node names ("market", "cfo",
+    ..., "ceo"); the last yield is always ("ceo", final_state)."""
+    graph = build_ceo_graph()
+    for update in graph.stream(_initial_state(goal, message, memory_context), stream_mode="updates"):
+        for node_name, partial_state in update.items():
+            yield node_name, partial_state
