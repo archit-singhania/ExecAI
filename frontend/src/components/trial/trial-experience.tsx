@@ -1,16 +1,16 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Brain, Loader2, Sparkles, X } from "lucide-react";
+import { ArrowRight, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { StatusPill } from "@/components/ui/status-pill";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { trialSuggestions } from "@/lib/trial-suggestions";
-import { ChatMessage, AgentReport } from "@/lib/api";
-import { starterPrompts } from "@/lib/dashboard-data";
+import { AgentReport } from "@/lib/api";
+import { VoiceStage, VoiceStageHandle } from "@/components/voice/voice-stage";
 
 const DEMO_REPLY =
   "Here's how the boardroom would open this up: Market Research would pressure-test demand with real interviews before any build, CFO would cap validation spend and track runway, and CTO would scope the narrowest workflow that still proves repeat value. Sign up free to run this for real, with memory, tasks, and weekly board reviews.";
@@ -34,51 +34,16 @@ const DEMO_REPORTS: AgentReport[] = [
 
 export function TrialExperience() {
   const router = useRouter();
-  const [goal, setGoal] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const [reports, setReports] = useState<AgentReport[]>([]);
+  const voiceStageRef = useRef<VoiceStageHandle>(null);
 
-  function scrollToEnd() {
-    window.setTimeout(() => transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" }), 60);
-  }
-
-  function simulateReply() {
-    setLoading(true);
-    window.setTimeout(() => {
-      const reply: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: DEMO_REPLY,
-        created_at: new Date().toISOString(),
-        reports: DEMO_REPORTS,
-      };
-      setMessages((current) => [...current, reply]);
-      setLoading(false);
-      scrollToEnd();
-    }, 900);
-  }
-
-  function runPrompt(prompt: string) {
-    const trimmed = prompt.trim();
-    if (!trimmed) return;
+  async function handleUtterance(text: string, onProgress: (label: string) => void): Promise<string> {
     setStarted(true);
-    setGoal("");
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: trimmed,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((current) => [...current, userMessage]);
-    scrollToEnd();
-    simulateReply();
-  }
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    runPrompt(goal);
+    onProgress("The boardroom is weighing in\u2026");
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
+    setReports(DEMO_REPORTS);
+    return DEMO_REPLY;
   }
 
   return (
@@ -115,7 +80,7 @@ export function TrialExperience() {
         <section className="mx-auto grid w-full max-w-[1400px] flex-1 grid-cols-1 gap-4 overflow-hidden px-4 pb-3 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-6 lg:px-8 lg:pb-4">
           <div className="flex min-h-0 flex-col gap-3">
             {!started ? (
-              <div className="animate-rise flex min-h-0 flex-1 flex-col justify-center gap-3">
+              <div className="animate-rise shrink-0 space-y-2 pb-1">
                 <div className="inline-flex w-fit items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-1.5 text-[0.7rem] font-black shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark sm:text-xs">
                   No account needed
                 </div>
@@ -123,100 +88,20 @@ export function TrialExperience() {
                   Put the boardroom to work on your idea.
                 </h1>
                 <p className="max-w-lg text-sm leading-6 text-steel sm:text-base sm:leading-7">
-                  This is a live demo with sample data — no signup required. Type your own goal below, or pick one
-                  of the boardroom moves on the right to see how the CEO and specialists respond.
+                  This is a live demo with sample data — no signup required. Tap the mic and tell the CEO what
+                  you&apos;re building, or pick one of the boardroom moves on the right to hear how it responds.
                 </p>
               </div>
             ) : null}
 
-            {started ? (
-              <div className="glass-strong command-scroll min-h-0 flex-1 space-y-4 overflow-y-auto rounded-lg p-4 sm:p-5">
-                {messages.map((message) => (
-                  <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div
-                      className={
-                        message.role === "user"
-                          ? "max-w-[85%] rounded-lg bg-ink px-4 py-3 text-sm font-semibold leading-6 text-fog"
-                          : "max-w-[92%] space-y-3"
-                      }
-                    >
-                      {message.role === "assistant" ? (
-                        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-steel">
-                          <Brain size={14} className="text-accent" />
-                          CEO
-                        </div>
-                      ) : null}
-                      <p
-                        className={
-                          message.role === "user"
-                            ? ""
-                            : "rounded-lg border border-ink/10 bg-white/70 p-3 text-sm font-semibold leading-6 shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark"
-                        }
-                      >
-                        {message.content}
-                      </p>
-                      {message.reports?.length ? (
-                        <div className="grid gap-2.5 sm:grid-cols-2">
-                          {message.reports.map((report) => (
-                            <div
-                              key={report.title}
-                              className="glass rounded-lg p-3 transition hover:-translate-y-0.5"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[0.65rem] font-black uppercase tracking-wide text-steel">
-                                  {report.agent}
-                                </p>
-                                <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[0.65rem] font-black text-ink">
-                                  {report.score}
-                                </span>
-                              </div>
-                              <p className="mt-1.5 text-xs font-black leading-5 sm:text-sm">{report.title}</p>
-                              <p className="mt-1 text-[0.72rem] leading-5 text-steel sm:text-xs">{report.summary}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-                {loading ? (
-                  <div className="flex items-center gap-2 text-xs font-bold text-steel">
-                    <Loader2 size={14} className="animate-spin text-accent" />
-                    The boardroom is weighing in…
-                  </div>
-                ) : null}
-                <div ref={transcriptEndRef} />
-              </div>
-            ) : null}
-
-            <form onSubmit={handleSubmit} className="shrink-0 space-y-3">
-              <div className="rounded-lg border border-ink/10 bg-white/75 p-2 shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark">
-                <textarea
-                  value={goal}
-                  onChange={(event) => setGoal(event.target.value)}
-                  placeholder="Tell the boardroom what you're building or challenge your plan…"
-                  className="min-h-20 w-full resize-none rounded-md bg-transparent p-3 text-sm font-semibold leading-7 outline-none"
-                />
-                {!started ? (
-                  <div className="flex flex-wrap gap-2 border-t border-ink/10 p-2 dark:border-fog/10">
-                    {starterPrompts.map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => setGoal(prompt)}
-                        className="rounded-md bg-fog px-3 py-2 text-left text-xs font-bold leading-5 text-steel transition hover:bg-chartreuse/30 hover:text-ink dark:bg-white/5 dark:hover:bg-white/10"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-              <Button disabled={loading || !goal.trim()} className="h-12 w-full sm:w-auto">
-                {loading ? <Loader2 className="animate-spin" size={17} /> : <Brain size={17} />}
-                {started ? "Send to the boardroom" : "Start CEO Session"}
-              </Button>
-            </form>
+            <div className="glass-strong min-h-0 flex-1 rounded-lg p-2 sm:p-3">
+              <VoiceStage
+                ref={voiceStageRef}
+                subtitle="Live demo"
+                placeholderPrompt="Tap the mic and tell the CEO what you're building."
+                onUtterance={handleUtterance}
+              />
+            </div>
           </div>
 
           <aside className="flex min-h-0 flex-col gap-2.5 overflow-hidden">
@@ -230,8 +115,7 @@ export function TrialExperience() {
                   <button
                     key={suggestion.id}
                     type="button"
-                    onClick={() => runPrompt(suggestion.prompt)}
-                    disabled={loading}
+                    onClick={() => voiceStageRef.current?.submit(suggestion.prompt)}
                     className="glass animate-rise flex min-w-0 flex-col gap-2 rounded-lg p-3 text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 sm:p-3.5"
                   >
                     <div className="flex items-center gap-2.5">
@@ -249,6 +133,19 @@ export function TrialExperience() {
                   </button>
                 );
               })}
+
+              {reports.map((report) => (
+                <div key={report.title} className="glass animate-rise rounded-lg p-3 sm:p-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[0.65rem] font-black uppercase tracking-wide text-steel">{report.agent}</p>
+                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[0.65rem] font-black text-ink">
+                      {report.score}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-xs font-black leading-5 sm:text-sm">{report.title}</p>
+                  <p className="mt-1 text-[0.72rem] leading-5 text-steel sm:text-xs">{report.summary}</p>
+                </div>
+              ))}
             </div>
 
             <div className="glass-strong relative shrink-0 overflow-hidden rounded-lg p-4">

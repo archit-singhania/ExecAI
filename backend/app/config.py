@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     llm_provider: str = "none"  
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
+    groq_whisper_model: str = "whisper-large-v3-turbo"
     ollama_base_url: str = "http://localhost:11434/v1"
     ollama_model: str = "llama3.1"
     ollama_embed_model: str = "nomic-embed-text"

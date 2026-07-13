@@ -2,15 +2,13 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Brain, Loader2, Mic, Sparkles } from "lucide-react";
 import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task, streamMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { DashboardTopbar } from "@/components/dashboard-topbar";
 import { ExecutiveGraph } from "@/components/sections/executive-graph";
 import { MetroHome } from "@/components/dashboard/metro-home";
 import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
-import { CommandPanel } from "@/components/sections/command-panel";
+import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
 import { BoardTheater } from "@/components/sections/board-theater";
@@ -44,7 +42,6 @@ export default function DashboardPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
-  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState("");
@@ -118,113 +115,77 @@ export default function DashboardPage() {
     setBoardHistory(history);
   }
 
-  async function startSession(event?: FormEvent) {
-    event?.preventDefault();
-    setLoading(true);
-    setError("");
-
-    if (isDemo) {
-      const userMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: goal,
-        created_at: new Date().toISOString(),
-      };
-      window.setTimeout(() => {
-        const reply: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: demoBoardReply,
-          created_at: new Date().toISOString(),
-          reports: fallbackReports,
-        };
-        setMessages((current) => [...current, reply]);
-        setLoading(false);
-      }, 700);
-      setMessages([userMessage]);
-      setInput("");
-      setActiveTab("chat");
-      return;
-    }
-
-    try {
-      const created = await api.createSession(goal);
-      setSession(created);
-      const firstMessage = await api.sendMessage(created.id, goal);
-      setMessages([firstMessage]);
-      await refreshSession(created.id);
-      setInput("");
-      setActiveTab("chat");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function startNewSessionFromHome() {
     setSession(null);
     setMessages([]);
     setBoardReport(null);
     setSelectedReport(null);
     setReportExport(null);
-    setInput("");
     setError("");
     setActiveTab("chat");
   }
-
-  async function sendMessage(event: FormEvent) {
-    event.preventDefault();
-    if (!input.trim()) return;
-
-    if (!session && !isDemo) {
-      setGoal(input);
-      await startSession();
-      return;
-    }
-
-    const optimistic: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: input,
-      created_at: new Date().toISOString(),
-    };
-
-    const assistantId = crypto.randomUUID();
-    const placeholder: ChatMessage = {
-      id: assistantId,
-      role: "assistant",
-      content: "",
-      created_at: new Date().toISOString(),
-      reports: [],
-    };
-
-    setMessages((current) => [...current, optimistic, placeholder]);
-    const contentToSend = input;
-    setInput("");
+  
+  async function handleVoiceUtterance(text: string, onProgress: (label: string) => void): Promise<string> {
+    setError("");
 
     if (isDemo) {
       setLoading(true);
-      window.setTimeout(() => {
-        const reply: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: demoBoardReply,
-          created_at: new Date().toISOString(),
-          reports: fallbackReports,
-        };
-        setMessages((current) => [...current, reply]);
-        setLoading(false);
-      }, 700);
-      return;
+      onProgress("The boardroom is weighing in\u2026");
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((current) => [...current, userMessage]);
+      await new Promise((resolve) => window.setTimeout(resolve, 700));
+      const reply: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: demoBoardReply,
+        created_at: new Date().toISOString(),
+        reports: fallbackReports,
+      };
+      setMessages((current) => [...current, reply]);
+      setLoading(false);
+      return demoBoardReply;
     }
 
     setLoading(true);
-    setError("");
-
     try {
-      await streamMessage(session!.id, contentToSend, (streamEvent) => {
+      let activeSessionId = session?.id;
+      if (!activeSessionId) {
+        onProgress("Assembling the boardroom\u2026");
+        const created = await api.createSession(text);
+        setSession(created);
+        setGoal(text);
+        activeSessionId = created.id;
+      }
+
+      const optimistic: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        created_at: new Date().toISOString(),
+      };
+      const assistantId = crypto.randomUUID();
+      const placeholder: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        created_at: new Date().toISOString(),
+        reports: [],
+      };
+      setMessages((current) => [...current, optimistic, placeholder]);
+
+      let finalText = "";
+      let streamError = "";
+      let reportCount = 0;
+
+      await streamMessage(activeSessionId, text, (streamEvent) => {
         if (streamEvent.type === "agent_report") {
+          reportCount += 1;
+          onProgress(`${reportCount}/9 agents reported`);
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantId
@@ -233,6 +194,7 @@ export default function DashboardPage() {
             ),
           );
         } else if (streamEvent.type === "done") {
+          finalText = streamEvent.final;
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantId
@@ -241,13 +203,20 @@ export default function DashboardPage() {
             ),
           );
         } else if (streamEvent.type === "error") {
-          setError(streamEvent.message);
+          streamError = streamEvent.message;
         }
       });
-      await refreshSession(session!.id);
+
+      if (streamError) throw new Error(streamError);
+      if (!finalText) throw new Error("No response from the CEO.");
+
+      await refreshSession(activeSessionId);
+      return finalText;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      setMessages((current) => current.filter((message) => message.id !== assistantId));
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      setMessages((current) => current.filter((entry) => entry.content || entry.role === "user"));
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setLoading(false);
     }
@@ -389,15 +358,14 @@ export default function DashboardPage() {
             onBack={() => setActiveTab(null)}
           >
             {activeTab === "chat" ? (
-              <CommandPanel
-                session={session}
-                messages={messages}
-                input={input}
-                loading={loading}
-                error={error}
-                setInput={setInput}
-                sendMessage={sendMessage}
-              />
+              <div className="glass-strong flex min-h-[560px] flex-col rounded-lg p-2 sm:min-h-[620px] sm:p-3 3xl:min-h-[680px]">
+                <VoiceStage
+                  subtitle={session?.title ?? (isDemo ? "Live demo" : "New session")}
+                  placeholderPrompt="Tap the mic and tell your CEO what's on your mind."
+                  onUtterance={handleVoiceUtterance}
+                  disabled={booting}
+                />
+              </div>
             ) : null}
 
             {activeTab === "agents" ? (

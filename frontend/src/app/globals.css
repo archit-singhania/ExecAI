@@ -211,6 +211,38 @@ input {
   animation: reverse-spin 18s linear infinite;
 }
 
+@keyframes ping-slow {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.animate-ping-slow {
+  animation: ping-slow 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes pulse-fast {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.4;
+  }
+}
+
+.animate-pulse-fast {
+  animation: pulse-fast 0.9s ease-in-out infinite;
+}
+
 .premium-focus:focus-visible,
 button:focus-visible,
 input:focus-visible,

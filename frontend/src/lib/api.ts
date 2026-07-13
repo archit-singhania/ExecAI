@@ -176,6 +176,22 @@ export async function sendMessage(sessionId: string, content: string): Promise<C
   };
 }
 
+export async function transcribeAudio(blob: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", blob, "voice.webm");
+  const response = await fetch(`${API_URL}/api/voice/transcribe`, {
+    method: "POST",
+    headers: { ...authHeader() },
+    body: formData,
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(detail || `Request failed: ${response.status}`);
+  }
+  const data = (await response.json()) as { text: string };
+  return data.text;
+}
+
 export type StreamEvent =
   | { type: "agent_report"; node: string; report: AgentReport }
   | { type: "done"; message_id: string; final: string; health_score: number; runway_months: number }

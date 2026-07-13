@@ -52,6 +52,27 @@ def _client():
     return None, None
 
 
+def transcribe_audio(file_bytes: bytes, filename: str = "audio.webm") -> str | None:
+    """Transcribe a short voice clip via Groq's Whisper endpoint (OpenAI-compatible
+    /audio/transcriptions route). Used as the STT fallback for browsers without
+    native SpeechRecognition support (Firefox, some Safari builds). Returns None
+    if Groq isn't configured or the call fails, so the caller can surface a clear
+    error instead of silently returning empty text.
+    """
+    settings = get_settings()
+    if settings.llm_provider.lower() != "groq" or not settings.groq_api_key:
+        return None
+    client = OpenAI(api_key=settings.groq_api_key, base_url="https://api.groq.com/openai/v1")
+    try:
+        result = client.audio.transcriptions.create(
+            model=settings.groq_whisper_model,
+            file=(filename, file_bytes),
+        )
+        return result.text
+    except Exception:
+        return None
+
+
 def _parse_report(agent_key: str, raw: str) -> dict:
     raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     data = json.loads(raw)

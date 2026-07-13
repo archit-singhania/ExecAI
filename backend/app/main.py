@@ -1,13 +1,14 @@
 from datetime import datetime
 import json
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from app.agents import run_ceo_agents, run_ceo_agents_stream
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.llm import transcribe_audio
 from app.config import get_settings
 from app.database import Base, engine, get_db, SessionLocal
 from app.memory import retrieve_relevant_memories, search_memory_rows, store_memory
@@ -44,9 +45,44 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Starlette's default 500 handling doesn't always run through
+    CORSMiddleware, so an unhandled exception shows up in the browser as a
+    generic 'blocked by CORS' error instead of the real message. This makes
+    sure the actual error always reaches the frontend (and the traceback
+    always reaches this terminal)."""
+    import traceback
+
+    traceback.print_exc()
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin and (origin in settings.cors_origin_list or "*" in settings.cors_origin_list):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(status_code=500, content={"detail": str(exc)}, headers=headers)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/voice/transcribe")
+async def transcribe_voice(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    """STT fallback for browsers without native SpeechRecognition (Firefox, some
+    Safari builds). VoiceStage's mic button records via MediaRecorder and posts
+    the clip here when window.SpeechRecognition is unavailable."""
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio upload.")
+    text = transcribe_audio(audio_bytes, file.filename or "audio.webm")
+    if text is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Voice transcription isn't configured (set LLM_PROVIDER=groq and GROQ_API_KEY in backend/.env).",
+        )
+    return {"text": text.strip()}
 
 
 @app.post("/api/auth/signup", response_model=TokenOut)
@@ -306,7 +342,14 @@ def send_message(
     user_message = Message(session_id=session.id, role="user", content=payload.content)
     db.add(user_message)
 
-    memory_context = _recent_history(db, session.id) + retrieve_relevant_memories(db, session.id, payload.content)
+    try:
+        memory_context = _recent_history(db, session.id) + retrieve_relevant_memories(db, session.id, payload.content)
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        memory_context = _recent_history(db, session.id)
+
     result = run_ceo_agents(session.business_goal, payload.content, memory_context)
     session.health_score = result["health_score"]
     session.runway_months = result["runway_months"]
@@ -347,10 +390,18 @@ def send_message(
                 )
             )
 
-    store_memory(db, session.id, "user_question", f"User asked: {payload.content}", importance=0.65)
-    store_memory(db, session.id, "ceo_decision", result["final"], importance=0.9)
     db.commit()
     db.refresh(response)
+
+    try:
+        store_memory(db, session.id, "user_question", f"User asked: {payload.content}", importance=0.65)
+        store_memory(db, session.id, "ceo_decision", result["final"], importance=0.9)
+        db.commit()
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        db.rollback()
 
     return MessageOut(
         id=response.id,
@@ -394,7 +445,15 @@ def send_message_stream(
     db.add(user_message)
     db.commit()
 
-    memory_context = _recent_history(db, session_id_value) + retrieve_relevant_memories(db, session_id_value, payload.content)
+    try:
+        memory_context = _recent_history(db, session_id_value) + retrieve_relevant_memories(
+            db, session_id_value, payload.content
+        )
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        memory_context = _recent_history(db, session_id_value)
 
     def event_stream():
         stream_db = SessionLocal()
@@ -447,10 +506,18 @@ def send_message_stream(
                         )
                     )
 
-            store_memory(stream_db, session_id_value, "user_question", f"User asked: {payload.content}", importance=0.65)
-            store_memory(stream_db, session_id_value, "ceo_decision", final_state["final"], importance=0.9)
             stream_db.commit()
             stream_db.refresh(response)
+
+            try:
+                store_memory(stream_db, session_id_value, "user_question", f"User asked: {payload.content}", importance=0.65)
+                store_memory(stream_db, session_id_value, "ceo_decision", final_state["final"], importance=0.9)
+                stream_db.commit()
+            except Exception:
+                import traceback
+
+                traceback.print_exc()
+                stream_db.rollback()
 
             yield f"data: {json.dumps({'type': 'done', 'message_id': response.id, 'final': final_state['final'], 'health_score': final_state['health_score'], 'runway_months': final_state['runway_months']})}\n\n"
         except Exception as exc:
