@@ -8,6 +8,7 @@ import { DashboardTopbar } from "@/components/dashboard-topbar";
 import { ExecutiveGraph } from "@/components/sections/executive-graph";
 import { MetroHome } from "@/components/dashboard/metro-home";
 import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
+import { MetroTone } from "@/components/dashboard/metro-tile";
 import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
@@ -32,6 +33,14 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   tasks: "Task board",
   board: "Board & memory",
   operations: "Operations",
+};
+
+const TAB_TONES: Record<DashboardTab, MetroTone> = {
+  chat: "accent",
+  agents: "ink",
+  tasks: "ember",
+  board: "basil",
+  operations: "steel",
 };
 
 export default function DashboardPage() {
@@ -349,6 +358,7 @@ export default function DashboardPage() {
         ) : (
           <MetroSectionShell
             title={TAB_TITLES[activeTab]}
+            tone={TAB_TONES[activeTab]}
             booting={booting}
             loading={loading}
             hasSession={!!session || isDemo}
@@ -358,7 +368,7 @@ export default function DashboardPage() {
             onBack={() => setActiveTab(null)}
           >
             {activeTab === "chat" ? (
-              <div className="glass-strong flex min-h-[560px] flex-col rounded-lg p-2 sm:min-h-[620px] sm:p-3 3xl:min-h-[680px]">
+              <div className="glass-strong section-panel flex min-h-[560px] flex-col rounded-lg p-2 sm:min-h-[620px] sm:p-3 3xl:min-h-[680px]">
                 <VoiceStage
                   subtitle={session?.title ?? (isDemo ? "Live demo" : "New session")}
                   placeholderPrompt="Tap the mic and tell your CEO what's on your mind."

@@ -20,13 +20,18 @@ export function AgentBriefing({
   const filteredReports = agentFilter === "All" ? reports : reports.filter((report) => report.agent === agentFilter);
 
   return (
-    <section className="glass-strong rounded-lg p-4 sm:p-5 3xl:p-6">
+    <section className="glass-strong section-panel rounded-lg p-4 sm:p-5 3xl:p-6">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Agent Floor</p>
-          <h2 className="text-xl font-black sm:text-2xl">Specialist briefings</h2>
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-ink to-ink/70 text-fog shadow-glow">
+            <Brain size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Agent Floor</p>
+            <h2 className="text-xl font-black sm:text-2xl">Specialist briefings</h2>
+          </div>
         </div>
-        <div className="rounded-md bg-chartreuse/25 px-3 py-2 text-sm font-black text-ink">
+        <div className="rounded-md bg-gradient-to-br from-chartreuse/40 to-chartreuse/15 px-3 py-2 text-sm font-black text-ink shadow-line">
           {filteredReports.length} active
         </div>
       </div>
@@ -111,7 +116,7 @@ function AgentCard({
   return (
     <button
       onClick={() => openReport(report)}
-      className="animate-rise rounded-lg border border-ink/10 bg-white/62 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-soft dark:bg-white/5 dark:hover:bg-white/[0.08]"
+      className="animate-rise group/card rounded-lg border border-ink/10 bg-white/62 p-4 text-left transition duration-200 hover:-translate-y-1 hover:border-ink/20 hover:bg-white/85 hover:shadow-glow dark:bg-white/5 dark:hover:border-fog/20 dark:hover:bg-white/[0.1]"
       style={{ animationDelay: `${index * 35}ms` }}
     >
       <div className="flex items-start gap-3">

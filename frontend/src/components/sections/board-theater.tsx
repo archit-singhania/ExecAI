@@ -27,11 +27,16 @@ export function BoardTheater({
   generateBoardMeeting: () => void;
 }) {
   return (
-    <section className="glass-strong rounded-lg p-4 sm:p-5">
+    <section className="glass-strong section-panel rounded-lg p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Board Room</p>
-          <h2 className="text-xl font-black sm:text-2xl">Weekly review</h2>
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-basil/35 to-basil/10 text-basil shadow-line">
+            <Volume2 size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Board Room</p>
+            <h2 className="text-xl font-black sm:text-2xl">Weekly review</h2>
+          </div>
         </div>
         <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !canRunBoard}>
           <Volume2 size={16} />
@@ -39,8 +44,9 @@ export function BoardTheater({
         </Button>
       </div>
 
-      <div className="relative overflow-hidden rounded-lg bg-ink p-4 text-fog">
+      <div className="relative overflow-hidden rounded-lg bg-ink p-4 text-fog shadow-glow">
         <div className="executive-gradient absolute inset-0 opacity-70" />
+        <div className="top-beam" />
         <div className="relative">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-fog/55">CEO board verdict</p>
           <h3 className="mt-3 text-2xl font-black leading-tight">

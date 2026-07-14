@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ThemeModeToggle, ThemeConfigurator } from "@/components/ui/theme-controls";
 import { LanguagePicker } from "@/components/ui/language-picker";
+import { MetroTone, TONE_GLOW_HEX } from "@/components/dashboard/metro-tile";
 
 export function DashboardTopbar({
   title,
+  tone,
   booting,
   loading,
   hasSession,
@@ -15,6 +17,7 @@ export function DashboardTopbar({
   onBack,
 }: {
   title: string;
+  tone?: MetroTone;
   booting: boolean;
   loading: boolean;
   hasSession: boolean;
@@ -22,8 +25,13 @@ export function DashboardTopbar({
   onBoardReview: () => void;
   onBack?: () => void;
 }) {
+  const accentHex = tone ? TONE_GLOW_HEX[tone] : null;
+
   return (
-    <header className="glass-strong flex shrink-0 flex-col gap-3 rounded-lg border-b-2 border-b-accent/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+    <header
+      className="glass-strong flex shrink-0 flex-col gap-3 rounded-lg border-b-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+      style={accentHex ? { borderBottomColor: `${accentHex}55` } : undefined}
+    >
       <div className="flex flex-wrap items-center gap-2.5">
         {onBack ? (
           <button
@@ -34,6 +42,12 @@ export function DashboardTopbar({
             <ChevronLeft size={15} />
             Home
           </button>
+        ) : null}
+        {accentHex ? (
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ background: accentHex, boxShadow: `0 0 12px 2px ${accentHex}88` }}
+          />
         ) : null}
         <h1 className="text-base font-black tracking-tight sm:text-lg">{title}</h1>
         {isDemo ? (

@@ -15,13 +15,17 @@ export function TaskBoard({
   completeTask: (taskId: string) => void;
 }) {
   return (
-    <section className="glass-strong rounded-lg p-4 sm:p-5">
+    <section className="glass-strong section-panel rounded-lg p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Execution</p>
-          <h2 className="text-xl font-black sm:text-2xl">Priority tasks</h2>
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-ember/30 to-ember/10 text-ember shadow-line">
+            <Check size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Execution</p>
+            <h2 className="text-xl font-black sm:text-2xl">Priority tasks</h2>
+          </div>
         </div>
-        <Check className="text-basil" size={24} />
       </div>
       <div className="mb-4 grid grid-cols-4 gap-2">
         {(["All", "Open", "High", "Done"] as TaskFilter[]).map((filter) => (
@@ -43,7 +47,7 @@ export function TaskBoard({
         {tasks.map((task) => (
           <div
             key={task.id}
-            className="group rounded-lg border border-ink/10 bg-white/62 p-4 transition hover:-translate-y-0.5 hover:shadow-soft dark:border-fog/10 dark:bg-white/5"
+            className="group rounded-lg border border-ink/10 bg-white/62 p-4 transition duration-200 hover:-translate-y-1 hover:border-ink/20 hover:bg-white/85 hover:shadow-glow dark:border-fog/10 dark:bg-white/5 dark:hover:border-fog/20 dark:hover:bg-white/[0.1]"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <p className="font-black leading-6">{task.title}</p>
