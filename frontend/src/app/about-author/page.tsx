@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileCode2, TerminalSquare, Sparkles } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -11,40 +12,144 @@ const LINE_COUNT = 22;
 
 const TAGS = [
   { label: "Founder", color: "#d9b467" },
-  { label: "CEOAI", color: "#8fae52" },
-  { label: "Builder", color: "#c9754a" },
+  { label: "Product Builder", color: "#8fae52" },
+  { label: "Strategic AI", color: "#c9754a" },
 ];
 
 const ASCII_ROWS = ASCII_ART.split("\n");
 const ASCII_WIDTH = Math.min(...ASCII_ROWS.map((row) => row.length));
 const ASCII_NORMALIZED = ASCII_ROWS.map((row) => row.slice(0, ASCII_WIDTH)).join("\n");
 
-function AsciiPortrait() {
+function FullPortraitGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivElement | null> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const image = new Image();
+    image.src = "/images/author-source.jpg";
+
+    const render = () => {
+      const bounds = canvas.getBoundingClientRect();
+      if (!bounds.width || !bounds.height || !image.naturalWidth) return;
+
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(bounds.width * pixelRatio);
+      canvas.height = Math.round(bounds.height * pixelRatio);
+
+      const context = canvas.getContext("2d");
+      const sample = document.createElement("canvas");
+      if (!context) return;
+
+      const cropWidth = image.naturalWidth * 0.4;
+      const cropHeight = image.naturalHeight * 0.71;
+      const cropAspect = cropWidth / cropHeight;
+      const boundsAspect = bounds.width / bounds.height;
+
+      let renderWidth: number;
+      let renderHeight: number;
+      if (boundsAspect > cropAspect) {
+        renderHeight = bounds.height;
+        renderWidth = renderHeight * cropAspect;
+      } else {
+        renderWidth = bounds.width;
+        renderHeight = renderWidth / cropAspect;
+      }
+      const offsetX = (bounds.width - renderWidth) / 2;
+      const offsetY = (bounds.height - renderHeight) / 2;
+
+      // Shrink the panel itself to hug the glyph's real width so no black
+      // margin is left on either side (desktop layout only — mobile stays
+      // full-width/stacked).
+      const panel = panelRef?.current;
+      if (panel && window.innerWidth >= 1024) {
+        const chrome = panel.offsetWidth - bounds.width; // borders/frame chrome
+        const nextWidth = Math.ceil(renderWidth + chrome);
+        if (Math.abs(panel.offsetWidth - nextWidth) > 1) {
+          panel.style.width = `${nextWidth}px`;
+        }
+      }
+
+      const columns = Math.max(160, Math.floor(renderWidth / 2.6));
+      const rows = Math.max(110, Math.floor(renderHeight / 3.4));
+      sample.width = columns;
+      sample.height = rows;
+      const sampleContext = sample.getContext("2d", { willReadFrequently: true });
+      if (!sampleContext) return;
+
+      sampleContext.drawImage(
+        image,
+        image.naturalWidth * 0.34,
+        image.naturalHeight * 0.29,
+        cropWidth,
+        cropHeight,
+        0,
+        0,
+        columns,
+        rows,
+      );
+
+      const pixels = sampleContext.getImageData(0, 0, columns, rows).data;
+      const glyphs = " `.'-:^,;!~+_?)(|/tfjcrLxvunzYCJUXo*OZm0QNdkbpqPKAHRGSDBME8W#@";
+      const cellWidth = renderWidth / columns;
+      const cellHeight = renderHeight / rows;
+
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.fillStyle = "#070706";
+      context.fillRect(0, 0, bounds.width, bounds.height);
+      context.font = `${Math.ceil(cellHeight * 1.1)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      context.textBaseline = "top";
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const pixel = (row * columns + column) * 4;
+          const red = pixels[pixel];
+          const green = pixels[pixel + 1];
+          const blue = pixels[pixel + 2];
+          const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+          // Gamma/contrast curve: expands the mid-tone band (skin, glass
+          // highlights) instead of compressing it, so facial and glass
+          // detail actually separates into distinct glyphs.
+          const normalized = luminance / 255;
+          const contrasted = Math.pow(normalized, 0.72);
+          const glyph = glyphs[Math.min(glyphs.length - 1, Math.floor(contrasted * glyphs.length))];
+
+          if (glyph === " ") continue;
+          const warmth = Math.min(255, luminance * 1.14 + 20);
+          context.fillStyle = `rgb(${Math.round(warmth)}, ${Math.round(warmth * 0.89)}, ${Math.round(warmth * 0.56)})`;
+          context.fillText(glyph, offsetX + column * cellWidth, offsetY + row * cellHeight);
+        }
+      }
+    };
+
+    image.addEventListener("load", render);
+    const resizeObserver = new ResizeObserver(render);
+    resizeObserver.observe(canvas);
+
+    return () => {
+      image.removeEventListener("load", render);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="h-full w-full" aria-label="Detailed full-body glyph portrait of AS in a tuxedo, holding a glass" />;
+}
+
+function RealisticGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivElement | null> }) {
   return (
-    <div
-      className="relative flex h-full w-full items-center justify-center overflow-hidden"
-      style={{ containerType: "size" } as React.CSSProperties}
-    >
-      <pre
-        className="select-none whitespace-pre font-mono"
-        style={{
-          color: "#e7c988",
-          textShadow: "0 0 14px rgba(231,201,136,0.45), 0 0 2px rgba(231,201,136,0.85)",
-          fontSize: "max(1.55cqw, 0.88cqh)",
-          lineHeight: 0.92,
-          letterSpacing: "0",
-          fontWeight: 500,
-          filter: "contrast(1.32) brightness(1.08) saturate(1.15) blur(0.15px)",
-        }}
-      >
-        {ASCII_NORMALIZED}
-      </pre>
+    <div className="glyph-portrait relative h-full w-full overflow-hidden">
+      <div className="glyph-portrait-halo pointer-events-none absolute inset-0" />
+      <div className="relative z-10 h-full w-full">
+        <FullPortraitGlyph panelRef={panelRef} />
+      </div>
     </div>
   );
 }
 
 export default function AboutAuthorPage() {
   const gutter = Array.from({ length: LINE_COUNT }, (_, i) => i + 1);
+  const glyphPanelRef = useRef<HTMLDivElement>(null);
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-radial-ui text-ink">
@@ -68,9 +173,9 @@ export default function AboutAuthorPage() {
         </div>
 
         <div className="animate-rise pb-5 sm:pb-7">
-          <p className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-accent">The Author</p>
+          <p className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-accent">Founder&apos;s Note</p>
           <h1 className="mt-2 font-serif text-[2.1rem] italic leading-tight text-ink sm:text-[2.6rem] lg:text-[3rem]">
-            A note from the founder&apos;s desk
+            Building a sharper way to think.
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {TAGS.map((tag) => (
@@ -90,9 +195,10 @@ export default function AboutAuthorPage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 pb-4 lg:grid-cols-[0.82fr_1.55fr] lg:gap-8">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 pb-4 lg:grid-cols-[auto_1fr] lg:gap-8">
           <div
-            className="animate-rise flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-glass"
+            ref={glyphPanelRef}
+            className="animate-rise flex min-h-0 w-full flex-col overflow-hidden rounded-xl border shadow-glass lg:w-[420px]"
             style={{
               borderColor: "rgba(217,180,103,0.28)",
               boxShadow: "0 30px 90px rgba(0,0,0,0.35), 0 0 0 1px rgba(217,180,103,0.08) inset",
@@ -110,14 +216,14 @@ export default function AboutAuthorPage() {
                 style={{ color: "#d9b46799" }}
               >
                 <TerminalSquare size={12} />
-                portrait.ascii
+                author.glyph
               </span>
               <span
                 className="ml-auto flex items-center gap-1 text-[0.6rem] font-bold uppercase tracking-widest"
                 style={{ color: "#8fae5299" }}
               >
                 <Sparkles size={11} />
-                rendered live
+                high-fidelity glyph
               </span>
             </div>
 
@@ -125,10 +231,10 @@ export default function AboutAuthorPage() {
               className="relative flex min-h-0 flex-1 overflow-hidden"
               style={{
                 background:
-                  "radial-gradient(circle at 50% 18%, rgba(217,180,103,0.14), transparent 55%), radial-gradient(circle at 15% 85%, rgba(143,174,82,0.10), transparent 50%), #0a0908",
+                  "radial-gradient(circle at 50% 22%, rgba(217,180,103,0.19), transparent 48%), radial-gradient(circle at 15% 85%, rgba(143,174,82,0.12), transparent 52%), #070706",
               }}
             >
-              <AsciiPortrait />
+              <RealisticGlyph panelRef={glyphPanelRef} />
             </div>
           </div>
 
@@ -170,10 +276,10 @@ export default function AboutAuthorPage() {
                   <span style={{ color: "#e07850", fontWeight: 800, fontSize: "1.08em" }}># About the Author</span>
                 </p>
                 <p className="mt-4">
-                  <span style={{ color: "#9dc262", fontWeight: 800, fontSize: "1.02em" }}>## @AS</span>
+                  <span style={{ color: "#9dc262", fontWeight: 800, fontSize: "1.02em" }}>## AS</span>
                 </p>
                 <p className="mt-5" style={{ color: "#e2ddd0" }}>
-                  CEOAI began with a simple belief:
+                  CEOAI began with a simple conviction:
                 </p>
 
                 <div
@@ -184,48 +290,48 @@ export default function AboutAuthorPage() {
                   }}
                 >
                   <p className="font-serif text-[1.02rem] italic leading-relaxed" style={{ color: "#f2d99e" }}>
-                    &ldquo;Great decisions shouldn&apos;t be limited by access to great advisors.&rdquo;
+                    &ldquo;Clarity, perspective, and excellent judgment should not be a luxury.&rdquo;
                   </p>
                 </div>
 
                 <p className="mt-4 leading-8" style={{ color: "#e2ddd0" }}>
-                  I created CEOAI to bring strategic thinking to everyone&mdash;from solo founders and students to
-                  growing businesses. Rather than acting as another chatbot, CEOAI is designed to think through
-                  problems, challenge assumptions, evaluate trade-offs, and help users make informed decisions
-                  with confidence.
+                  I created CEOAI to make disciplined strategic thinking available to more people&mdash;from ambitious
+                  students and solo founders to teams building the next great company. It is not designed to be
+                  another chatbot; it is designed to examine problems, test assumptions, weigh trade-offs, and
+                  make the path forward easier to see.
                 </p>
                 <p className="mt-4 leading-8" style={{ color: "#e2ddd0" }}>
-                  The vision is larger than a single application. CEOAI is the foundation of an intelligent
-                  executive platform where specialized AI experts collaborate to solve complex business and
-                  technical challenges, making high-quality decision support accessible to anyone.
+                  The ambition extends beyond a single product. CEOAI is the beginning of an intelligent executive
+                  platform: a place where specialised AI experts work together on complex business and technical
+                  questions, bringing high-quality decision support within reach.
                 </p>
 
-                <p className="mt-5" style={{ color: "#a39d8c" }}># Every feature is guided by three principles:</p>
+                <p className="mt-5" style={{ color: "#a39d8c" }}># The work is guided by three principles:</p>
                 <ul className="mt-2 space-y-1.5">
                   <li style={{ color: "#e2ddd0" }}>
-                    <span style={{ color: "#e7c988" }}>*</span> Think deeply.
+                    <span style={{ color: "#e7c988" }}>*</span> Think with rigour.
                   </li>
                   <li style={{ color: "#e2ddd0" }}>
-                    <span style={{ color: "#e7c988" }}>*</span> Explain clearly.
+                    <span style={{ color: "#e7c988" }}>*</span> Communicate with clarity.
                   </li>
                   <li style={{ color: "#e2ddd0" }}>
-                    <span style={{ color: "#e7c988" }}>*</span> Execute effectively.
+                    <span style={{ color: "#e7c988" }}>*</span> Turn insight into action.
                   </li>
                 </ul>
 
                 <p className="mt-5 leading-8" style={{ color: "#e2ddd0" }}>
-                  Artificial intelligence is changing how we build, work, and innovate. My goal is to create
-                  products that don&apos;t just generate answers&mdash;they help people think better.
+                  Artificial intelligence is reshaping how we build, work, and create. My focus is on products
+                  that do more than generate answers&mdash;they help people ask better questions and make better calls.
                 </p>
                 <p className="mt-4" style={{ color: "#e2ddd0" }}>
-                  Thank you for being part of the CEOAI journey.
+                  Thank you for being part of the journey.
                 </p>
 
                 <p className="mt-6" style={{ color: "#75705f" }}>
                   &mdash;
                 </p>
                 <p className="mt-1">
-                  <span style={{ color: "#f2d99e", fontWeight: 800, fontSize: "1.02em" }}>**@AS**</span>
+                  <span style={{ color: "#f2d99e", fontWeight: 800, fontSize: "1.02em" }}>**AS**</span>
                 </p>
                 <p style={{ color: "#a39d8c" }}>
                   Founder &amp; Creator, CEOAI
