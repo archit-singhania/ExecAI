@@ -59,12 +59,9 @@ function FullPortraitGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivEle
       const offsetX = (bounds.width - renderWidth) / 2;
       const offsetY = (bounds.height - renderHeight) / 2;
 
-      // Shrink the panel itself to hug the glyph's real width so no black
-      // margin is left on either side (desktop layout only — mobile stays
-      // full-width/stacked).
       const panel = panelRef?.current;
       if (panel && window.innerWidth >= 1024) {
-        const chrome = panel.offsetWidth - bounds.width; // borders/frame chrome
+        const chrome = panel.offsetWidth - bounds.width;
         const nextWidth = Math.ceil(renderWidth + chrome);
         if (Math.abs(panel.offsetWidth - nextWidth) > 1) {
           panel.style.width = `${nextWidth}px`;
@@ -95,6 +92,20 @@ function FullPortraitGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivEle
       const cellWidth = renderWidth / columns;
       const cellHeight = renderHeight / rows;
 
+      const lum = new Float32Array(columns * rows);
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const pixel = (row * columns + column) * 4;
+          lum[row * columns + column] =
+            pixels[pixel] * 0.2126 + pixels[pixel + 1] * 0.7152 + pixels[pixel + 2] * 0.0722;
+        }
+      }
+      const sampleLum = (r: number, c: number) => {
+        const rr = r < 0 ? 0 : r >= rows ? rows - 1 : r;
+        const cc = c < 0 ? 0 : c >= columns ? columns - 1 : c;
+        return lum[rr * columns + cc];
+      };
+
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       context.fillStyle = "#070706";
       context.fillRect(0, 0, bounds.width, bounds.height);
@@ -102,15 +113,35 @@ function FullPortraitGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivEle
       context.textBaseline = "top";
 
       for (let row = 0; row < rows; row += 1) {
+        const rowFrac = row / rows;
+        const inFaceCap = rowFrac <= 0.3;
+        const inHandGlass = rowFrac >= 0.55 && rowFrac <= 0.85;
+        const inDetailZone = inFaceCap || inHandGlass;
+
         for (let column = 0; column < columns; column += 1) {
-          const pixel = (row * columns + column) * 4;
-          const red = pixels[pixel];
-          const green = pixels[pixel + 1];
-          const blue = pixels[pixel + 2];
-          const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-          // Gamma/contrast curve: expands the mid-tone band (skin, glass
-          // highlights) instead of compressing it, so facial and glass
-          // detail actually separates into distinct glyphs.
+          const idx = row * columns + column;
+          let luminance = lum[idx];
+
+          if (inDetailZone) {
+            const gx = sampleLum(row, column + 1) - sampleLum(row, column - 1);
+            const gy = sampleLum(row + 1, column) - sampleLum(row - 1, column);
+            const gradient = Math.sqrt(gx * gx + gy * gy);
+
+            if (gradient > 26) {
+              luminance = Math.max(0, luminance - gradient * 0.4);
+            } else {
+              const localMean =
+                (sampleLum(row - 1, column) +
+                  sampleLum(row + 1, column) +
+                  sampleLum(row, column - 1) +
+                  sampleLum(row, column + 1) +
+                  luminance) /
+                5;
+              luminance = localMean + (luminance - localMean) * 1.6;
+            }
+            luminance = Math.min(255, Math.max(0, luminance));
+          }
+
           const normalized = luminance / 255;
           const contrasted = Math.pow(normalized, 0.72);
           const glyph = glyphs[Math.min(glyphs.length - 1, Math.floor(contrasted * glyphs.length))];
