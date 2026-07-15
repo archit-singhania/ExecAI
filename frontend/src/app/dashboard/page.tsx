@@ -36,11 +36,11 @@ const TAB_TITLES: Record<DashboardTab, string> = {
 };
 
 const TAB_TONES: Record<DashboardTab, MetroTone> = {
-  chat: "accent",
+  chat: "midnight",
   agents: "ink",
-  tasks: "ember",
-  board: "basil",
-  operations: "steel",
+  tasks: "cobalt",
+  board: "teal",
+  operations: "slate",
 };
 
 export default function DashboardPage() {

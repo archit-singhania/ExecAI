@@ -39,8 +39,9 @@ export function MetroHome({
   taskCount: number;
 }) {
   return (
-    <div className="metro-grid-fade flex h-full min-w-0 flex-1 flex-col gap-3 sm:gap-4">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg px-1 py-1">
+    <div className="metro-grid-fade metro-home-shell relative flex h-full min-w-0 flex-1 flex-col gap-3 sm:gap-4">
+      <div className="metro-home-atmosphere pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className="metro-home-header relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2.5 sm:px-4">
         <div className="flex items-center gap-2.5">
           <Logo size={34} />
           <div>
@@ -71,19 +72,21 @@ export function MetroHome({
         </div>
       </div>
 
-      <div className="command-scroll min-h-0 flex-1 overflow-y-auto rounded-lg">
-        <div className="grid auto-rows-[minmax(120px,1fr)] grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+      <div className="metro-home-deck command-scroll relative z-10 min-h-0 flex-1 overflow-y-auto rounded-xl p-2 sm:p-3">
+        <div className="metro-home-grid grid auto-rows-[minmax(120px,1fr)] grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
           <MetroTile
             label="Chat with the CEO"
+            eyebrow="Command channel"
             stat="Open the boardroom"
             icon={MessagesSquare}
-            tone="accent"
+            tone="midnight"
             size="2x2"
             onClick={() => onSelectTab("chat")}
           />
 
           <MetroTile
             label="Agent briefing"
+            eyebrow="Intelligence desk"
             stat="Specialist reports"
             icon={Users2}
             tone="ink"
@@ -93,42 +96,47 @@ export function MetroHome({
 
           <MetroTile
             label="Task board"
+            eyebrow="Execution layer"
             stat={`${doneTasks}/${taskCount} done`}
             icon={ListChecks}
-            tone="ember"
+            tone="cobalt"
             size="1x1"
             onClick={() => onSelectTab("tasks")}
           />
 
           <MetroTile
             label="Board & memory"
+            eyebrow="Decision archive"
             stat="Weekly reviews"
             icon={Presentation}
-            tone="basil"
+            tone="teal"
             size="1x1"
             onClick={() => onSelectTab("board")}
           />
 
           <MetroTile
             label="Operations"
+            eyebrow="Operating rhythm"
             stat="Roadmap & signal"
             icon={Activity}
-            tone="steel"
+            tone="slate"
             size="1x1"
             onClick={() => onSelectTab("operations")}
           />
 
           <MetroTile
             label="Health score"
+            eyebrow="Company signal"
             stat={`${healthScore}%`}
             icon={Gauge}
-            tone="chartreuse"
+            tone="plum"
             size="1x1"
             onClick={() => onSelectTab("operations")}
           />
 
           <MetroTile
             label="Runway"
+            eyebrow="Capital outlook"
             stat={`${runway} months`}
             icon={CircleDollarSign}
             tone="ink"
@@ -138,9 +146,10 @@ export function MetroHome({
 
           <MetroTile
             label="Start new session"
+            eyebrow="New workstream"
             stat="Fresh CEO run"
             icon={RefreshCcw}
-            tone="accent"
+            tone="midnight"
             size="wide"
             onClick={onStartNewSession}
           />

@@ -15,22 +15,14 @@ export type SurfaceOption = {
 };
 
 export const ACCENT_OPTIONS: AccentOption[] = [
-  { name: "Chartreuse", value: "183 202 93" },
-  { name: "Basil", value: "29 111 95" },
-  { name: "Ember", value: "212 95 58" },
-  { name: "Amber", value: "217 158 44" },
-  { name: "Teal", value: "24 148 148" },
-  { name: "Sky", value: "42 130 214" },
+  { name: "Cobalt", value: "91 122 214" },
+  { name: "Teal", value: "41 158 157" },
   { name: "Violet", value: "124 92 214" },
-  { name: "Rose", value: "214 78 122" },
-  { name: "Lime", value: "132 190 84" },
-  { name: "Cobalt", value: "51 99 209" },
-  { name: "Coral", value: "224 108 92" },
-  { name: "Gold", value: "196 155 61" },
+  { name: "Slate Blue", value: "90 110 158" },
   { name: "Orchid", value: "170 96 196" },
   { name: "Jade", value: "38 150 122" },
-  { name: "Crimson", value: "196 58 78" },
-  { name: "Slate Blue", value: "90 110 158" },
+  { name: "Sky", value: "42 130 214" },
+  { name: "Indigo", value: "80 92 184" },
 ];
 
 export const SURFACE_OPTIONS: { light: SurfaceOption[]; dark: SurfaceOption[] } = {
