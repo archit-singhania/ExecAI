@@ -1,18 +1,19 @@
 "use client";
 
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type MetroTone = "ink" | "midnight" | "cobalt" | "teal" | "plum" | "slate";
+export type MetroTileSize = "1x1" | "wide" | "2x2";
 
-const TONE_CLASSES: Record<MetroTone, string> = {
-  ink: "bg-gradient-to-br from-[#26303a] via-[#141a21] to-[#07090d] text-fog",
-  midnight: "bg-gradient-to-br from-[#1c2948] via-[#10192e] to-[#070b15] text-fog",
-  cobalt: "bg-gradient-to-br from-[#273d71] via-[#17274f] to-[#090e20] text-fog",
-  teal: "bg-gradient-to-br from-[#123f47] via-[#0b2930] to-[#061316] text-fog",
-  plum: "bg-gradient-to-br from-[#3c294c] via-[#251932] to-[#100a18] text-fog",
-  slate: "bg-gradient-to-br from-[#455363] via-[#252f3b] to-[#0d1218] text-fog",
+const TONE_BG: Record<MetroTone, string> = {
+  ink: "linear-gradient(145deg, #26303a 0%, #141a21 55%, #07090d 100%)",
+  midnight: "linear-gradient(145deg, #1c2948 0%, #10192e 55%, #070b15 100%)",
+  cobalt: "linear-gradient(145deg, #273d71 0%, #17274f 55%, #090e20 100%)",
+  teal: "linear-gradient(145deg, #123f47 0%, #0b2930 55%, #061316 100%)",
+  plum: "linear-gradient(145deg, #3c294c 0%, #251932 55%, #100a18 100%)",
+  slate: "linear-gradient(145deg, #455363 0%, #252f3b 55%, #0d1218 100%)",
 };
 
 export const TONE_GLOW_HEX: Record<MetroTone, string> = {
@@ -24,38 +25,37 @@ export const TONE_GLOW_HEX: Record<MetroTone, string> = {
   slate: "#9eafc0",
 };
 
-const TONE_CONTRAST_HEX: Record<MetroTone, string> = {
-  ink: "#eef4ff",
-  midnight: "#e8efff",
-  cobalt: "#edf2ff",
-  teal: "#e5fffc",
-  plum: "#faefff",
-  slate: "#edf5ff",
-};
-
-const TONE_PATTERN: Record<MetroTone, string> = {
-  ink: "metro-tile-pattern-grid",
-  midnight: "metro-tile-pattern-dots",
-  cobalt: "metro-tile-pattern-diagonal",
-  teal: "metro-tile-pattern-cross",
-  plum: "metro-tile-pattern-dots",
-  slate: "metro-tile-pattern-grid",
-};
-
-export type MetroTileSize = "1x1" | "wide" | "2x2";
-
 const SIZE_CLASSES: Record<MetroTileSize, string> = {
-  "1x1": "col-span-1 row-span-1 aspect-square",
-  wide: "col-span-2 row-span-1 aspect-[2/1] sm:aspect-[2.1/1]",
-  "2x2": "col-span-2 row-span-2 aspect-square",
+  "1x1": "col-span-1 row-span-1",
+  wide: "col-span-2 row-span-1",
+  "2x2": "col-span-2 row-span-2",
 };
 
-function hexToRgba(hex: string, alpha: number) {
+function rgba(hex: string, alpha: number) {
   const clean = hex.replace("#", "");
-  const r = parseInt(clean.substring(0, 2), 16);
-  const g = parseInt(clean.substring(2, 4), 16);
-  const b = parseInt(clean.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return `rgba(${parseInt(clean.slice(0, 2), 16)}, ${parseInt(clean.slice(2, 4), 16)}, ${parseInt(
+    clean.slice(4, 6),
+    16,
+  )}, ${alpha})`;
+}
+
+function Sparkline({ points, color }: { points: number[]; color: string }) {
+  if (points.length < 2) return null;
+
+  const max = Math.max(...points);
+  const min = Math.min(...points);
+  const span = max - min || 1;
+  const step = 100 / (points.length - 1);
+
+  const path = points
+    .map((value, index) => `${index * step},${26 - ((value - min) / span) * 22}`)
+    .join(" ");
+
+  return (
+    <svg viewBox="0 0 100 28" preserveAspectRatio="none" className="mt2-spark" aria-hidden="true">
+      <polyline points={path} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
 }
 
 export function MetroTile({
@@ -67,6 +67,10 @@ export function MetroTile({
   size = "1x1",
   onClick,
   className,
+  trend,
+  progress,
+  delta,
+  status = "Ready",
 }: {
   label: string;
   stat?: string;
@@ -76,110 +80,110 @@ export function MetroTile({
   size?: MetroTileSize;
   onClick: () => void;
   className?: string;
+  trend?: number[];
+  progress?: number;
+  delta?: string;
+  status?: string;
 }) {
-  const surfaceRef = useRef<HTMLDivElement>(null);
+  const frame = useRef<number | null>(null);
+  const pending = useRef<{ x: number; y: number } | null>(null);
+  const node = useRef<HTMLButtonElement>(null);
+
+  const flush = useCallback(() => {
+    frame.current = null;
+    const next = pending.current;
+    const element = node.current;
+    if (!next || !element) return;
+
+    element.style.setProperty("--sx", `${next.x}%`);
+    element.style.setProperty("--sy", `${next.y}%`);
+  }, []);
+
+  const handleMove = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === "touch") return;
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      pending.current = {
+        x: ((event.clientX - rect.left) / rect.width) * 100,
+        y: ((event.clientY - rect.top) / rect.height) * 100,
+      };
+
+      if (frame.current === null) {
+        frame.current = requestAnimationFrame(flush);
+      }
+    },
+    [flush],
+  );
+
+  const handleLeave = useCallback(() => {
+    if (frame.current !== null) {
+      cancelAnimationFrame(frame.current);
+      frame.current = null;
+    }
+    pending.current = null;
+    node.current?.style.setProperty("--sx", "50%");
+    node.current?.style.setProperty("--sy", "50%");
+  }, []);
+
   const glow = TONE_GLOW_HEX[tone];
-  const contrast = TONE_CONTRAST_HEX[tone];
-
-  function handlePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
-    const surface = surfaceRef.current;
-    if (!surface || event.pointerType === "touch") return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const px = (event.clientX - rect.left) / rect.width;
-    const py = (event.clientY - rect.top) / rect.height;
-    const rotateY = (px - 0.5) * 16;
-    const rotateX = (0.5 - py) * 16;
-    surface.style.setProperty("--tile-tilt-x", `${rotateX}deg`);
-    surface.style.setProperty("--tile-tilt-y", `${rotateY}deg`);
-    event.currentTarget.style.setProperty("--spot-x", `${px * 100}%`);
-    event.currentTarget.style.setProperty("--spot-y", `${py * 100}%`);
-  }
-
-  function handlePointerLeave(event: React.PointerEvent<HTMLButtonElement>) {
-    const surface = surfaceRef.current;
-    if (!surface) return;
-    surface.style.setProperty("--tile-tilt-x", "0deg");
-    surface.style.setProperty("--tile-tilt-y", "0deg");
-    event.currentTarget.style.setProperty("--spot-x", "50%");
-    event.currentTarget.style.setProperty("--spot-y", "50%");
-  }
+  const large = size === "2x2";
 
   return (
     <button
+      ref={node}
       type="button"
       onClick={onClick}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
+      onPointerMove={handleMove}
+      onPointerLeave={handleLeave}
       style={
         {
-          "--tile-glow": `0 0 18px 0px ${hexToRgba(glow, 0.28)}`,
-          "--tile-glow-strong": `0 0 40px 3px ${hexToRgba(glow, 0.55)}`,
-          "--tile-light": hexToRgba(glow, 0.72),
-          "--tile-light-soft": hexToRgba(glow, 0.24),
-          "--tile-contrast": TONE_CONTRAST_HEX[tone],
-          "--tile-contrast-soft": hexToRgba(TONE_CONTRAST_HEX[tone], 0.28),
+          "--tile-bg": TONE_BG[tone],
+          "--tile-glow": glow,
+          "--tile-glow-12": rgba(glow, 0.12),
+          "--tile-glow-45": rgba(glow, 0.45),
         } as React.CSSProperties
       }
-      className={cn(
-        "metro-tile group relative flex flex-col justify-between overflow-hidden p-3 text-left sm:p-4",
-        SIZE_CLASSES[size],
-        className,
-      )}
+      className={cn("mt2", SIZE_CLASSES[size], className)}
     >
-      <div
-        ref={surfaceRef}
-        className={cn("metro-tile-surface absolute inset-0", TONE_CLASSES[tone])}
-      >
-        <div className="metro-tile-aurora" />
-        <div className="metro-tile-scan" />
-        <div className="metro-tile-stage" aria-hidden="true">
-          <div className="metro-tile-floor" />
-          <div className="metro-tile-orbit metro-tile-orbit-a" />
-          <div className="metro-tile-orbit metro-tile-orbit-b" />
-          <div className="metro-tile-prism">
-            <span className="metro-tile-prism-face metro-tile-prism-front" />
-            <span className="metro-tile-prism-face metro-tile-prism-back" />
-            <span className="metro-tile-prism-face metro-tile-prism-left" />
-            <span className="metro-tile-prism-face metro-tile-prism-right" />
-            <span className="metro-tile-prism-face metro-tile-prism-top" />
-          </div>
-        </div>
-        <div className={cn("metro-tile-pattern", TONE_PATTERN[tone])} />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          style={{
-            background: `radial-gradient(220px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255,255,255,0.28), transparent 68%)`,
-          }}
-        />
-        <div className="metro-tile-grain" />
-        <div className="metro-tile-shimmer" />
-      </div>
+      <span className="mt2-sheen" aria-hidden="true" />
 
-      <div
-        className={cn(
-          "metro-tile-content relative z-10 flex h-full flex-col justify-between",
-          TONE_CLASSES[tone].includes("text-ink") ? "text-ink" : "text-fog",
-        )}
-        style={{ color: contrast }}
-      >
-        <div className="flex items-start justify-between">
-          <div className="metro-tile-icon-shell">
-            <Icon size={size === "2x2" ? 28 : 20} className="metro-tile-icon" />
-          </div>
-          <div className="metro-tile-state">
-            <span className="metro-tile-pulse-dot h-1.5 w-1.5 rounded-full" style={{ background: "currentColor" }} />
-            <span>{size === "2x2" ? "Primary" : "Ready"}</span>
-          </div>
-        </div>
-        <div>
-          <p className="metro-tile-eyebrow">{eyebrow ?? "Executive system"}</p>
-          <div className="mt-1 flex items-end justify-between gap-2">
-            <p className={cn("font-black leading-tight", size === "2x2" ? "text-lg sm:text-xl" : "text-xs sm:text-sm")}>{label}</p>
-            <span className="metro-tile-action" aria-hidden="true"><ArrowUpRight size={size === "2x2" ? 18 : 15} /></span>
-          </div>
-          {stat ? <div className="metro-tile-reading"><span>{stat}</span><span className="metro-tile-reading-line" /></div> : null}
-        </div>
-      </div>
+      <span className="mt2-inner">
+        <span className="mt2-head">
+          <span className="mt2-icon">
+            <Icon size={large ? 22 : 17} strokeWidth={1.9} />
+          </span>
+          <span className="mt2-status">
+            <span className="mt2-dot" />
+            {status}
+          </span>
+        </span>
+
+        <span className="mt2-foot">
+          {eyebrow ? <span className="mt2-eyebrow">{eyebrow}</span> : null}
+
+          <span className="mt2-title-row">
+            <span className={cn("mt2-title", large && "mt2-title-lg")}>{label}</span>
+            <ArrowUpRight size={large ? 17 : 14} className="mt2-arrow" />
+          </span>
+
+          {stat ? (
+            <span className="mt2-stat-row">
+              <span className={cn("mt2-stat", large && "mt2-stat-lg")}>{stat}</span>
+              {delta ? <span className="mt2-delta">{delta}</span> : null}
+              {trend?.length ? <Sparkline points={trend} color={glow} /> : null}
+            </span>
+          ) : null}
+
+          {typeof progress === "number" ? (
+            <span className="mt2-bar">
+              <span className="mt2-bar-fill" style={{ width: `${Math.max(2, Math.min(100, progress))}%` }} />
+            </span>
+          ) : null}
+        </span>
+      </span>
+
+      <span className="mt2-edge" aria-hidden="true" />
     </button>
   );
 }

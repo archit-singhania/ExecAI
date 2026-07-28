@@ -3,9 +3,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task, streamMessage } from "@/lib/api";
-import { DashboardSidebar } from "@/components/dashboard-sidebar";
-import { DashboardTopbar } from "@/components/dashboard-topbar";
-import { ExecutiveGraph } from "@/components/sections/executive-graph";
 import { MetroHome } from "@/components/dashboard/metro-home";
 import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
 import { MetroTone } from "@/components/dashboard/metro-tile";
@@ -353,6 +350,8 @@ export default function DashboardPage() {
             runway={runway}
             doneTasks={doneTasks}
             taskCount={activeTasks.length}
+            reportCount={latestReports.length}
+            opportunityScore={opportunityScore}
           />
         ) : (
           <MetroSectionShell

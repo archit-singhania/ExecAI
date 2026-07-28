@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.database import Base, engine, get_db, SessionLocal
 from app.memory import retrieve_relevant_memories, search_memory_rows, store_memory
 from app.models import AgentReport, BusinessMemory, BusinessSession, Message, ReviewSchedule, Task, User
-from app.halcyon.models import HalcyonSession, HalcyonTurn  # noqa: F401  (registers tables)
+from app.halcyon.models import HalcyonSession, HalcyonTurn
 from app.halcyon import router as halcyon_router
 from app.scheduling import (
     build_board_meeting,
@@ -22,6 +22,7 @@ from app.scheduling import (
     run_due_reviews,
     serialize_report,
 )
+from app.ratelimit import limit_by_user
 from app.schemas import (
     AgentReportOut,
     DashboardOut,
@@ -81,9 +82,13 @@ def health():
 
 app.include_router(halcyon_router)
 
+agent_run_limit = limit_by_user("agent_run", limit=10, window_seconds=60)
+board_limit = limit_by_user("board_meeting", limit=6, window_seconds=300)
+transcribe_limit = limit_by_user("transcribe", limit=30, window_seconds=60)
+
 
 @app.post("/api/voice/transcribe")
-async def transcribe_voice(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+async def transcribe_voice(file: UploadFile = File(...), current_user: User = Depends(transcribe_limit)):
     """STT fallback for browsers without native SpeechRecognition (Firefox, some
     Safari builds). VoiceStage's mic button records via MediaRecorder and posts
     the clip here when window.SpeechRecognition is unavailable."""
@@ -349,7 +354,7 @@ def send_message(
     session_id: str,
     payload: MessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(agent_run_limit),
 ):
     session = _owned_session(session_id, db, current_user)
 
@@ -443,7 +448,7 @@ def send_message_stream(
     session_id: str,
     payload: MessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(agent_run_limit),
 ):
     """Same as POST /messages, but streams each agent's report to the client
     over Server-Sent Events as soon as it's ready, instead of waiting for
@@ -633,7 +638,7 @@ def list_board_meetings(
 def generate_board_meeting(
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(board_limit),
 ):
     session = _owned_session(session_id, db, current_user)
     report = build_board_meeting(db, session, trigger="manual")

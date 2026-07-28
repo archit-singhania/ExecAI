@@ -17,6 +17,20 @@ import { AuthUser } from "@/lib/auth";
 import { DashboardTab } from "@/lib/dashboard-data";
 import { MetroTile } from "@/components/dashboard/metro-tile";
 
+function shapeFrom(seed: number, length = 7): number[] {
+  const points: number[] = [];
+  let value = Math.max(8, seed * 0.55);
+
+  for (let index = 0; index < length; index += 1) {
+    const wave = Math.sin((seed + index * 1.7) * 0.9) * (seed * 0.08 + 2);
+    value = value + wave + (seed - value) * 0.22;
+    points.push(Math.max(1, value));
+  }
+
+  points[points.length - 1] = Math.max(1, seed);
+  return points;
+}
+
 export function MetroHome({
   user,
   isDemo,
@@ -27,6 +41,8 @@ export function MetroHome({
   runway,
   doneTasks,
   taskCount,
+  reportCount = 0,
+  opportunityScore = 0,
 }: {
   user: AuthUser | null;
   isDemo: boolean;
@@ -37,47 +53,67 @@ export function MetroHome({
   runway: number;
   doneTasks: number;
   taskCount: number;
+  reportCount?: number;
+  opportunityScore?: number;
 }) {
+  const completion = taskCount ? Math.round((doneTasks / taskCount) * 100) : 0;
+  const openTasks = Math.max(0, taskCount - doneTasks);
+  const name = user?.name ?? (isDemo ? "Demo session" : "Account");
+  const initial = name.trim().charAt(0).toUpperCase() || "C";
+
   return (
-    <div className="metro-grid-fade metro-home-shell relative flex h-full min-w-0 flex-1 flex-col gap-3 sm:gap-4">
-      <div className="metro-home-atmosphere pointer-events-none absolute inset-0" aria-hidden="true" />
-      <div className="metro-home-header relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2.5 sm:px-4">
-        <div className="flex items-center gap-2.5">
-          <Logo size={34} />
-          <div>
-            <p className="text-sm font-black leading-tight">{user?.name ?? (isDemo ? "Demo session" : "Account")}</p>
-            <p className="text-[0.7rem] font-semibold leading-tight text-steel">
+    <div className="mh relative flex h-full min-w-0 flex-1 flex-col gap-3">
+      <header className="mh-bar relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2.5 sm:px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Logo size={30} />
+          <span className="mh-rule" aria-hidden="true" />
+          <div className="mh-avatar" aria-hidden="true">
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold leading-tight tracking-[-0.01em]">{name}</p>
+            <p className="truncate text-[0.7rem] font-semibold leading-tight text-steel">
               {isDemo ? "Sample data · nothing is saved" : user?.email ?? ""}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="mh-pills hidden items-center gap-1 md:flex">
+            <span className="mh-pill">
+              <span className="mh-pill-label">Health</span>
+              <span className="mh-pill-value">{healthScore}%</span>
+            </span>
+            <span className="mh-pill">
+              <span className="mh-pill-label">Runway</span>
+              <span className="mh-pill-value">{runway}mo</span>
+            </span>
+            <span className="mh-pill">
+              <span className="mh-pill-label">Open</span>
+              <span className="mh-pill-value">{openTasks}</span>
+            </span>
+          </div>
+
           {isDemo ? (
-            <Link
-              href="/signup"
-              className="rounded-md border border-ink/10 bg-white/60 px-3 py-2 text-xs font-bold text-steel transition hover:border-ink/25 hover:text-ink dark:border-fog/10 dark:bg-white/5 dark:hover:border-fog/25"
-            >
+            <Link href="/signup" className="mh-btn">
               Sign up to save this
             </Link>
           ) : null}
-          <button
-            type="button"
-            onClick={onLogout}
-            className="inline-flex items-center gap-1.5 rounded-md border border-ink/10 bg-white/60 px-3 py-2 text-xs font-bold text-steel transition hover:border-ember/40 hover:text-ember dark:border-fog/10 dark:bg-white/5"
-          >
-            <LogOut size={15} />
+
+          <button type="button" onClick={onLogout} className="mh-btn mh-btn-danger">
+            <LogOut size={14} />
             <span className="hidden sm:inline">Log out</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="metro-home-deck command-scroll relative z-10 min-h-0 flex-1 overflow-y-auto rounded-xl p-2 sm:p-3">
-        <div className="metro-home-grid grid auto-rows-[minmax(120px,1fr)] grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+      <div className="mh-deck command-scroll relative z-10 min-h-0 flex-1 overflow-y-auto rounded-xl p-2 sm:p-3">
+        <div className="mh-grid">
           <MetroTile
             label="Chat with the CEO"
             eyebrow="Command channel"
             stat="Open the boardroom"
+            status="Live"
             icon={MessagesSquare}
             tone="midnight"
             size="2x2"
@@ -87,40 +123,47 @@ export function MetroHome({
           <MetroTile
             label="Agent briefing"
             eyebrow="Intelligence desk"
-            stat="Specialist reports"
+            stat={reportCount ? `${reportCount}` : "—"}
+            delta={reportCount ? "filed" : undefined}
+            status={reportCount ? "Reporting" : "Idle"}
+            trend={reportCount ? shapeFrom(reportCount) : undefined}
             icon={Users2}
             tone="ink"
-            size="1x1"
             onClick={() => onSelectTab("agents")}
           />
 
           <MetroTile
             label="Task board"
             eyebrow="Execution layer"
-            stat={`${doneTasks}/${taskCount} done`}
+            stat={`${doneTasks}/${taskCount}`}
+            delta={`${completion}%`}
+            status={openTasks ? `${openTasks} open` : "Clear"}
+            progress={completion}
             icon={ListChecks}
             tone="cobalt"
-            size="1x1"
             onClick={() => onSelectTab("tasks")}
           />
 
           <MetroTile
             label="Board & memory"
             eyebrow="Decision archive"
-            stat="Weekly reviews"
+            stat="Weekly"
+            delta="review"
+            status="Scheduled"
             icon={Presentation}
             tone="teal"
-            size="1x1"
             onClick={() => onSelectTab("board")}
           />
 
           <MetroTile
             label="Operations"
             eyebrow="Operating rhythm"
-            stat="Roadmap & signal"
+            stat={opportunityScore ? `${opportunityScore}` : "—"}
+            delta={opportunityScore ? "consensus" : undefined}
+            trend={opportunityScore ? shapeFrom(opportunityScore) : undefined}
+            status="Signal"
             icon={Activity}
             tone="slate"
-            size="1x1"
             onClick={() => onSelectTab("operations")}
           />
 
@@ -128,19 +171,23 @@ export function MetroHome({
             label="Health score"
             eyebrow="Company signal"
             stat={`${healthScore}%`}
+            progress={healthScore}
+            trend={shapeFrom(healthScore)}
+            status="Tracking"
             icon={Gauge}
             tone="plum"
-            size="1x1"
             onClick={() => onSelectTab("operations")}
           />
 
           <MetroTile
             label="Runway"
             eyebrow="Capital outlook"
-            stat={`${runway} months`}
+            stat={`${runway}`}
+            delta="months"
+            trend={shapeFrom(runway * 4)}
+            status={runway < 6 ? "Tight" : "Stable"}
             icon={CircleDollarSign}
             tone="ink"
-            size="1x1"
             onClick={() => onSelectTab("operations")}
           />
 
@@ -148,6 +195,7 @@ export function MetroHome({
             label="Start new session"
             eyebrow="New workstream"
             stat="Fresh CEO run"
+            status="Ready"
             icon={RefreshCcw}
             tone="midnight"
             size="wide"

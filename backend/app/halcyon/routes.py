@@ -42,8 +42,12 @@ from app.halcyon.schemas import (
 )
 from app.halcyon.worlds import WORLD_BASELINES, baseline_for
 from app.models import User
+from app.ratelimit import limit_by_user
 
 router = APIRouter(prefix="/api/halcyon", tags=["halcyon"])
+
+turn_limit = limit_by_user("halcyon_turn", limit=20, window_seconds=60)
+session_limit = limit_by_user("halcyon_session", limit=10, window_seconds=300)
 
 
 @router.get("/support")
@@ -170,7 +174,7 @@ def get_preferences(
 def start_session(
     payload: SessionStartIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(session_limit),
 ):
     session = HalcyonSession(
         user_id=current_user.id,
@@ -196,7 +200,7 @@ async def take_turn(
     session_id: str,
     payload: TurnIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(turn_limit),
 ):
     session = _owned_session(session_id, db, current_user)
     if session.ended_at:
