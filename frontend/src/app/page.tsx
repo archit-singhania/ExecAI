@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Feather, Radio, ShieldCheck, Sparkles, Volume2 } from "lucide-react";
+import { ArrowRight, Feather, Moon, Radio, ShieldCheck, Sparkles, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
@@ -110,6 +110,14 @@ export default function LandingPage() {
             className="group inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-white/60 text-steel shadow-line backdrop-blur transition hover:border-accent/50 hover:text-accent dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark"
           >
             <Feather size={12} className="transition group-hover:scale-110" />
+          </Link>
+          <Link
+            href="/halcyon"
+            title="Halcyon — a quieter place"
+            aria-label="Halcyon"
+            className="hal-quiet-link group"
+          >
+            <Moon size={12} className="transition group-hover:scale-110" />
           </Link>
         </footer>
       </div>

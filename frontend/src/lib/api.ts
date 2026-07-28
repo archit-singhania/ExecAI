@@ -63,6 +63,18 @@ export type MemorySearch = {
   results: Memory[];
 };
 
+export type ReviewCadence = "off" | "weekly" | "biweekly" | "monthly";
+
+export type ReviewSchedule = {
+  cadence: ReviewCadence;
+  weekday: number;
+  hour: number;
+  tz_offset_minutes: number;
+  email_enabled: boolean;
+  last_run_at: string | null;
+  next_run_at: string | null;
+};
+
 export type CEOResponse = {
   message: ChatMessage;
   recommendation: string;
@@ -151,6 +163,12 @@ export const api = {
       body: JSON.stringify({ content }),
     }),
   dashboard: () => request<DashboardSummary>("/api/dashboard"),
+  getReviewSchedule: () => request<ReviewSchedule>("/api/review-schedule"),
+  updateReviewSchedule: (schedule: Omit<ReviewSchedule, "last_run_at" | "next_run_at">) =>
+    request<ReviewSchedule>("/api/review-schedule", {
+      method: "PUT",
+      body: JSON.stringify(schedule),
+    }),
 };
 
 export async function createSession() {

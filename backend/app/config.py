@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me-in-prod"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 7
+    cron_secret: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

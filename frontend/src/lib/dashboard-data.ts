@@ -38,6 +38,18 @@ export const operatingPhases = [
   "Board meetings",
 ];
 
+export type PhaseStatus = "shipped" | "building" | "next";
+
+export const operatingRoadmap: { name: string; status: PhaseStatus; note: string }[] = [
+  { name: "Core chat", status: "shipped", note: "Voice and text into the boardroom" },
+  { name: "Agent graph", status: "shipped", note: "Nine specialists file in parallel" },
+  { name: "Long-term memory", status: "shipped", note: "Decisions persist across sessions" },
+  { name: "Reports", status: "shipped", note: "Board-ready markdown export" },
+  { name: "Voice", status: "building", note: "Hands-free sessions, spoken verdicts" },
+  { name: "Board meetings", status: "building", note: "Weekly scored review of progress" },
+  { name: "Scheduled reviews", status: "next", note: "The board meets whether you show up or not" },
+];
+
 export type TaskFilter = "All" | "Open" | "Done" | "High";
 
 export type DashboardTab = "chat" | "agents" | "tasks" | "board" | "operations";

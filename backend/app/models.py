@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -94,3 +94,25 @@ class BusinessMemory(Base):
     embedding_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedding: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ReviewSchedule(Base):
+    """Standing cadence for automatic board reviews.
+
+    One row per user. The board convenes on this schedule whether or not the
+    founder opens the app — this is the accountability loop, not a reminder.
+    """
+
+    __tablename__ = "review_schedules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    cadence: Mapped[str] = mapped_column(String(24), default="weekly")  # off | weekly | biweekly | monthly
+    weekday: Mapped[int] = mapped_column(Integer, default=0)  # 0=Monday .. 6=Sunday
+    hour: Mapped[int] = mapped_column(Integer, default=9)  # local hour, 0-23
+    tz_offset_minutes: Mapped[int] = mapped_column(Integer, default=0)  # local = utc + offset
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -12,7 +12,16 @@ from app.llm import transcribe_audio
 from app.config import get_settings
 from app.database import Base, engine, get_db, SessionLocal
 from app.memory import retrieve_relevant_memories, search_memory_rows, store_memory
-from app.models import AgentReport, BusinessMemory, BusinessSession, Message, Task, User
+from app.models import AgentReport, BusinessMemory, BusinessSession, Message, ReviewSchedule, Task, User
+from app.halcyon.models import HalcyonSession, HalcyonTurn  # noqa: F401  (registers tables)
+from app.halcyon import router as halcyon_router
+from app.scheduling import (
+    build_board_meeting,
+    compute_next_run,
+    get_or_create_schedule,
+    run_due_reviews,
+    serialize_report,
+)
 from app.schemas import (
     AgentReportOut,
     DashboardOut,
@@ -21,6 +30,8 @@ from app.schemas import (
     MessageCreate,
     MessageOut,
     ReportExportOut,
+    ReviewScheduleIn,
+    ReviewScheduleOut,
     SessionCreate,
     SessionOut,
     TaskOut,
@@ -66,6 +77,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+app.include_router(halcyon_router)
 
 
 @app.post("/api/voice/transcribe")
@@ -622,42 +636,52 @@ def generate_board_meeting(
     current_user: User = Depends(get_current_user),
 ):
     session = _owned_session(session_id, db, current_user)
-
-    tasks = db.query(Task).filter(Task.session_id == session.id).all()
-    reports = db.query(AgentReport).filter(AgentReport.session_id == session.id).all()
-    completed = len([task for task in tasks if task.status.lower() in {"done", "complete", "completed"}])
-    missed_or_open = len(tasks) - completed
-    average_score = round(sum(report.score for report in reports) / len(reports)) if reports else session.health_score
-    bullets = [
-        f"Completed tasks: {completed}",
-        f"Open or missed tasks: {missed_or_open}",
-        f"Business health score: {average_score}/100",
-        "Next recommendation: prove demand before expanding scope or spending on acquisition.",
-    ]
-    summary = (
-        "This board review approves continued validation, but blocks full-scale buildout until customer evidence improves. "
-        "The CEO wants sharper buyer proof, clearer pricing, and weekly accountability on tasks."
-    )
-    report = AgentReport(
-        session_id=session.id,
-        agent="CEO Board",
-        report_type="board",
-        title="Weekly board meeting",
-        summary=summary,
-        bullets="\n".join(bullets),
-        score=average_score,
-    )
-    db.add(report)
-    db.add(BusinessMemory(session_id=session.id, kind="board_report", content=summary, importance=0.85, embedding_text=summary))
+    report = build_board_meeting(db, session, trigger="manual")
     db.commit()
     db.refresh(report)
-    return {
-        "id": report.id,
-        "agent": report.agent,
-        "report_type": report.report_type,
-        "title": report.title,
-        "summary": report.summary,
-        "bullets": report.bullets.splitlines(),
-        "score": report.score,
-        "created_at": report.created_at,
-    }
+    return serialize_report(report)
+
+
+@app.get("/api/review-schedule", response_model=ReviewScheduleOut)
+def get_review_schedule(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_or_create_schedule(db, current_user.id)
+
+
+@app.put("/api/review-schedule", response_model=ReviewScheduleOut)
+def update_review_schedule(
+    payload: ReviewScheduleIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    schedule = get_or_create_schedule(db, current_user.id)
+    schedule.cadence = payload.cadence
+    schedule.weekday = payload.weekday
+    schedule.hour = payload.hour
+    schedule.tz_offset_minutes = payload.tz_offset_minutes
+    schedule.email_enabled = payload.email_enabled
+    schedule.next_run_at = compute_next_run(
+        payload.cadence,
+        payload.weekday,
+        payload.hour,
+        payload.tz_offset_minutes,
+        schedule.last_run_at,
+    )
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+
+@app.post("/api/internal/run-due-reviews")
+def trigger_due_reviews(request: Request, db: Session = Depends(get_db)):
+    """Cron target. Point an external scheduler at this every 15 minutes with
+    the X-Cron-Secret header set to CRON_SECRET."""
+    if not settings.cron_secret:
+        raise HTTPException(status_code=503, detail="CRON_SECRET is not configured.")
+    if request.headers.get("x-cron-secret") != settings.cron_secret:
+        raise HTTPException(status_code=401, detail="Invalid cron secret.")
+
+    results = run_due_reviews(db)
+    return {"ran": len(results), "results": results}

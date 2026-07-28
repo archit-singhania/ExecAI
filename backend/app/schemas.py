@@ -111,3 +111,23 @@ class ReportExportOut(BaseModel):
 class MemorySearchOut(BaseModel):
     query: str
     results: list[MemoryOut]
+
+
+class ReviewScheduleIn(BaseModel):
+    cadence: str = Field(default="weekly", pattern="^(off|weekly|biweekly|monthly)$")
+    weekday: int = Field(default=0, ge=0, le=6)
+    hour: int = Field(default=9, ge=0, le=23)
+    tz_offset_minutes: int = Field(default=0, ge=-840, le=840)
+    email_enabled: bool = True
+
+
+class ReviewScheduleOut(BaseModel):
+    cadence: str
+    weekday: int
+    hour: int
+    tz_offset_minutes: int
+    email_enabled: bool
+    last_run_at: datetime | None = None
+    next_run_at: datetime | None = None
+
+    model_config = {"from_attributes": True}

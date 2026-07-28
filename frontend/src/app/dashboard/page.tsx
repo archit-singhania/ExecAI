@@ -13,8 +13,7 @@ import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
 import { BoardTheater } from "@/components/sections/board-theater";
-import { OperatingPhases } from "@/components/sections/operating-phases";
-import { KpiRunway } from "@/components/sections/kpi-runway";
+import { Operations } from "@/components/sections/operations";
 import { clearSession, getStoredUser, isDemoSession } from "@/lib/auth";
 import {
   DashboardTab,
@@ -384,11 +383,22 @@ export default function DashboardPage() {
                 selectedReport={selectedReport}
                 reportExport={reportExport}
                 openReport={openReport}
+                loading={loading && !latestReports.length}
+                onCloseReport={() => {
+                  setSelectedReport(null);
+                  setReportExport(null);
+                }}
               />
             ) : null}
 
             {activeTab === "tasks" ? (
-              <TaskBoard tasks={filteredTasks} taskFilter={taskFilter} setTaskFilter={setTaskFilter} completeTask={completeTask} />
+              <TaskBoard
+                tasks={filteredTasks}
+                allTasks={activeTasks}
+                taskFilter={taskFilter}
+                setTaskFilter={setTaskFilter}
+                completeTask={completeTask}
+              />
             ) : null}
 
             {activeTab === "board" ? (
@@ -403,14 +413,17 @@ export default function DashboardPage() {
                 loading={loading}
                 canRunBoard={!!session || isDemo}
                 generateBoardMeeting={generateBoardMeeting}
+                isDemo={isDemo}
               />
             ) : null}
 
             {activeTab === "operations" ? (
-              <div className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
-                <OperatingPhases />
-                <KpiRunway reports={latestReports.length ? latestReports : fallbackReports} opportunityScore={opportunityScore} />
-              </div>
+              <Operations
+                reports={latestReports.length ? latestReports : fallbackReports}
+                opportunityScore={opportunityScore}
+                healthScore={healthScore}
+                runway={runway}
+              />
             ) : null}
           </MetroSectionShell>
         )}

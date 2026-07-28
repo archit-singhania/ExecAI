@@ -1,25 +1,66 @@
-import { operatingPhases } from "@/lib/dashboard-data";
+"use client";
+
+import { Check, CircleDot, Clock } from "lucide-react";
+import { operatingRoadmap, PhaseStatus } from "@/lib/dashboard-data";
+import { cn } from "@/lib/utils";
+
+const STATUS_META: Record<PhaseStatus, { label: string; icon: React.ElementType; className: string }> = {
+  shipped: { label: "Shipped", icon: Check, className: "sec-phase-shipped" },
+  building: { label: "Building", icon: CircleDot, className: "sec-phase-building" },
+  next: { label: "Next", icon: Clock, className: "sec-phase-next" },
+};
 
 export function OperatingPhases() {
+  const shipped = operatingRoadmap.filter((phase) => phase.status === "shipped").length;
+
   return (
-    <section className="glass-strong section-panel rounded-lg p-4 sm:p-5">
-      <div className="mb-5">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Roadmap</p>
-        <h2 className="text-xl font-black sm:text-2xl">Operating phases</h2>
+    <div>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <p className="sec-eyebrow">Roadmap</p>
+        <span className="text-[0.7rem] font-bold tabular-nums text-steel">
+          {shipped}/{operatingRoadmap.length} shipped
+        </span>
       </div>
-      <div className="space-y-3">
-        {operatingPhases.map((phase, index) => (
-          <div key={phase} className="group flex items-center gap-3 rounded-lg bg-white/62 p-3 shadow-line transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-glow dark:bg-white/5 dark:shadow-line-dark dark:hover:bg-white/[0.1]">
-            <div className="grid h-9 w-9 place-items-center rounded-md bg-gradient-to-br from-accent/50 to-accent/20 text-sm font-black shadow-line">{index + 1}</div>
-            <div className="min-w-0 flex-1">
-              <p className="font-black">{phase}</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink/8 dark:bg-fog/10">
-                <div className="h-full rounded-full bg-ink dark:bg-fog" style={{ width: `${Math.min(100, 45 + index * 9)}%` }} />
+
+      <ol className="sec-stagger relative space-y-1">
+        {operatingRoadmap.map((phase, index) => {
+          const meta = STATUS_META[phase.status];
+          const Icon = meta.icon;
+          const last = index === operatingRoadmap.length - 1;
+
+          return (
+            <li
+              key={phase.name}
+              style={{ animationDelay: `${index * 45}ms` }}
+              className="relative flex gap-3 pb-1"
+            >
+              <div className="relative flex flex-col items-center">
+                <span className={cn("sec-phase-node grid h-6 w-6 place-items-center rounded-full", meta.className)}>
+                  <Icon size={12} strokeWidth={2.6} />
+                </span>
+                {last ? null : <span className="sec-phase-line" />}
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
+
+              <div className="min-w-0 flex-1 pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p
+                    className={cn(
+                      "text-[0.85rem] font-bold leading-5 tracking-[-0.01em]",
+                      phase.status === "next" && "text-steel",
+                    )}
+                  >
+                    {phase.name}
+                  </p>
+                  {phase.status !== "shipped" ? (
+                    <span className={cn("sec-phase-chip", meta.className)}>{meta.label}</span>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-[0.75rem] font-medium leading-5 text-steel">{phase.note}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

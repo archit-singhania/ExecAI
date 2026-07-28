@@ -1,7 +1,16 @@
+"use client";
+
 import { FormEvent } from "react";
-import { Volume2 } from "lucide-react";
+import { Gavel, History, Search, Sparkles, Volume2 } from "lucide-react";
 import { AgentReport, Memory } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import {
+  EmptyState,
+  ScoreRing,
+  SectionHeader,
+  SectionPanel,
+} from "@/components/dashboard/section-kit";
+import { ReviewCadenceCard } from "@/components/dashboard/review-cadence-card";
 
 export function BoardTheater({
   boardReport,
@@ -14,6 +23,7 @@ export function BoardTheater({
   loading,
   canRunBoard,
   generateBoardMeeting,
+  isDemo,
 }: {
   boardReport: AgentReport | null;
   boardHistory: AgentReport[];
@@ -25,91 +35,164 @@ export function BoardTheater({
   loading: boolean;
   canRunBoard: boolean;
   generateBoardMeeting: () => void;
+  isDemo?: boolean;
 }) {
+  const trail = memoryResults.length ? memoryResults : memories;
+
   return (
-    <section className="glass-strong section-panel rounded-lg p-4 sm:p-5">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-basil/35 to-basil/10 text-basil shadow-line">
-            <Volume2 size={20} />
-          </div>
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-steel">Board Room</p>
-            <h2 className="text-xl font-black sm:text-2xl">Weekly review</h2>
+    <SectionPanel tone="teal">
+      <SectionHeader
+        eyebrow="Board room"
+        title="Weekly review"
+        icon={Gavel}
+        meta={
+          boardHistory.length ? (
+            <span className="sec-eyebrow tabular-nums">{boardHistory.length} on record</span>
+          ) : null
+        }
+        actions={
+          <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !canRunBoard}>
+            <Volume2 size={15} />
+            {loading ? "Convening\u2026" : "Run review"}
+          </Button>
+        }
+      />
+
+      {boardReport ? (
+        <div className="relative overflow-hidden rounded-lg bg-ink p-5 text-fog shadow-glow">
+          <div className="executive-gradient absolute inset-0 opacity-60" />
+          <div className="top-beam" />
+          <div className="relative">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[0.625rem] font-bold uppercase tracking-[0.18em] text-fog/50">
+                  CEO board verdict
+                </p>
+                <h3 className="mt-2 text-xl font-bold leading-tight tracking-[-0.015em] sm:text-2xl">
+                  {boardReport.title}
+                </h3>
+              </div>
+              <div className="shrink-0 rounded-xl bg-white/10 p-1.5">
+                <ScoreRing score={boardReport.score} size={52} />
+              </div>
+            </div>
+
+            <p className="mt-3 max-w-2xl text-[0.85rem] font-medium leading-7 text-fog/70">
+              {boardReport.summary}
+            </p>
+
+            {boardReport.bullets.length ? (
+              <ol className="sec-stagger mt-5 grid gap-2">
+                {boardReport.bullets.map((bullet, index) => (
+                  <li
+                    key={bullet}
+                    style={{ animationDelay: `${index * 55}ms` }}
+                    className="flex gap-3 rounded-md border border-white/10 bg-white/10 px-3.5 py-2.5"
+                  >
+                    <span className="mt-0.5 shrink-0 text-[0.7rem] font-black tabular-nums text-fog/45">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="text-[0.82rem] font-semibold leading-6">{bullet}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
           </div>
         </div>
-        <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !canRunBoard}>
-          <Volume2 size={16} />
-          Run
-        </Button>
-      </div>
+      ) : (
+        <EmptyState
+          icon={Sparkles}
+          title="No board review yet"
+          body="Once the CEO has produced reports and tasks, the board scores your progress, names what slipped, and reads the verdict aloud."
+          action={
+            <Button variant="ghost" onClick={generateBoardMeeting} disabled={loading || !canRunBoard}>
+              <Volume2 size={15} />
+              Run first review
+            </Button>
+          }
+        />
+      )}
 
-      <div className="relative overflow-hidden rounded-lg bg-ink p-4 text-fog shadow-glow">
-        <div className="executive-gradient absolute inset-0 opacity-70" />
-        <div className="top-beam" />
-        <div className="relative">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-fog/55">CEO board verdict</p>
-          <h3 className="mt-3 text-2xl font-black leading-tight">
-            {boardReport?.title ?? "No board meeting generated yet"}
-          </h3>
-          <p className="mt-3 text-sm leading-6 text-fog/70">
-            {boardReport?.summary ??
-              "Generate a board review after the CEO has created reports and tasks. It will score progress, call out missed work, and speak the summary aloud."}
-          </p>
-          {boardReport ? (
-            <div className="mt-4 grid gap-2">
-              {boardReport.bullets.map((bullet) => (
-                <p key={bullet} className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm font-bold">
-                  {bullet}
-                </p>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <ReviewCadenceCard isDemo={isDemo} />
+
+        <div className="sec-card rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <History size={14} className="text-steel" />
+            <p className="sec-eyebrow">Board history</p>
+          </div>
+
+          {boardHistory.length ? (
+            <div className="sec-stagger space-y-2">
+              {boardHistory.slice(0, 4).map((report, index) => (
+                <div
+                  key={report.id ?? report.title}
+                  style={{ animationDelay: `${index * 45}ms` }}
+                  className="sec-soft-row flex items-center justify-between gap-3 rounded-md px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.82rem] font-bold leading-5">{report.title}</p>
+                    <p className="mt-0.5 text-[0.7rem] font-semibold text-steel">
+                      {report.created_at ? new Date(report.created_at).toLocaleDateString() : "Recent"}
+                    </p>
+                  </div>
+                  <ScoreRing score={report.score} size={34} />
+                </div>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <p className="py-6 text-center text-[0.8rem] font-medium leading-6 text-steel">
+              Past reviews will stack up here so you can watch the trend, not just the last verdict.
+            </p>
+          )}
         </div>
-      </div>
 
-      {boardHistory.length ? (
-        <div className="mt-4 rounded-lg border border-ink/10 bg-white/58 p-4 dark:border-fog/10 dark:bg-white/5">
-          <h3 className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-steel">Board history</h3>
-          <div className="space-y-2">
-            {boardHistory.slice(0, 3).map((report) => (
-              <div
-                key={report.id ?? report.title}
-                className="flex items-start justify-between gap-3 rounded-md bg-fog px-3 py-2 dark:bg-white/5"
-              >
-                <div>
-                  <p className="text-sm font-black">{report.title}</p>
-                  <p className="text-xs font-semibold text-steel">
-                    {report.created_at ? new Date(report.created_at).toLocaleString() : "Recent"}
-                  </p>
-                </div>
-                <span className="rounded-md bg-ink px-2 py-1 text-xs font-black text-fog dark:bg-fog dark:text-ink">{report.score}</span>
-              </div>
-            ))}
+        <div className="sec-card rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Search size={14} className="text-steel" />
+            <p className="sec-eyebrow">Memory trail</p>
           </div>
-        </div>
-      ) : null}
 
-      <div className="mt-4 rounded-lg border border-ink/10 bg-white/58 p-4 dark:border-fog/10 dark:bg-white/5">
-        <h3 className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-steel">Memory trail</h3>
-        <form onSubmit={searchMemory} className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-          <input
-            value={memoryQuery}
-            onChange={(event) => setMemoryQuery(event.target.value)}
-            placeholder="Search CEO memory..."
-            className="h-10 rounded-md border border-ink/10 bg-white/70 px-3 text-sm font-semibold outline-none dark:border-fog/10 dark:bg-white/5"
-          />
-          <button className="rounded-md bg-ink px-3 py-2 text-xs font-black text-fog dark:bg-fog dark:text-ink">Search</button>
-        </form>
-        <div className="space-y-2">
-          {(memoryResults.length ? memoryResults : memories).map((memory) => (
-            <div key={memory.id} className="rounded-md bg-fog px-3 py-2 dark:bg-white/5">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-steel">{memory.kind}</p>
-              <p className="mt-1 line-clamp-2 text-sm font-semibold leading-6">{memory.content}</p>
+          <form onSubmit={searchMemory} className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <input
+              value={memoryQuery}
+              onChange={(event) => setMemoryQuery(event.target.value)}
+              placeholder="Search decisions and strategy…"
+              className="sec-input h-9 rounded-md px-3 text-[0.8rem] font-semibold"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-ink px-3.5 py-2 text-[0.72rem] font-bold text-fog transition hover:opacity-90 dark:bg-fog dark:text-ink"
+            >
+              Search
+            </button>
+          </form>
+
+          {trail.length ? (
+            <div className="sec-stagger space-y-2">
+              {trail.slice(0, 5).map((memory, index) => (
+                <div
+                  key={memory.id}
+                  style={{ animationDelay: `${index * 45}ms` }}
+                  className="sec-soft-row rounded-md px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="sec-eyebrow">{memory.kind}</span>
+                    {memory.importance >= 0.85 ? (
+                      <span className="h-1 w-1 rounded-full bg-ember" title="High importance" />
+                    ) : null}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[0.8rem] font-semibold leading-6">{memory.content}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <p className="py-6 text-center text-[0.8rem] font-medium leading-6 text-steel">
+              {memoryQuery ? "Nothing matched that search." : "The CEO's long-term memory fills as you work."}
+            </p>
+          )}
         </div>
       </div>
-    </section>
+    </SectionPanel>
   );
 }
