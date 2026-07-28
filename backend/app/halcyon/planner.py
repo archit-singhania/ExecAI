@@ -59,6 +59,33 @@ CRISIS_REPLY = (
     "You can stay in this place as long as you want, but please talk to a real person too."
 )
 
+INVITATIONS: dict[str, tuple[str, str]] = {
+    "anxious": ("sit", "There's somewhere to sit, just there."),
+    "angry": ("water_edge", "The water's edge is a few steps away."),
+    "low": ("sit", "Somewhere to sit has appeared, if you want it."),
+    "exhausted": ("shelter", "There's shelter, and nothing after this."),
+    "hopeful": ("overlook", "There's a longer view from up there."),
+}
+"""Where the world would like you to go, by mood.
+
+Calm and neutral are absent on purpose. Someone who is fine does not need to
+be sent anywhere, and a world that constantly suggests things is a world that
+wants something from you.
+"""
+
+WORLD_PLACES: dict[str, set[str]] = {
+    "zen_garden": {"sit", "water_edge", "shelter", "path"},
+    "ocean_dusk": {"sit", "water_edge", "overlook", "path"},
+    "old_forest": {"sit", "water_edge", "shelter", "path"},
+    "rain_cabin": {"sit", "shelter"},
+    "nordic_lake": {"sit", "water_edge", "overlook"},
+    "blossom_park": {"sit", "shelter", "path"},
+    "desert_oasis": {"sit", "water_edge", "shelter", "overlook"},
+    "observatory": {"sit", "overlook", "shelter"},
+}
+"""What each world actually contains. The planner never invites you somewhere
+that doesn't exist — an invitation you can't accept is worse than silence."""
+
 
 def plan_crisis_environment(world: str) -> EnvironmentCommand:
     """Neutral, still, non-manipulative. The world stops performing."""
@@ -71,9 +98,24 @@ def plan_crisis_environment(world: str) -> EnvironmentCommand:
     env.breathing_guide = False
     env.companion_action = "absent"
     env.companion = "none"
+    env.invitation = "none"
+    env.invitation_label = ""
     env.transition_seconds = 4.0
     env.reason = "crisis_hold"
     return env
+
+
+def choose_invitation(world: str, label: str) -> tuple[str, str]:
+    """Pick somewhere to suggest, or nothing at all."""
+    proposal = INVITATIONS.get(label)
+    if not proposal:
+        return "none", ""
+
+    place, text = proposal
+    if place not in WORLD_PLACES.get(world, set()):
+        return "none", ""
+
+    return place, text
 
 
 def plan_environment(world: str, affect: AffectReading) -> EnvironmentCommand:
@@ -128,6 +170,7 @@ def plan_environment(world: str, affect: AffectReading) -> EnvironmentCommand:
         env.transition_seconds = 7.0
 
     env.reason = f"{label}:v{affect.valence}:a{affect.arousal}"
+    env.invitation, env.invitation_label = choose_invitation(world, label)
     return env
 
 

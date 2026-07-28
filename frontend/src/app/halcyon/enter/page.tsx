@@ -2,27 +2,22 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUp, Loader2, Mic, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUp, Loader2, Mic, Square, Trash2, Volume2, VolumeX } from "lucide-react";
 import {
   halcyon,
+  handOverSession,
   HalcyonEnvironment,
+  HalcyonPreferences,
   HalcyonSession,
   HalcyonWorldId,
   pixelStreamUrl,
+  StreamQuality,
 } from "@/lib/halcyon-api";
+import { formatHour, WORLD_BASELINES, worldGradient } from "@/lib/halcyon-worlds";
+import { LaunchConsole } from "@/components/halcyon/launch-console";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
+import { useSpeechSynthesis } from "@/lib/use-speech-synthesis";
 import { cn } from "@/lib/utils";
-
-const WORLDS: { id: HalcyonWorldId; label: string }[] = [
-  { id: "zen_garden", label: "Zen Garden" },
-  { id: "ocean_dusk", label: "Ocean at Dusk" },
-  { id: "old_forest", label: "Old Forest" },
-  { id: "rain_cabin", label: "Rain Cabin" },
-  { id: "nordic_lake", label: "Nordic Lake" },
-  { id: "blossom_park", label: "Blossom Park" },
-  { id: "desert_oasis", label: "Desert Oasis" },
-  { id: "observatory", label: "Observatory" },
-];
 
 function moodClass(env: HalcyonEnvironment | null): string {
   if (!env) return "hal-mood-clear";
@@ -34,8 +29,10 @@ function moodClass(env: HalcyonEnvironment | null): string {
 
 export default function HalcyonEnterPage() {
   const recognition = useSpeechRecognition();
+  const synthesis = useSpeechSynthesis();
 
   const [world, setWorld] = useState<HalcyonWorldId>("zen_garden");
+  const [quality, setQuality] = useState<StreamQuality>("high");
   const [consent, setConsent] = useState(false);
   const [session, setSession] = useState<HalcyonSession | null>(null);
   const [environment, setEnvironment] = useState<HalcyonEnvironment | null>(null);
@@ -44,7 +41,22 @@ export default function HalcyonEnterPage() {
   const [listening, setListening] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [linked, setLinked] = useState(false);
+  const [preferences, setPreferences] = useState<HalcyonPreferences | null>(null);
+  const [spoken, setSpoken] = useState(true);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    halcyon
+      .preferences()
+      .then((prefs) => {
+        setPreferences(prefs);
+        if (prefs.favourite_world) setWorld(prefs.favourite_world);
+      })
+      .catch(() => {
+      });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -78,6 +90,11 @@ export default function HalcyonEnterPage() {
       setEnvironment(turn.environment);
       setReply(turn.reply);
       setText("");
+
+      if (spoken && synthesis.supported) {
+        synthesis.speak(turn.reply, () => undefined);
+      }
+
       endRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -101,6 +118,7 @@ export default function HalcyonEnterPage() {
 
   async function leave() {
     if (!session) return;
+    synthesis.cancel();
     try {
       await halcyon.endSession(session.id);
     } catch {
@@ -136,48 +154,64 @@ export default function HalcyonEnterPage() {
             <span>Halcyon</span>
           </Link>
           {session ? (
-            <button type="button" onClick={leave} className="hal-back">
-              Leave the world
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  if (spoken) synthesis.cancel();
+                  setSpoken((current) => !current);
+                }}
+                aria-pressed={spoken}
+                className="hal-back"
+              >
+                {spoken ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                <span>{spoken ? "Spoken" : "Silent"}</span>
+              </button>
+              <button type="button" onClick={leave} className="hal-back">
+                Leave the world
+              </button>
+            </div>
           ) : null}
         </nav>
 
         {!session ? (
           <section className="flex flex-1 flex-col justify-center py-16">
-            <p className="hal-eyebrow">Choose where to go</p>
-            <h1 className="hal-title mt-4 max-w-2xl">Where do you want to be?</h1>
+            <p className="hal-eyebrow">{preferences?.greeting || "Choose where to go"}</p>
+            <h1 className="hal-title mt-4 max-w-2xl">
+              {preferences?.returning ? "Where to today?" : "Where do you want to be?"}
+            </h1>
 
-            <div className="mt-8 flex flex-wrap gap-2">
-              {WORLDS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setWorld(option.id)}
-                  aria-pressed={world === option.id}
-                  className={cn("hal-mood-btn", world === option.id && "hal-mood-btn-active")}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <div className="hal-launch mt-8">
+              <div className="hal-world-cards hal-world-cards-compact">
+                {WORLD_BASELINES.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setWorld(option.id)}
+                    aria-pressed={world === option.id}
+                    className={cn("hal-card", world === option.id && "hal-card-active")}
+                  >
+                    <span className="hal-card-sky" style={{ background: worldGradient(option) }}>
+                      <span className="hal-card-hour">{formatHour(option.timeOfDay)}</span>
+                      {option.first ? <span className="hal-card-flag">First build</span> : null}
+                    </span>
+                    <span className="hal-card-body">
+                      <span className="hal-card-name">{option.label}</span>
+                      <span className="hal-card-note">{option.note}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
 
-            <button
-              type="button"
-              onClick={() => setConsent((current) => !current)}
-              className="mt-8 flex max-w-lg items-start gap-3 text-left"
-            >
-              <span className={cn("hal-consent-box", consent && "hal-consent-box-on")} />
-              <span className="hal-world-note">
-                Keep what I say. Off by default — without this, only the shape of the session is
-                stored, never the words. You can delete everything at any time.
-              </span>
-            </button>
-
-            <div className="mt-9">
-              <button type="button" onClick={begin} disabled={busy} className="hal-enter-btn">
-                {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-                Go in
-              </button>
+              <LaunchConsole
+                world={WORLD_BASELINES.find((option) => option.id === world) ?? WORLD_BASELINES[0]}
+                quality={quality}
+                onQualityChange={setQuality}
+                consent={consent}
+                onConsentChange={setConsent}
+                onEnter={begin}
+                busy={busy}
+              />
             </div>
 
             {error ? <p className="hal-error mt-5">{error}</p> : null}
@@ -186,14 +220,16 @@ export default function HalcyonEnterPage() {
           <section className="flex flex-1 flex-col py-8">
             <div className="hal-stream">
               <iframe
+                ref={frameRef}
                 src={pixelStreamUrl()}
                 title="Halcyon"
                 allow="autoplay; fullscreen; microphone"
+                onLoad={() => setLinked(handOverSession(frameRef.current, session.id, quality))}
                 className="h-full w-full border-0"
               />
               <div className="hal-stream-hint">
                 <span className="hal-status-dot" />
-                Streaming from your local Unreal instance
+                {linked ? "Linked to this session" : "Waiting for the world"}
               </div>
             </div>
 
@@ -205,6 +241,12 @@ export default function HalcyonEnterPage() {
               ) : (
                 <p className="hal-world-note">Say anything. The world is listening.</p>
               )}
+
+              {environment?.invitation_label ? (
+                <p key={environment.invitation_label} className="hal-invite">
+                  {environment.invitation_label}
+                </p>
+              ) : null}
             </div>
 
             <form

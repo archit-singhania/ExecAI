@@ -103,6 +103,139 @@ never closes past `ApproachDistance`. That default is deliberate. Nothing in
 this world should demand attention, and an animal that walks into your face
 is a demand.
 
+**`AHalcyonWaterDirector`** — one per body of water. Assign your water meshes
+and it pushes `WaveAmplitude`, `WaveSpeed`, `SurfaceRoughness` and `Warmth`
+into dynamic material instances. Parameter names are exposed as properties, so
+rename them to match your material rather than the other way round.
+
+The roughness curve is deliberately non-linear — the first bit of motion
+breaks a mirror surface far more visibly than the last bit adds chop. Below
+0.12 the surface effect switches off entirely, because stillness has to be
+complete to land.
+
+**`AHalcyonPawn`** — set as the Game Mode's default pawn. Standard UE
+character defaults are tuned for action games: 600cm/s is a jog, the camera
+snaps, and you can jump. All three are wrong here. A world that eases its
+light over twelve seconds and then lets you sprint through it is telling you
+two contradictory things.
+
+So: 185cm/s amble, gentle acceleration, camera lag, subtle head bob that eases
+to a zero crossing when you stop, no jump. And the walk speed itself eases
+down when the world's energy drops — floored at 68% so it reads as *no reason
+to hurry* rather than *the controls have broken*. When the breathing guide is
+running, the field of view breathes with it, at a depth low enough that you
+shouldn't consciously notice.
+
+Bind four axes in Project Settings → Input: `MoveForward`, `MoveRight`,
+`Turn`, `LookUp`.
+
+**`AHalcyonQualityDirector`** — one per level. Three presets (1080p Balanced,
+1440p High, 4K Cinematic) that set scalability groups, TSR, Lumen hardware ray
+tracing, virtual shadow map bias, volumetric fog grid density, and the Pixel
+Streaming encoder bitrate together.
+
+It also holds a frame-time budget by moving screen percentage rather than
+dropping features — losing Lumen mid-session is visible, losing 12% of screen
+percentage is not. The adapt rate is deliberately slow, and it climbs back
+more slowly than it falls, because a resolution that visibly hunts is worse
+than one that sits slightly too low.
+
+The counter-intuitive part is in `ApplyStreamingSettings`: past a point, more
+pixels make a *streamed* image look worse, because the encoder has a fixed
+budget to spend. A clean 1440p at 20Mbps beats a mushy 4K at the same rate.
+That's why 1440p High is the default rather than 4K.
+
+Reads `-HalcyonQuality=cinematic|high|balanced` so the browser's choice passes
+straight through to the instance.
+
+**`AHalcyonGradeDirector`** — one per level. This is the actor that decides
+whether the render looks like a game or a film, and it matters more than
+resolution does. Ungraded UE output has a recognisable look — slightly green
+midtones, crushed shadows, everything equally saturated — that most people spot
+instantly without being able to name it.
+
+Eight per-world grades ship as defaults: Zen Garden restrained with cool
+shadows, Ocean at Dusk warm and rich, Nordic Lake desaturated to 0.74 because
+stillness reads better without colour, Observatory near-monochrome with heavy
+grain to sell the low light. Each pairs cool shadows against warm highlights,
+which is the oldest trick in grading and still the most effective.
+
+Grades then bend with live state: warmth shifts temperature by up to 1600K,
+fog lifts the blacks (a hazy scene with crushed shadows looks wrong), grain
+rises as light falls the way real sensors behave, and a breathing session
+pulls focus shallower to quiet the periphery.
+
+Exposure is locked to manual by default. Auto-exposure hunting during a slow
+light change is the single most immersion-breaking artefact in a world like
+this one.
+
+**`AHalcyonPlace`** — one per spot worth going to. Set `PlaceKind` to a verb
+from the shared vocabulary (`sit`, `water_edge`, `shelter`, `overlook`,
+`path`) and drop it on a bench, a shoreline, under a tree, on a ridge. When
+the planner names that verb, the nearest matching place wakes: an optional
+light rises over eight seconds, a Niagara effect and an audio loop fade in,
+and the whole thing breathes slowly. `OnArrived` fires once when you get
+within `ArrivalRadius`.
+
+The hard rule is that an invitation must never become a demand. No quest
+marker, no arrow, no objective text — a place simply brightens, and if you
+ignore it nothing at all happens. That restraint is the entire difference
+between a calm world and a game nagging you to run an errand. The eight-second
+wake is part of it: a light that snaps on is a notification, one that arrives
+slowly is just the place being noticed.
+
+Any new world gets invitations for free by tagging its own geometry. The
+server never names a place that world doesn't have.
+
+---
+
+## Getting a session into the running instance
+
+Pasting a token into the editor is fine for level work and useless for
+anything else. Three routes, in order of how you'll actually use them.
+
+**Launch arguments — local development and production alike.**
+
+```
+HalcyonWorld.exe \
+  -HalcyonSession=<session-id> \
+  -HalcyonToken=<jwt> \
+  -HalcyonQuality=high \
+  -PixelStreamingURL=ws://127.0.0.1:8888 \
+  -RenderOffScreen -Windowed -ResX=1280 -ResY=720
+```
+
+`AHalcyonGameMode` reads these on BeginPlay and connects the bridge. This is
+also exactly how you'd spawn a per-user GPU instance later, so the local and
+deployed paths stay identical. `-HalcyonUrl=` overrides the API address.
+
+**Data channel — handing a running instance a new session.**
+
+Add a `PixelStreamingInput` component to your Blueprint, add a
+`HalcyonStreamLink` component, and bind the input delegate to
+`HandleBrowserMessage`. One node.
+
+The browser side is already built: `/halcyon/enter` posts the credentials into
+the stream iframe on load. For that to reach Unreal, drop this into the Pixel
+Streaming player page, which forwards the postMessage onto the data channel:
+
+```html
+<script>
+window.addEventListener("message", (event) => {
+  if (event.data?.type !== "halcyon.session") return;
+  if (typeof emitUIInteraction === "function") emitUIInteraction(event.data);
+});
+</script>
+```
+
+The stream hint in the browser flips from "Waiting for the world" to "Linked
+to this session" once the post lands.
+
+**Editor fields** — still there, used only when the other two find nothing.
+
+Until credentials arrive the bridge stays disconnected and the world sits at
+its baseline, which is a perfectly reasonable thing to look at.
+
 ---
 
 ## A note on the C++

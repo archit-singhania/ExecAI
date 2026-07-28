@@ -2407,6 +2407,345 @@ textarea:focus-visible {
   color: #e8907a;
 }
 
+.hal-world-cards {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 700px) {
+  .hal-world-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.hal-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(232, 238, 244, 0.1);
+  background: rgba(232, 238, 244, 0.03);
+  text-align: left;
+  transition: border-color 260ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 260ms ease;
+}
+
+.hal-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(232, 238, 244, 0.26);
+  background: rgba(232, 238, 244, 0.06);
+}
+
+.hal-card-active {
+  border-color: var(--hal-glow);
+  background: rgba(232, 238, 244, 0.08);
+}
+
+.hal-card-sky {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+}
+
+.hal-card-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.32) 100%);
+}
+
+.hal-card-hour {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.55rem;
+  z-index: 1;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.hal-card-flag {
+  position: absolute;
+  bottom: 0.45rem;
+  left: 0.55rem;
+  z-index: 1;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.1rem 0.45rem;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+.hal-card-body {
+  display: block;
+  padding: 0.7rem 0.8rem 0.85rem;
+}
+
+.hal-card-name {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #eef3f8;
+}
+
+.hal-card-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: rgba(232, 238, 244, 0.45);
+}
+
+.hal-launch {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 900px) {
+  .hal-launch {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: start;
+  }
+}
+
+.hal-world-cards-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .hal-world-cards-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.hal-console {
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(232, 238, 244, 0.12);
+  background: rgba(232, 238, 244, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+.hal-console-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.hal-console-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.hal-console-scanline {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.6;
+}
+
+.hal-console-preview-meta {
+  position: absolute;
+  bottom: 0.7rem;
+  left: 0.85rem;
+  right: 0.85rem;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hal-console-world {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+.hal-console-hour {
+  font-size: 0.66rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.hal-console-body {
+  padding: 0.9rem 1rem 1.1rem;
+}
+
+.hal-console-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hal-console-icon {
+  color: rgba(232, 238, 244, 0.45);
+}
+
+.hal-console-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(232, 238, 244, 0.45);
+}
+
+.hal-console-toggle {
+  border-radius: 0.4rem;
+  border: 1px solid rgba(232, 238, 244, 0.16);
+  padding: 0.28rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(232, 238, 244, 0.85);
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.hal-console-toggle:hover {
+  border-color: rgba(232, 238, 244, 0.34);
+  background: rgba(232, 238, 244, 0.06);
+}
+
+.hal-quality-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.hal-quality {
+  display: block;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(232, 238, 244, 0.1);
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.hal-quality:hover {
+  border-color: rgba(232, 238, 244, 0.26);
+  background: rgba(232, 238, 244, 0.04);
+}
+
+.hal-quality-on {
+  border-color: var(--hal-glow);
+  background: rgba(232, 238, 244, 0.06);
+}
+
+.hal-quality-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgba(232, 238, 244, 0.9);
+}
+
+.hal-quality-res {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hal-quality-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(232, 238, 244, 0.5);
+}
+
+.hal-quality-detail {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: rgba(232, 238, 244, 0.45);
+}
+
+.hal-quality-bitrate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(232, 238, 244, 0.35);
+}
+
+.hal-console-divider {
+  height: 1px;
+  margin: 0.9rem 0;
+  background: rgba(232, 238, 244, 0.1);
+}
+
+.hal-console-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  text-align: left;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: rgba(232, 238, 244, 0.5);
+}
+
+.hal-console-consent:hover {
+  color: rgba(232, 238, 244, 0.7);
+}
+
+.hal-console-enter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+  border-radius: 0.55rem;
+  background: rgba(232, 238, 244, 0.92);
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0a0d12;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+.hal-console-enter:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.hal-console-enter:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hal-invite {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.7;
+  color: rgba(232, 238, 244, 0.5);
+  animation: hal-settle 1400ms ease both;
+  animation-delay: 700ms;
+}
+
 .sec-meter {
   height: 5px;
   border-radius: 999px;

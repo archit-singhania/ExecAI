@@ -53,10 +53,29 @@ LEXICON: dict[str, tuple[float, float, tuple[str, ...]]] = {
 }
 
 CRISIS_TERMS: tuple[str, ...] = (
-    "kill myself", "end my life", "want to die", "suicidal", "suicide",
-    "hurt myself", "harm myself", "self harm", "self-harm", "no reason to live",
-    "better off dead", "end it all",
+    "kill myself", "killing myself", "kill my self",
+    "end my life", "ending my life", "ended my life",
+    "take my own life", "taking my own life",
+    "end it all", "ending it all",
+    "want to die", "wanna die", "want to be dead",
+    "wish i was dead", "wish i were dead",
+    "suicidal", "suicide",
+    "hurt myself", "hurting myself",
+    "harm myself", "harming myself",
+    "self harm", "self-harm", "selfharm",
+    "cut myself", "cutting myself",
+    "no reason to live", "nothing to live for",
+    "better off dead", "better off without me",
+    "don't want to be here anymore", "dont want to be here anymore",
+    "don't want to wake up", "dont want to wake up",
 )
+"""High recall by design.
+
+A false positive costs one gentle, slightly off-target reply. A false
+negative means the world responds to someone in danger by adjusting the
+weather. Those costs are not comparable, so inflected variants are listed
+explicitly rather than stemmed, and this list should only ever grow.
+"""
 
 
 def _normalise(text: str) -> str:

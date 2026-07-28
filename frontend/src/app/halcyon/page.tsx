@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Compass, Ear, Waves } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { formatHour, WORLD_BASELINES, worldGradient } from "@/lib/halcyon-worlds";
 import { cn } from "@/lib/utils";
 
 type Mood = "restless" | "heavy" | "flat" | "clear";
@@ -14,17 +15,6 @@ const MOODS: { value: Mood; label: string; response: string }[] = [
   { value: "heavy", label: "Heavy", response: "Dawn comes early here. The light warms, and something small comes to sit nearby." },
   { value: "flat", label: "Flat", response: "Colour returns slowly. A path opens toward the treeline, if you want it." },
   { value: "clear", label: "Clear", response: "The sky stays open. The world holds its shape and lets you think." },
-];
-
-const WORLDS: { name: string; note: string; first?: boolean }[] = [
-  { name: "Zen Garden", note: "Raked stone, koi, a waterfall you hear before you see", first: true },
-  { name: "Ocean at Dusk", note: "Long tide, low sun, the shoreline going gold", first: true },
-  { name: "Old Forest", note: "Deep canopy, a stream off the path, fireflies after dark" },
-  { name: "Rain Cabin", note: "Weather at the glass, a fire, nowhere else to be" },
-  { name: "Nordic Lake", note: "Flat water, far mountains, air that carries sound" },
-  { name: "Blossom Park", note: "Petals moving without wind, benches, long avenues" },
-  { name: "Desert Oasis", note: "Heat easing off the rock, palms, water in an impossible place" },
-  { name: "Observatory", note: "A dome open to the sky and the whole quiet weight of it" },
 ];
 
 export default function HalcyonPage() {
@@ -117,17 +107,20 @@ export default function HalcyonPage() {
         <section className="mt-20">
           <div className="flex items-baseline justify-between gap-3">
             <p className="hal-eyebrow">The worlds</p>
-            <span className="hal-count">{WORLDS.length} planned</span>
+            <span className="hal-count">{WORLD_BASELINES.length} planned</span>
           </div>
 
-          <div className="hal-world-grid mt-5">
-            {WORLDS.map((world) => (
-              <div key={world.name} className="hal-world">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="hal-world-name">{world.name}</h3>
-                  {world.first ? <span className="hal-chip">First build</span> : null}
-                </div>
-                <p className="hal-world-note mt-1.5">{world.note}</p>
+          <div className="hal-world-cards mt-5">
+            {WORLD_BASELINES.map((world) => (
+              <div key={world.id} className="hal-card">
+                <span className="hal-card-sky" style={{ background: worldGradient(world) }}>
+                  <span className="hal-card-hour">{formatHour(world.timeOfDay)}</span>
+                  {world.first ? <span className="hal-card-flag">First build</span> : null}
+                </span>
+                <span className="hal-card-body">
+                  <span className="hal-card-name">{world.label}</span>
+                  <span className="hal-card-note">{world.note}</span>
+                </span>
               </div>
             ))}
           </div>

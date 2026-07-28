@@ -22,6 +22,8 @@ from sqlalchemy.orm import Session
 from app.auth import decode_access_token, get_current_user
 from app.database import SessionLocal, get_db
 from app.halcyon.affect import detect_crisis, estimate_affect
+from app.halcyon.arc import ArcReading, apply_arc, compute_arc
+from app.halcyon import narrator
 from app.halcyon.models import HalcyonSession, HalcyonTurn
 from app.halcyon.planner import (
     CRISIS_REPLY,
@@ -32,6 +34,7 @@ from app.halcyon.planner import (
 from app.halcyon.schemas import (
     AffectReading,
     EnvironmentCommand,
+    HalcyonPreferences,
     HalcyonSessionOut,
     SessionStartIn,
     TurnIn,
@@ -93,6 +96,66 @@ def list_worlds():
     ]
 
 
+@router.get("/preferences", response_model=HalcyonPreferences)
+def get_preferences(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """What the place remembers about you, derived from session history.
+
+    Nothing here is stored as a setting, so clearing sessions clears this too.
+    """
+    sessions = (
+        db.query(HalcyonSession)
+        .filter(HalcyonSession.user_id == current_user.id)
+        .order_by(desc(HalcyonSession.started_at))
+        .limit(60)
+        .all()
+    )
+
+    if not sessions:
+        return HalcyonPreferences(greeting="First time here.")
+
+    counts: dict[str, int] = {}
+    for session in sessions:
+        counts[session.world] = counts.get(session.world, 0) + 1
+
+    favourite = max(counts, key=lambda key: counts[key])
+    last_world = sessions[0].world
+
+    session_ids = [session.id for session in sessions]
+    turns = (
+        db.query(HalcyonTurn.affect_label)
+        .filter(HalcyonTurn.session_id.in_(session_ids))
+        .all()
+    )
+
+    affect_counts: dict[str, int] = {}
+    for (label,) in turns:
+        if label in {"neutral", "crisis"}:
+            continue
+        affect_counts[label] = affect_counts.get(label, 0) + 1
+
+    common = max(affect_counts, key=lambda key: affect_counts[key]) if affect_counts else None
+
+    visits = len(sessions)
+    if visits == 1:
+        greeting = "You've been here once before."
+    elif counts[favourite] >= 3:
+        greeting = "Your usual place is ready."
+    else:
+        greeting = "Welcome back."
+
+    return HalcyonPreferences(
+        visits=visits,
+        favourite_world=favourite,
+        last_world=last_world,
+        common_affect=common,
+        returning=True,
+        greeting=greeting,
+    )
+
+
 @router.post("/sessions", response_model=HalcyonSessionOut)
 def start_session(
     payload: SessionStartIn,
@@ -138,10 +201,28 @@ async def take_turn(
         affect = AffectReading(label="crisis", valence=-1.0, arousal=0.6, confidence=1.0)
         environment = plan_crisis_environment(session.world)
         reply = CRISIS_REPLY
+        arc = ArcReading()
     else:
         affect = estimate_affect(payload.text)
         environment = plan_environment(session.world, affect)
-        reply = compose_reply(affect, seed=session.turn_count)
+
+        history = (
+            db.query(HalcyonTurn)
+            .filter(HalcyonTurn.session_id == session.id)
+            .order_by(HalcyonTurn.turn_index)
+            .all()
+        )
+        readings = [
+            AffectReading(label=turn.affect_label, valence=turn.valence, arousal=turn.arousal)
+            for turn in history
+        ] + [affect]
+
+        arc = compute_arc(readings)
+        environment = apply_arc(environment, arc)
+
+        reply = narrator.compose(affect, environment) or compose_reply(
+            affect, seed=session.turn_count
+        )
 
     session.turn_count += 1
     turn = HalcyonTurn(

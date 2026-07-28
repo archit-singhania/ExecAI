@@ -56,6 +56,12 @@ struct FHalcyonWorldState
     FString CompanionAction = TEXT("absent");
 
     UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")
+    FString Invitation = TEXT("none");
+
+    UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")
+    FString InvitationLabel;
+
+    UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")
     bool bBreathingGuide = false;
 
     UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")

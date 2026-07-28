@@ -30,6 +30,14 @@ Music = Literal["none", "soft_piano", "low_drone", "warm_strings"]
 Companion = Literal["none", "dog", "cat", "deer", "sea_turtle", "koi", "monk"]
 CompanionAction = Literal["absent", "distant", "approach", "settle", "lead"]
 
+Invitation = Literal["none", "sit", "water_edge", "shelter", "overlook", "path"]
+"""Somewhere the world would like you to go.
+
+Deliberately a tiny shared vocabulary rather than per-world place names, so
+Unreal needs one marker type per verb and any new world gets invitations for
+free by tagging its own geometry.
+"""
+
 
 class AffectReading(BaseModel):
     """Where the user seems to be, as far as we can tell from words alone."""
@@ -68,6 +76,9 @@ class EnvironmentCommand(BaseModel):
     companion: Companion = "none"
     companion_action: CompanionAction = "absent"
 
+    invitation: Invitation = "none"
+    invitation_label: str = ""
+
     breathing_guide: bool = False
     breathing_pace_seconds: float = Field(default=5.5, ge=3.0, le=8.0)
 
@@ -101,3 +112,19 @@ class HalcyonSessionOut(BaseModel):
 class SessionStartIn(BaseModel):
     world: WorldId = "zen_garden"
     consent_to_store: bool = False
+
+
+class HalcyonPreferences(BaseModel):
+    """What the place has learned about you across visits.
+
+    Derived from session history rather than stored as settings, so there is
+    nothing extra to delete when someone clears their data — removing the
+    sessions removes the preferences by construction.
+    """
+
+    visits: int = 0
+    favourite_world: WorldId | None = None
+    last_world: WorldId | None = None
+    common_affect: str | None = None
+    returning: bool = False
+    greeting: str = ""

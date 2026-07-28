@@ -188,6 +188,9 @@ void AHalcyonBridge::ApplyTargetFromJson(const TSharedPtr<FJsonObject>& Data)
     Target.Companion = ReadString(Data, TEXT("companion"), Target.Companion);
     Target.CompanionAction = ReadString(Data, TEXT("companion_action"), Target.CompanionAction);
 
+    Target.Invitation = ReadString(Data, TEXT("invitation"), TEXT("none"));
+    Target.InvitationLabel = ReadString(Data, TEXT("invitation_label"), TEXT(""));
+
     Data->TryGetBoolField(TEXT("breathing_guide"), Target.bBreathingGuide);
     Target.BreathingPaceSeconds = ReadNumber(Data, TEXT("breathing_pace_seconds"), Target.BreathingPaceSeconds);
     Target.TransitionSeconds = ReadNumber(Data, TEXT("transition_seconds"), Target.TransitionSeconds);
@@ -198,6 +201,8 @@ void AHalcyonBridge::ApplyTargetFromJson(const TSharedPtr<FJsonObject>& Data)
     Current.Music = Target.Music;
     Current.Companion = Target.Companion;
     Current.CompanionAction = Target.CompanionAction;
+    Current.Invitation = Target.Invitation;
+    Current.InvitationLabel = Target.InvitationLabel;
     Current.bBreathingGuide = Target.bBreathingGuide;
     Current.BreathingPaceSeconds = Target.BreathingPaceSeconds;
 

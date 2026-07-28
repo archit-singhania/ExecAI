@@ -24,6 +24,8 @@ export type HalcyonEnvironment = {
   music_volume: number;
   companion: string;
   companion_action: string;
+  invitation: string;
+  invitation_label: string;
   breathing_guide: boolean;
   breathing_pace_seconds: number;
   transition_seconds: number;
@@ -54,6 +56,15 @@ export type HalcyonTurn = {
   turn_index: number;
 };
 
+export type HalcyonPreferences = {
+  visits: number;
+  favourite_world: HalcyonWorldId | null;
+  last_world: HalcyonWorldId | null;
+  common_affect: string | null;
+  returning: boolean;
+  greeting: string;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function authHeader(): Record<string, string> {
@@ -82,6 +93,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const halcyon = {
+  preferences: () => request<HalcyonPreferences>("/api/halcyon/preferences"),
+
   startSession: (world: HalcyonWorldId, consentToStore: boolean) =>
     request<HalcyonSession>("/api/halcyon/sessions", {
       method: "POST",
@@ -108,6 +121,58 @@ export const halcyon = {
     request<{ deleted: number }>("/api/halcyon/sessions", { method: "DELETE" }),
 };
 
+export type StreamQuality = "balanced" | "high" | "cinematic";
+
+export const STREAM_QUALITIES: {
+  id: StreamQuality;
+  label: string;
+  resolution: string;
+  detail: string;
+  bitrate: string;
+}[] = [
+  {
+    id: "balanced",
+    label: "Balanced",
+    resolution: "1080p",
+    detail: "Software Lumen. Runs on most machines.",
+    bitrate: "8 Mbps",
+  },
+  {
+    id: "high",
+    label: "High",
+    resolution: "1440p",
+    detail: "Hardware ray tracing. The sweet spot for streaming.",
+    bitrate: "20 Mbps",
+  },
+  {
+    id: "cinematic",
+    label: "Cinematic",
+    resolution: "4K",
+    detail: "Everything at maximum. Needs a strong GPU and a fast line.",
+    bitrate: "40 Mbps",
+  },
+];
+
 export function pixelStreamUrl(): string {
   return process.env.NEXT_PUBLIC_PIXEL_STREAM_URL ?? "http://127.0.0.1";
+}
+
+export function authToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("ceoai-auth-token");
+}
+
+export function handOverSession(
+  frame: HTMLIFrameElement | null,
+  sessionId: string,
+  quality: StreamQuality = "high",
+): boolean {
+  const token = authToken();
+  if (!frame?.contentWindow || !token) return false;
+
+  frame.contentWindow.postMessage(
+    { type: "halcyon.session", session_id: sessionId, token, quality },
+    new URL(pixelStreamUrl()).origin,
+  );
+  return true;
 }
