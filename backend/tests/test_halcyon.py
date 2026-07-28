@@ -12,6 +12,7 @@ import pytest
 
 from app.halcyon.affect import detect_crisis, estimate_affect
 from app.halcyon.arc import ArcReading, apply_arc, compute_arc
+from app.halcyon import crisis
 from app.halcyon.narrator import _sanitise
 from app.halcyon.planner import (
     WORLD_PLACES,
@@ -127,6 +128,62 @@ def test_crisis_environment_stops_performing():
     assert env.companion_action == "absent"
     assert env.breathing_guide is False
     assert env.invitation == "none"
+
+
+# --------------------------------------------------------------------------
+# crisis hold — the session must not forget
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("first_time", [True, False])
+@pytest.mark.parametrize("world", list(WORLD_BASELINES))
+def test_hold_environment_is_neutral_everywhere(world, first_time):
+    """Not dark and not brightened. Either would be the environment
+    editorialising about someone's state."""
+    env = crisis.hold_environment(world, first_time=first_time)
+
+    assert env.wind <= 0.05
+    assert env.water_motion <= 0.05
+    assert env.brightness == 0.5
+    assert env.warmth == 0.5
+    assert env.music == "none"
+    assert env.music_volume == 0.0
+    assert env.companion == "none"
+    assert env.companion_action == "absent"
+    assert env.invitation == "none"
+    assert env.invitation_label == ""
+    assert env.breathing_guide is False
+
+
+def test_continued_hold_is_gentler_than_the_first():
+    first = crisis.hold_environment("zen_garden", first_time=True)
+    later = crisis.hold_environment("zen_garden", first_time=False)
+
+    assert first.reason == "crisis_hold"
+    assert later.reason == "crisis_continued"
+    assert later.transition_seconds > first.transition_seconds
+
+
+def test_replies_differ_and_neither_asks_anything():
+    first = crisis.reply_for(first_time=True)
+    later = crisis.reply_for(first_time=False)
+
+    assert first != later
+    for text in (first, later):
+        assert "?" not in text
+        assert text.strip()
+
+
+def test_first_reply_points_somewhere():
+    """A referral with no destination is not a referral."""
+    assert crisis.resources()
+    assert any(item.url for item in crisis.resources())
+
+
+def test_resources_are_a_copy():
+    """Callers must not be able to mutate the shared list."""
+    first = crisis.resources()
+    first.clear()
+    assert crisis.resources()
 
 def test_distress_is_invited_to_stop_not_to_move():
     env = plan_environment("zen_garden", estimate_affect("I'm panicking, I can't stop"))

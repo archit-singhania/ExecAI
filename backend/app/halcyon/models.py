@@ -25,6 +25,7 @@ class HalcyonSession(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     world: Mapped[str] = mapped_column(String(40), default="zen_garden")
     consent_to_store: Mapped[bool] = mapped_column(Boolean, default=False)
+    crisis_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
     turn_count: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

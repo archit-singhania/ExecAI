@@ -91,11 +91,23 @@ class TurnIn(BaseModel):
     world: WorldId | None = None
 
 
+class SupportResource(BaseModel):
+    label: str
+    detail: str
+    url: str | None = None
+
+
 class TurnOut(BaseModel):
     reply: str
     affect: AffectReading
     environment: EnvironmentCommand
     turn_index: int
+    support: list[SupportResource] | None = None
+    """Present once a session has touched a crisis, and for every turn after.
+
+    The client keeps these on screen rather than showing them once — a
+    resource that scrolls away was never really offered.
+    """
 
 
 class HalcyonSessionOut(BaseModel):

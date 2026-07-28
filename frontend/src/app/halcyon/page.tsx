@@ -137,10 +137,20 @@ export default function HalcyonPage() {
 
         <footer className="hal-footer mt-20 flex flex-wrap items-center justify-between gap-4 py-8">
           <p className="hal-footnote">Halcyon · an unreleased part of CEO.ai</p>
-          <Link href="/" className="hal-back">
-            <ArrowLeft size={15} />
-            <span>Back to CEO.ai</span>
-          </Link>
+          <div className="flex items-center gap-5">
+            <a
+              href="https://findahelpline.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hal-quiet-support"
+            >
+              Talk to someone
+            </a>
+            <Link href="/" className="hal-back">
+              <ArrowLeft size={15} />
+              <span>Back to CEO.ai</span>
+            </Link>
+          </div>
         </footer>
       </div>
     </main>

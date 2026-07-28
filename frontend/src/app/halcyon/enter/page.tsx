@@ -12,9 +12,11 @@ import {
   HalcyonWorldId,
   pixelStreamUrl,
   StreamQuality,
+  SupportResource,
 } from "@/lib/halcyon-api";
 import { formatHour, WORLD_BASELINES, worldGradient } from "@/lib/halcyon-worlds";
 import { LaunchConsole } from "@/components/halcyon/launch-console";
+import { SupportPanel } from "@/components/halcyon/support-panel";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import { useSpeechSynthesis } from "@/lib/use-speech-synthesis";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ export default function HalcyonEnterPage() {
   const [linked, setLinked] = useState(false);
   const [preferences, setPreferences] = useState<HalcyonPreferences | null>(null);
   const [spoken, setSpoken] = useState(true);
+  const [support, setSupport] = useState<SupportResource[]>([]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +94,10 @@ export default function HalcyonEnterPage() {
       setReply(turn.reply);
       setText("");
 
+      if (turn.support?.length) {
+        setSupport(turn.support);
+      }
+
       if (spoken && synthesis.supported) {
         synthesis.speak(turn.reply, () => undefined);
       }
@@ -126,6 +133,7 @@ export default function HalcyonEnterPage() {
     setSession(null);
     setEnvironment(null);
     setReply("");
+    setSupport([]);
   }
 
   async function forgetEverything() {
@@ -248,6 +256,8 @@ export default function HalcyonEnterPage() {
                 </p>
               ) : null}
             </div>
+
+            {support.length ? <SupportPanel resources={support} /> : null}
 
             <form
               onSubmit={(event: FormEvent) => {

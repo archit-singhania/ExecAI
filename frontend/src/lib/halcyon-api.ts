@@ -49,11 +49,18 @@ export type HalcyonSession = {
   environment: HalcyonEnvironment | null;
 };
 
+export type SupportResource = {
+  label: string;
+  detail: string;
+  url: string | null;
+};
+
 export type HalcyonTurn = {
   reply: string;
   affect: HalcyonAffect;
   environment: HalcyonEnvironment;
   turn_index: number;
+  support?: SupportResource[] | null;
 };
 
 export type HalcyonPreferences = {
@@ -94,6 +101,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const halcyon = {
   preferences: () => request<HalcyonPreferences>("/api/halcyon/preferences"),
+
+  support: () => request<{ resources: SupportResource[] }>("/api/halcyon/support"),
 
   startSession: (world: HalcyonWorldId, consentToStore: boolean) =>
     request<HalcyonSession>("/api/halcyon/sessions", {

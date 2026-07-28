@@ -23,7 +23,7 @@ from app.auth import decode_access_token, get_current_user
 from app.database import SessionLocal, get_db
 from app.halcyon.affect import detect_crisis, estimate_affect
 from app.halcyon.arc import ArcReading, apply_arc, compute_arc
-from app.halcyon import narrator
+from app.halcyon import crisis, narrator
 from app.halcyon.models import HalcyonSession, HalcyonTurn
 from app.halcyon.planner import (
     CRISIS_REPLY,
@@ -44,6 +44,16 @@ from app.halcyon.worlds import WORLD_BASELINES, baseline_for
 from app.models import User
 
 router = APIRouter(prefix="/api/halcyon", tags=["halcyon"])
+
+
+@router.get("/support")
+def support_resources():
+    """Always available, never triggered.
+
+    Deliberately not gated behind a crisis flag — someone looking for this
+    should be able to find it without having to say something alarming first.
+    """
+    return {"resources": [item.model_dump() for item in crisis.resources()]}
 
 
 class WorldBridge:
@@ -197,10 +207,18 @@ async def take_turn(
 
     in_crisis = detect_crisis(payload.text)
 
-    if in_crisis:
-        affect = AffectReading(label="crisis", valence=-1.0, arousal=0.6, confidence=1.0)
-        environment = plan_crisis_environment(session.world)
-        reply = CRISIS_REPLY
+    if in_crisis or session.crisis_flagged:
+        first_time = not session.crisis_flagged
+        session.crisis_flagged = True
+
+        affect = AffectReading(
+            label="crisis" if in_crisis else "held",
+            valence=-1.0 if in_crisis else 0.0,
+            arousal=0.6 if in_crisis else 0.3,
+            confidence=1.0,
+        )
+        environment = crisis.hold_environment(session.world, first_time=first_time)
+        reply = crisis.reply_for(first_time=first_time)
         arc = ArcReading()
     else:
         affect = estimate_affect(payload.text)
@@ -244,6 +262,7 @@ async def take_turn(
         affect=affect,
         environment=environment,
         turn_index=session.turn_count,
+        support=[item.model_dump() for item in crisis.resources()] if session.crisis_flagged else None,
     )
 
 
