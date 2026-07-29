@@ -2,20 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
+import {
+  AmbientState,
+  getAmbient,
+  healthColor,
+  subscribeAmbient,
+  subscribePulse,
+} from "@/lib/ambient-state";
 
-type VantaEffectInstance = { destroy: () => void };
-
-const NET_COLOR_LIGHT = 0x10131a; 
-const NET_COLOR_DARK = 0xf2f4ff; 
+type VantaEffectInstance = {
+  destroy: () => void;
+  setOptions?: (opts: Record<string, unknown>) => void;
+};
 
 export function VantaNetworkBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
   const effectRef = useRef<VantaEffectInstance | null>(null);
   const threeModRef = useRef<typeof import("three") | null>(null);
   const netFactoryRef = useRef<((opts: Record<string, unknown>) => VantaEffectInstance) | null>(null);
+  const ambientRef = useRef<AmbientState>(getAmbient());
   const { mode } = useTheme();
   const [reducedMotion, setReducedMotion] = useState(true);
   const [visible, setVisible] = useState(true);
+  const [pulsing, setPulsing] = useState(false);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -29,6 +38,29 @@ export function VantaNetworkBackground() {
     const handleVisibility = () => setVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  useEffect(() => {
+    return subscribeAmbient((state) => {
+      const previous = ambientRef.current;
+      ambientRef.current = state;
+
+      const effect = effectRef.current;
+      if (!effect || typeof effect.setOptions !== "function") return;
+      if (previous.health === state.health) return;
+
+      try {
+        effect.setOptions({ color: healthColor(state.health, mode === "dark") });
+      } catch {
+      }
+    });
+  }, [mode]);
+
+  useEffect(() => {
+    return subscribePulse(() => {
+      setPulsing(true);
+      window.setTimeout(() => setPulsing(false), 620);
+    });
   }, []);
 
   useEffect(() => {
@@ -63,7 +95,7 @@ export function VantaNetworkBackground() {
         spacing: 20.0,
         showDots: true,
         backgroundAlpha: 0,
-        color: mode === "dark" ? NET_COLOR_DARK : NET_COLOR_LIGHT,
+        color: healthColor(ambientRef.current.health, mode === "dark"),
         backgroundColor: mode === "dark" ? 0x0c0e11 : 0xf6f4ee,
       });
     }
@@ -82,7 +114,7 @@ export function VantaNetworkBackground() {
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none absolute inset-0 opacity-[0.55] dark:opacity-[0.6]"
+      className={`vanta-layer pointer-events-none absolute inset-0${pulsing ? " vanta-layer-pulse" : ""}`}
       aria-hidden
     />
   );

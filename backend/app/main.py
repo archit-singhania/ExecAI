@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
 import json
+import secrets
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,13 +10,17 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from app.agents import run_ceo_agents, run_ceo_agents_stream
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.email import send_password_changed, send_password_reset, send_welcome
 from app.llm import transcribe_audio
 from app.config import get_settings
 from app.database import Base, engine, get_db, SessionLocal
 from app.memory import retrieve_relevant_memories, search_memory_rows, store_memory
-from app.models import AgentReport, BusinessMemory, BusinessSession, Message, ReviewSchedule, Task, User
+from app.models import AgentReport, BusinessMemory, BusinessSession, Message, PasswordResetToken, ReviewSchedule, Task, User
 from app.halcyon.models import HalcyonSession, HalcyonTurn
 from app.halcyon import router as halcyon_router
+from app.billing import router as billing_router
+from app.account import router as account_router
+from app.entitlements import enforce_run_quota, enforce_session_quota, require_feature
 from app.scheduling import (
     build_board_meeting,
     compute_next_run,
@@ -22,7 +28,7 @@ from app.scheduling import (
     run_due_reviews,
     serialize_report,
 )
-from app.ratelimit import limit_by_user
+from app.ratelimit import limit_by_ip, limit_by_user
 from app.schemas import (
     AgentReportOut,
     DashboardOut,
@@ -30,6 +36,8 @@ from app.schemas import (
     MemorySearchOut,
     MessageCreate,
     MessageOut,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     ReportExportOut,
     ReviewScheduleIn,
     ReviewScheduleOut,
@@ -45,6 +53,22 @@ from app.schemas import (
 
 
 settings = get_settings()
+
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.app_env,
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+            max_request_body_size="never",
+        )
+        print("[sentry] Error tracking enabled.")
+    except ImportError:
+        print("[sentry] SENTRY_DSN is set but sentry-sdk isn't installed. Skipping.")
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CEO.ai API", version="0.1.0")
@@ -81,10 +105,15 @@ def health():
 
 
 app.include_router(halcyon_router)
+app.include_router(billing_router)
+app.include_router(account_router)
 
 agent_run_limit = limit_by_user("agent_run", limit=10, window_seconds=60)
 board_limit = limit_by_user("board_meeting", limit=6, window_seconds=300)
 transcribe_limit = limit_by_user("transcribe", limit=30, window_seconds=60)
+
+forgot_limit = limit_by_ip("forgot_password", limit=5, window_seconds=900)
+reset_limit = limit_by_ip("reset_password", limit=10, window_seconds=900)
 
 
 @app.post("/api/voice/transcribe")
@@ -120,6 +149,7 @@ def signup(payload: UserCreate, db: Session = Depends(get_db)):
     db.refresh(user)
 
     token = create_access_token(user.id)
+    send_welcome(to=user.email, name=user.name, app_url=settings.app_base_url)
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
@@ -139,12 +169,102 @@ def me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@app.post("/api/auth/forgot-password")
+def forgot_password(
+    payload: PasswordResetRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(forgot_limit),
+):
+    """Always reports success.
+
+    Saying "no account with that email" would turn this endpoint into a free
+    membership oracle — anyone could enumerate which addresses have accounts.
+    The cost of the ambiguity is one confused user; the cost of the leak is
+    every user's email address being confirmable.
+    """
+    generic = {
+        "detail": "If that email has an account, a reset link is on its way."
+    }
+
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if not user:
+        return generic
+
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({"used_at": datetime.utcnow()}, synchronize_session=False)
+
+    raw_token = secrets.token_urlsafe(32)
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+            expires_at=datetime.utcnow() + timedelta(minutes=settings.password_reset_minutes),
+        )
+    )
+    db.commit()
+
+    send_password_reset(
+        to=user.email,
+        name=user.name,
+        reset_url=f"{settings.app_base_url}/reset-password?token={raw_token}",
+        minutes_valid=settings.password_reset_minutes,
+    )
+
+    return generic
+
+
+@app.post("/api/auth/reset-password", response_model=TokenOut)
+def reset_password(
+    payload: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+    _: None = Depends(reset_limit),
+):
+    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+
+    record = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == token_hash)
+        .first()
+    )
+
+    invalid = HTTPException(
+        status_code=400,
+        detail="This reset link is invalid or has expired. Request a new one.",
+    )
+
+    if not record or record.used_at is not None or record.expires_at < datetime.utcnow():
+        raise invalid
+
+    user = db.get(User, record.user_id)
+    if not user:
+        raise invalid
+
+    user.hashed_password = hash_password(payload.password)
+    record.used_at = datetime.utcnow()
+
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({"used_at": datetime.utcnow()}, synchronize_session=False)
+
+    db.commit()
+    db.refresh(user)
+
+    send_password_changed(to=user.email, name=user.name)
+
+    token = create_access_token(user.id)
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
 @app.post("/api/sessions", response_model=SessionOut)
 def create_session(
     payload: SessionCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    enforce_session_quota(db, current_user)
     title = payload.business_goal.strip()[:72]
     session = BusinessSession(
         user_id=current_user.id,
@@ -269,7 +389,7 @@ def get_report(
 def export_report(
     report_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_feature("exports", "Markdown export")),
 ):
     report = db.get(AgentReport, report_id)
     if not report:
@@ -354,7 +474,7 @@ def send_message(
     session_id: str,
     payload: MessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(agent_run_limit),
+    current_user: User = Depends(enforce_run_quota),
 ):
     session = _owned_session(session_id, db, current_user)
 
@@ -448,7 +568,7 @@ def send_message_stream(
     session_id: str,
     payload: MessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(agent_run_limit),
+    current_user: User = Depends(enforce_run_quota),
 ):
     """Same as POST /messages, but streams each agent's report to the client
     over Server-Sent Events as soon as it's ready, instead of waiting for
@@ -659,7 +779,7 @@ def get_review_schedule(
 def update_review_schedule(
     payload: ReviewScheduleIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_feature("scheduled_reviews", "Scheduled board reviews")),
 ):
     schedule = get_or_create_schedule(db, current_user.id)
     schedule.cadence = payload.cadence

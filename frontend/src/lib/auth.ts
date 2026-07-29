@@ -85,4 +85,8 @@ export const authApi = {
     authRequest<AuthResponse>("/api/auth/signup", { name, email, password }),
   login: (email: string, password: string) =>
     authRequest<AuthResponse>("/api/auth/login", { email, password }),
+  forgotPassword: (email: string) =>
+    authRequest<{ detail: string }>("/api/auth/forgot-password", { email }),
+  resetPassword: (token: string, password: string) =>
+    authRequest<AuthResponse>("/api/auth/reset-password", { token, password }),
 };

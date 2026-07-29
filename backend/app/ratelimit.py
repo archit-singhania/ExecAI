@@ -68,6 +68,28 @@ def reset_limits() -> None:
     _window.reset()
 
 
+def limit_by_ip(name: str, limit: int, window_seconds: float):
+    """For unauthenticated endpoints, where there is no user to key on.
+
+    Password reset request is the motivating case: it must be callable
+    without a session, which also makes it the easiest endpoint to abuse for
+    email bombing someone else's inbox.
+    """
+
+    def dependency(request: Request) -> None:
+        identity = request.client.host if request.client else "anon"
+        allowed, retry_after = _window.check(f"{name}:{identity}", limit, window_seconds)
+
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many attempts. Try again in about {int(retry_after) + 1} seconds.",
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+
+    return dependency
+
+
 def limit_by_user(name: str, limit: int, window_seconds: float):
     """Dependency factory. Keys on user id, falling back to client host.
 

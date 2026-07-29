@@ -10,7 +10,9 @@ from datetime import datetime, timedelta
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.models import AgentReport, BusinessMemory, BusinessSession, ReviewSchedule, Task
+from app.config import get_settings
+from app.email import send_board_review
+from app.models import AgentReport, BusinessMemory, BusinessSession, ReviewSchedule, Task, User
 
 CADENCE_DAYS = {"weekly": 7, "biweekly": 14, "monthly": 28}
 
@@ -169,13 +171,27 @@ def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) 
         schedule.next_run_at = compute_next_run(
             schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now
         )
+
+        delivered = False
+        if schedule.email_enabled:
+            user = db.get(User, schedule.user_id)
+            if user and user.email:
+                delivered = send_board_review(
+                    to=user.email,
+                    name=user.name,
+                    title=report.title,
+                    score=report.score,
+                    bullets=report.bullets.splitlines(),
+                    app_url=get_settings().app_base_url,
+                )
+
         results.append(
             {
                 "user_id": schedule.user_id,
                 "session_id": session.id,
                 "status": "generated",
                 "score": report.score,
-                "email_queued": bool(schedule.email_enabled),
+                "email_sent": delivered,
             }
         )
 

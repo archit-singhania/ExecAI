@@ -78,7 +78,7 @@ export function MetroTile({
   icon: React.ElementType;
   tone?: MetroTone;
   size?: MetroTileSize;
-  onClick: () => void;
+  onClick: (rect?: DOMRect) => void;
   className?: string;
   trend?: number[];
   progress?: number;
@@ -133,7 +133,7 @@ export function MetroTile({
     <button
       ref={node}
       type="button"
-      onClick={onClick}
+      onClick={(event) => onClick(event.currentTarget.getBoundingClientRect())}
       onPointerMove={handleMove}
       onPointerLeave={handleLeave}
       style={

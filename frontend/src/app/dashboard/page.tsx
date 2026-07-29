@@ -1,11 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task, streamMessage } from "@/lib/api";
 import { MetroHome } from "@/components/dashboard/metro-home";
 import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
 import { MetroTone } from "@/components/dashboard/metro-tile";
+import { BoardroomConvening } from "@/components/dashboard/boardroom-convening";
+import { pulseAmbient, resetAmbient, setAmbient } from "@/lib/ambient-state";
+import { toast, toastFromError } from "@/lib/toast";
+import { Toaster } from "@/components/ui/toaster";
+import { CommandPalette } from "@/components/dashboard/command-palette";
+import { hasOnboarded, Onboarding } from "@/components/dashboard/onboarding";
 import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
@@ -39,10 +45,16 @@ const TAB_TONES: Record<DashboardTab, MetroTone> = {
   operations: "slate",
 };
 
+const VALID_TABS: DashboardTab[] = ["chat", "agents", "tasks", "board", "operations"];
+
+function parseTab(value: string | null): DashboardTab | null {
+  return value && VALID_TABS.includes(value as DashboardTab) ? (value as DashboardTab) : null;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [isDemo] = useState(() => isDemoSession());
-  const [activeTab, setActiveTab] = useState<DashboardTab | null>(null);
+  const [activeTab, setActiveTabState] = useState<DashboardTab | null>(null);
   const [goal, setGoal] = useState(starterPrompts[0]);
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -59,6 +71,38 @@ export default function DashboardPage() {
   const [memoryResults, setMemoryResults] = useState<Memory[]>([]);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("All");
   const [demoTasks, setDemoTasks] = useState<Task[]>(fallbackTasks);
+  const [liveReports, setLiveReports] = useState<AgentReport[]>([]);
+  const [liveFinal, setLiveFinal] = useState("");
+  const [originRect, setOriginRect] = useState<DOMRect | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (!hasOnboarded()) setShowOnboarding(true);
+  }, []);
+
+  const setActiveTab = useCallback(
+    (tab: DashboardTab | null, rect?: DOMRect) => {
+      setOriginRect(rect ?? null);
+      setActiveTabState(tab);
+      const url = tab ? `/dashboard?view=${tab}` : "/dashboard";
+      window.history.replaceState(null, "", url);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setActiveTabState(parseTab(params.get("view")));
+  }, []);
+
+  useEffect(() => {
+    function onPopState() {
+      const params = new URLSearchParams(window.location.search);
+      setActiveTabState(parseTab(params.get("view")));
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -109,6 +153,15 @@ export default function DashboardPage() {
     ? Math.round(latestReports.reduce((total, report) => total + report.score, 0) / latestReports.length)
     : 84;
 
+  useEffect(() => {
+    setAmbient({ health: healthScore });
+  }, [healthScore]);
+
+  useEffect(() => {
+    setAmbient({ filed: liveReports.length, active: loading });
+    if (liveReports.length) pulseAmbient();
+  }, [liveReports.length, loading]);
+
   async function refreshSession(sessionId: string) {
     const [summary, mems, history] = await Promise.all([
       api.dashboard(),
@@ -128,6 +181,7 @@ export default function DashboardPage() {
     setReportExport(null);
     setError("");
     setActiveTab("chat");
+    resetAmbient();
   }
   
   async function handleVoiceUtterance(text: string, onProgress: (label: string) => void): Promise<string> {
@@ -135,6 +189,8 @@ export default function DashboardPage() {
 
     if (isDemo) {
       setLoading(true);
+      setLiveReports([]);
+      setLiveFinal("");
       onProgress("The boardroom is weighing in\u2026");
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -143,7 +199,13 @@ export default function DashboardPage() {
         created_at: new Date().toISOString(),
       };
       setMessages((current) => [...current, userMessage]);
-      await new Promise((resolve) => window.setTimeout(resolve, 700));
+
+      for (let index = 0; index < fallbackReports.length; index += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 260));
+        setLiveReports(fallbackReports.slice(0, index + 1));
+        onProgress(`${index + 1}/${fallbackReports.length} agents reported`);
+      }
+
       const reply: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -152,11 +214,14 @@ export default function DashboardPage() {
         reports: fallbackReports,
       };
       setMessages((current) => [...current, reply]);
+      setLiveFinal(demoBoardReply);
       setLoading(false);
       return demoBoardReply;
     }
 
     setLoading(true);
+    setLiveReports([]);
+    setLiveFinal("");
     try {
       let activeSessionId = session?.id;
       if (!activeSessionId) {
@@ -191,6 +256,7 @@ export default function DashboardPage() {
         if (streamEvent.type === "agent_report") {
           reportCount += 1;
           onProgress(`${reportCount}/9 agents reported`);
+          setLiveReports((current) => [...current, streamEvent.report]);
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantId
@@ -200,6 +266,7 @@ export default function DashboardPage() {
           );
         } else if (streamEvent.type === "done") {
           finalText = streamEvent.final;
+          setLiveFinal(streamEvent.final);
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantId
@@ -220,6 +287,7 @@ export default function DashboardPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       setError(message);
+      toastFromError(err, "The board couldn't finish");
       setMessages((current) => current.filter((entry) => entry.content || entry.role === "user"));
       throw err instanceof Error ? err : new Error(message);
     } finally {
@@ -234,14 +302,29 @@ export default function DashboardPage() {
       setDemoTasks((current) =>
         current.map((task) => (task.id === taskId ? { ...task, status: "Done", completed_at: new Date().toISOString() } : task)),
       );
+      toast.success("Task closed");
       return;
+    }
+
+    const previous = dashboard;
+    if (dashboard) {
+      setDashboard({
+        ...dashboard,
+        tasks: dashboard.tasks.map((task) =>
+          task.id === taskId
+            ? { ...task, status: "Done", completed_at: new Date().toISOString() }
+            : task,
+        ),
+      });
     }
 
     try {
       await api.updateTask(taskId, "Done");
       setDashboard(await api.dashboard());
+      toast.success("Task closed");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update task.");
+      if (previous) setDashboard(previous);
+      toastFromError(err, "Unable to update task");
     }
   }
 
@@ -271,7 +354,9 @@ export default function DashboardPage() {
       await refreshSession(session.id);
       speak(`${report.title}. ${report.summary}. ${report.bullets.join(". ")}`);
       setActiveTab("board");
+      toast.success("Board review complete", `${report.score}/100`);
     } catch (err) {
+      toastFromError(err, "Unable to generate board meeting");
       setError(err instanceof Error ? err.message : "Unable to generate board meeting.");
     } finally {
       setLoading(false);
@@ -294,6 +379,7 @@ export default function DashboardPage() {
       setSelectedReport(freshReport);
       setReportExport(exported);
     } catch (err) {
+      toastFromError(err, "Unable to open report");
       setError(err instanceof Error ? err.message : "Unable to open report.");
     }
   }
@@ -362,11 +448,22 @@ export default function DashboardPage() {
             hasSession={!!session || isDemo}
             isDemo={isDemo}
             error={error}
+            originRect={originRect}
             onBoardReview={generateBoardMeeting}
             onBack={() => setActiveTab(null)}
           >
             {activeTab === "chat" ? (
               <div className="glass-strong section-panel flex min-h-[560px] flex-col rounded-lg p-2 sm:min-h-[620px] sm:p-3 3xl:min-h-[680px]">
+                {loading || liveReports.length ? (
+                  <div className="px-2 pb-6 pt-4">
+                    <BoardroomConvening
+                      reports={liveReports}
+                      active={loading}
+                      finalText={liveFinal || undefined}
+                    />
+                  </div>
+                ) : null}
+
                 <VoiceStage
                   subtitle={session?.title ?? (isDemo ? "Live demo" : "New session")}
                   placeholderPrompt="Tap the mic and tell your CEO what's on your mind."
@@ -427,6 +524,17 @@ export default function DashboardPage() {
           </MetroSectionShell>
         )}
       </div>
+
+      <CommandPalette
+        onSelectTab={setActiveTab}
+        onStartNewSession={startNewSessionFromHome}
+        onBoardReview={generateBoardMeeting}
+        onLogout={logout}
+        onReplayTour={() => setShowOnboarding(true)}
+      />
+      <Toaster />
+
+      {showOnboarding ? <Onboarding onDone={() => setShowOnboarding(false)} /> : null}
     </main>
   );
 }

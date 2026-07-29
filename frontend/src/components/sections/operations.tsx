@@ -4,6 +4,7 @@ import { Activity, Files, Repeat, Target } from "lucide-react";
 import { AgentReport } from "@/lib/api";
 import { OperatingPhases } from "@/components/sections/operating-phases";
 import { KpiRunway } from "@/components/sections/kpi-runway";
+import { ConvictionSpread } from "@/components/dashboard/conviction-spread";
 import {
   MetricRow,
   MetricStat,
@@ -60,6 +61,10 @@ export function Operations({
             <ReadChip icon={Target} label="Runway" value={`${runway} months`} />
           </div>
         </div>
+      </div>
+
+      <div className="sec-card mt-4 rounded-lg p-4">
+        <ConvictionSpread reports={reports} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">

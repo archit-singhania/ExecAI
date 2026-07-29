@@ -9,6 +9,7 @@ import {
   MessagesSquare,
   Presentation,
   RefreshCcw,
+  Settings,
   Users2,
 } from "lucide-react";
 import Link from "next/link";
@@ -47,7 +48,7 @@ export function MetroHome({
   user: AuthUser | null;
   isDemo: boolean;
   onLogout: () => void;
-  onSelectTab: (tab: DashboardTab) => void;
+  onSelectTab: (tab: DashboardTab, rect?: DOMRect) => void;
   onStartNewSession: () => void;
   healthScore: number;
   runway: number;
@@ -100,6 +101,11 @@ export function MetroHome({
             </Link>
           ) : null}
 
+          <Link href="/settings" className="mh-btn" title="Account settings">
+            <Settings size={14} />
+            <span className="hidden sm:inline">Settings</span>
+          </Link>
+
           <button type="button" onClick={onLogout} className="mh-btn mh-btn-danger">
             <LogOut size={14} />
             <span className="hidden sm:inline">Log out</span>
@@ -117,7 +123,7 @@ export function MetroHome({
             icon={MessagesSquare}
             tone="midnight"
             size="2x2"
-            onClick={() => onSelectTab("chat")}
+            onClick={(rect) => onSelectTab("chat", rect)}
           />
 
           <MetroTile
@@ -129,7 +135,7 @@ export function MetroHome({
             trend={reportCount ? shapeFrom(reportCount) : undefined}
             icon={Users2}
             tone="ink"
-            onClick={() => onSelectTab("agents")}
+            onClick={(rect) => onSelectTab("agents", rect)}
           />
 
           <MetroTile
@@ -141,7 +147,7 @@ export function MetroHome({
             progress={completion}
             icon={ListChecks}
             tone="cobalt"
-            onClick={() => onSelectTab("tasks")}
+            onClick={(rect) => onSelectTab("tasks", rect)}
           />
 
           <MetroTile
@@ -152,7 +158,7 @@ export function MetroHome({
             status="Scheduled"
             icon={Presentation}
             tone="teal"
-            onClick={() => onSelectTab("board")}
+            onClick={(rect) => onSelectTab("board", rect)}
           />
 
           <MetroTile
@@ -164,7 +170,7 @@ export function MetroHome({
             status="Signal"
             icon={Activity}
             tone="slate"
-            onClick={() => onSelectTab("operations")}
+            onClick={(rect) => onSelectTab("operations", rect)}
           />
 
           <MetroTile
@@ -176,7 +182,7 @@ export function MetroHome({
             status="Tracking"
             icon={Gauge}
             tone="plum"
-            onClick={() => onSelectTab("operations")}
+            onClick={(rect) => onSelectTab("operations", rect)}
           />
 
           <MetroTile
@@ -188,7 +194,7 @@ export function MetroHome({
             status={runway < 6 ? "Tight" : "Stable"}
             icon={CircleDollarSign}
             tone="ink"
-            onClick={() => onSelectTab("operations")}
+            onClick={(rect) => onSelectTab("operations", rect)}
           />
 
           <MetroTile

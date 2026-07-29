@@ -130,6 +130,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 </div>
               </label>
 
+              {!isSignup ? (
+                <div className="text-right">
+                  <Link
+                    href="/forgot-password"
+                    className="text-[0.72rem] font-bold text-steel transition hover:text-accent"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
+              ) : null}
+
               {error ? <p className="rounded-md bg-ember/10 px-3 py-2 text-xs font-semibold text-ember">{error}</p> : null}
 
               <Button disabled={loading} className="h-12 w-full accent-glow">

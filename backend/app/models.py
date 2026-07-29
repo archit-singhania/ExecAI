@@ -16,6 +16,13 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(120), default="")
+    tier: Mapped[str] = mapped_column(String(24), default="free")
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    subscription_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    subscription_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    runs_this_period: Mapped[int] = mapped_column(Integer, default=0)
+    period_started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     sessions: Mapped[list["BusinessSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -37,6 +44,17 @@ class BusinessSession(Base):
     reports: Mapped[list["AgentReport"]] = relationship(back_populates="session", cascade="all, delete-orphan")
     tasks: Mapped[list["Task"]] = relationship(back_populates="session", cascade="all, delete-orphan")
     user: Mapped["User | None"] = relationship(back_populates="sessions")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class Message(Base):
@@ -107,10 +125,10 @@ class ReviewSchedule(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
-    cadence: Mapped[str] = mapped_column(String(24), default="weekly")  # off | weekly | biweekly | monthly
-    weekday: Mapped[int] = mapped_column(Integer, default=0)  # 0=Monday .. 6=Sunday
-    hour: Mapped[int] = mapped_column(Integer, default=9)  # local hour, 0-23
-    tz_offset_minutes: Mapped[int] = mapped_column(Integer, default=0)  # local = utc + offset
+    cadence: Mapped[str] = mapped_column(String(24), default="weekly") 
+    weekday: Mapped[int] = mapped_column(Integer, default=0)  
+    hour: Mapped[int] = mapped_column(Integer, default=9) 
+    tz_offset_minutes: Mapped[int] = mapped_column(Integer, default=0) 
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

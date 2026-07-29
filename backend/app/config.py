@@ -14,11 +14,24 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434/v1"
     ollama_model: str = "llama3.1"
     ollama_embed_model: str = "nomic-embed-text"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3003"
     jwt_secret: str = "dev-only-change-me-in-prod"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 7
     cron_secret: str | None = None
+
+    resend_api_key: str | None = None
+    email_from: str = "CEO.ai <onboarding@resend.dev>"
+    app_base_url: str = "http://localhost:3003"
+    password_reset_minutes: int = 60
+
+    sentry_dsn: str | None = None
+
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+    stripe_price_pro: str | None = None
+    stripe_price_team: str | None = None
+    stripe_price_agency: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
