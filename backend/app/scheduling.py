@@ -11,7 +11,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.email import send_board_review
+from app.email import send_board_review, send_weekly_digest
 from app.models import AgentReport, BusinessMemory, BusinessSession, ReviewSchedule, Task, User
 
 CADENCE_DAYS = {"weekly": 7, "biweekly": 14, "monthly": 28}
@@ -133,6 +133,59 @@ def get_or_create_schedule(db: Session, user_id: str) -> ReviewSchedule:
     db.commit()
     db.refresh(schedule)
     return schedule
+
+
+def run_weekly_digests(db: Session, now: datetime | None = None, limit: int = 500) -> list[dict]:
+    now = now or datetime.utcnow()
+    since = now - timedelta(days=7)
+
+    users = (
+        db.query(User)
+        .join(ReviewSchedule, ReviewSchedule.user_id == User.id)
+        .filter(ReviewSchedule.email_enabled.is_(True), ReviewSchedule.cadence != "off")
+        .limit(limit)
+        .all()
+    )
+
+    results: list[dict] = []
+
+    for user in users:
+        sessions = db.query(BusinessSession).filter(BusinessSession.user_id == user.id).all()
+        if not sessions:
+            continue
+
+        session_ids = [session.id for session in sessions]
+        tasks = db.query(Task).filter(Task.session_id.in_(session_ids)).all()
+
+        done = len(
+            [
+                task
+                for task in tasks
+                if task.status.lower() in {"done", "complete", "completed"}
+                and task.completed_at
+                and task.completed_at >= since
+            ]
+        )
+        open_tasks = [
+            task for task in tasks if task.status.lower() not in {"done", "complete", "completed"}
+        ]
+        high_priority = [task.title for task in open_tasks if task.priority == "High"]
+
+        health = round(sum(session.health_score for session in sessions) / len(sessions))
+
+        delivered = send_weekly_digest(
+            to=user.email,
+            name=user.name,
+            health=health,
+            done=done,
+            open_tasks=len(open_tasks),
+            high_priority=high_priority,
+            app_url=get_settings().app_base_url,
+        )
+
+        results.append({"user_id": user.id, "sent": delivered, "done": done})
+
+    return results
 
 
 def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) -> list[dict]:

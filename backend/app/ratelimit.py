@@ -22,6 +22,7 @@ from fastapi import Depends, HTTPException, Request
 
 from app.auth import get_current_user
 from app.models import User
+from app.store import check_window
 
 
 class SlidingWindow:
@@ -78,7 +79,7 @@ def limit_by_ip(name: str, limit: int, window_seconds: float):
 
     def dependency(request: Request) -> None:
         identity = request.client.host if request.client else "anon"
-        allowed, retry_after = _window.check(f"{name}:{identity}", limit, window_seconds)
+        allowed, retry_after = check_window(f"rl:{name}:{identity}", limit, window_seconds)
 
         if not allowed:
             raise HTTPException(
@@ -99,7 +100,7 @@ def limit_by_user(name: str, limit: int, window_seconds: float):
 
     def dependency(request: Request, current_user: User = Depends(get_current_user)) -> User:
         identity = current_user.id if current_user else (request.client.host if request.client else "anon")
-        allowed, retry_after = _window.check(f"{name}:{identity}", limit, window_seconds)
+        allowed, retry_after = check_window(f"rl:{name}:{identity}", limit, window_seconds)
 
         if not allowed:
             raise HTTPException(

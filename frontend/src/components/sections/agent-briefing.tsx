@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Brain, FileText, Inbox } from "lucide-react";
-import { AgentReport, ReportExport } from "@/lib/api";
+import { Brain, Check, FileText, Inbox, Link2 } from "lucide-react";
+import { AgentReport, api, ReportExport } from "@/lib/api";
 import { agentMeta } from "@/lib/dashboard-data";
+import { toastFromError } from "@/lib/toast";
 import {
   DetailSheet,
   EmptyState,
@@ -116,7 +117,8 @@ export function AgentBriefing({
       >
         {selectedReport ? (
           <div className="pt-4">
-            <p className="text-sm font-medium leading-7 text-steel">{selectedReport.summary}</p>
+            {selectedReport.id ? <ShareRow reportId={selectedReport.id} /> : null}
+            <p className="mt-4 text-sm font-medium leading-7 text-steel">{selectedReport.summary}</p>
 
             {selectedReport.bullets.length ? (
               <div className="mt-5">
@@ -153,6 +155,39 @@ export function AgentBriefing({
         ) : null}
       </DetailSheet>
     </SectionPanel>
+  );
+}
+
+function ShareRow({ reportId }: { reportId: string }) {
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    setBusy(true);
+    try {
+      const result = await api.createShareLink(reportId);
+      setUrl(result.url);
+      await navigator.clipboard.writeText(result.url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch (error) {
+      toastFromError(error, "Couldn't create a share link");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="sec-card flex flex-wrap items-center justify-between gap-3 rounded-lg px-3.5 py-2.5">
+      <p className="min-w-0 flex-1 truncate text-[0.75rem] font-semibold text-steel">
+        {url || "Create a public link anyone can read."}
+      </p>
+      <button type="button" onClick={share} disabled={busy} className="sec-rail-item shrink-0">
+        {copied ? <Check size={13} /> : <Link2 size={13} />}
+        {copied ? "Copied" : url ? "Copy again" : "Share"}
+      </button>
+    </div>
   );
 }
 

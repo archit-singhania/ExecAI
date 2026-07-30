@@ -1,15 +1,20 @@
 from typing import Iterator, TypedDict
+import hashlib
+
 from langgraph.graph import END, StateGraph
+
+from app.store import cache_get, cache_set
 from app.config import get_settings
 from app.llm import generate_agent_report
 
 
-class AgentBrief(TypedDict):
+class AgentBrief(TypedDict, total=False):
     agent: str
     title: str
     summary: str
     bullets: list[str]
     score: int
+    prediction: dict[str, object]
 
 
 class CEOState(TypedDict):
@@ -19,8 +24,49 @@ class CEOState(TypedDict):
     reports: list[AgentBrief]
     final: str
     tasks: list[dict[str, str]]
+    predictions: list[dict[str, object]]
     health_score: int
     runway_months: int
+
+
+AGENT_PREDICTIONS: dict[str, tuple[str, int]] = {
+    "Market Research": (
+        "At least 3 of the next 10 target customers will describe this problem as urgent.",
+        30,
+    ),
+    "CFO": (
+        "Cost to acquire a customer will exceed first-month revenue per customer.",
+        60,
+    ),
+    "CTO": (
+        "The core workflow will be shippable by one engineer within six weeks.",
+        42,
+    ),
+    "Product Manager": (
+        "More than half of users who finish a first session will return within seven days.",
+        30,
+    ),
+    "Marketing": (
+        "Organic channels will produce more signups than paid in the first month.",
+        30,
+    ),
+    "Legal": (
+        "No regulatory or compliance blocker will surface before launch.",
+        90,
+    ),
+    "Sales": (
+        "At least one prospect will commit to a paid pilot.",
+        45,
+    ),
+    "Designer": (
+        "First-session completion rate will exceed 50 percent.",
+        30,
+    ),
+    "Executive Assistant": (
+        "Fewer than half of this week's tasks will be closed on time.",
+        14,
+    ),
+}
 
 
 def _score(text: str, base: int) -> int:
@@ -257,6 +303,28 @@ def ceo_synthesis(state: CEOState) -> CEOState:
             "created_by_agent": "Sales",
         },
     ]
+    state["predictions"] = []
+    for report in state["reports"]:
+        agent = report["agent"]
+        supplied = report.get("prediction")
+
+        if isinstance(supplied, dict) and supplied.get("statement"):
+            statement = str(supplied["statement"])
+            horizon = int(supplied.get("horizon_days", 30) or 30)
+        elif agent in AGENT_PREDICTIONS:
+            statement, horizon = AGENT_PREDICTIONS[agent]
+        else:
+            continue
+
+        state["predictions"].append(
+            {
+                "agent": agent,
+                "statement": statement,
+                "horizon_days": horizon,
+                "confidence": report["score"],
+            }
+        )
+
     state["final"] = (
         f"CEO decision: proceed only with validation gates. The opportunity currently scores {average_score}/100. "
         f"My main concern is {top_risk}. For the next 7 days, do not build the full product. "
@@ -301,16 +369,34 @@ def _initial_state(goal: str, message: str, memory_context: list[str] | None) ->
         "reports": [],
         "final": "",
         "tasks": [],
+        "predictions": [],
         "health_score": 75,
         "runway_months": 6,
     }
 
 
+def _cache_key(goal: str, message: str) -> str:
+    digest = hashlib.sha256(f"{goal.strip().lower()}||{message.strip().lower()}".encode()).hexdigest()
+    return f"agents:v1:{digest[:32]}"
+
+
 def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = None) -> CEOState:
     settings = get_settings()
     _ = settings.openai_api_key
+
+    key = _cache_key(goal, message)
+    if not memory_context:
+        cached = cache_get(key)
+        if cached:
+            return cached
+
     graph = build_ceo_graph()
-    return graph.invoke(_initial_state(goal, message, memory_context))
+    result = graph.invoke(_initial_state(goal, message, memory_context))
+
+    if not memory_context:
+        cache_set(key, result, ttl_seconds=86400)
+
+    return result
 
 
 def run_ceo_agents_stream(

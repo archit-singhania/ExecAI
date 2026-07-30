@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Check, CircleCheck, ListChecks } from "lucide-react";
 import { Task } from "@/lib/api";
 import { TaskFilter } from "@/lib/dashboard-data";
@@ -73,11 +74,7 @@ export function TaskBoard({
       />
 
       {tasks.length ? (
-        <div className="sec-stagger space-y-2.5">
-          {tasks.map((task, index) => (
-            <TaskRow key={task.id} task={task} index={index} completeTask={completeTask} />
-          ))}
-        </div>
+        <TaskList tasks={tasks} completeTask={completeTask} />
       ) : (
         <EmptyState
           icon={CircleCheck}
@@ -90,6 +87,83 @@ export function TaskBoard({
         />
       )}
     </SectionPanel>
+  );
+}
+
+const VIRTUALISE_ABOVE = 60;
+const ESTIMATED_ROW = 118;
+const OVERSCAN = 6;
+
+function TaskList({
+  tasks,
+  completeTask,
+}: {
+  tasks: Task[];
+  completeTask: (taskId: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [range, setRange] = useState({ start: 0, end: 40 });
+
+  const virtualise = tasks.length > VIRTUALISE_ABOVE;
+
+  useEffect(() => {
+    if (!virtualise) return;
+
+    const scroller = containerRef.current?.closest(".command-scroll") as HTMLElement | null;
+    if (!scroller) return;
+
+    let frame = 0;
+
+    function measure() {
+      frame = 0;
+      const node = containerRef.current;
+      if (!node || !scroller) return;
+
+      const offset = node.offsetTop;
+      const scrolled = Math.max(0, scroller.scrollTop - offset);
+      const start = Math.max(0, Math.floor(scrolled / ESTIMATED_ROW) - OVERSCAN);
+      const visible = Math.ceil(scroller.clientHeight / ESTIMATED_ROW) + OVERSCAN * 2;
+
+      setRange({ start, end: Math.min(tasks.length, start + visible) });
+    }
+
+    function onScroll() {
+      if (!frame) frame = requestAnimationFrame(measure);
+    }
+
+    measure();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [tasks.length, virtualise]);
+
+  if (!virtualise) {
+    return (
+      <div className="sec-stagger space-y-2.5">
+        {tasks.map((task, index) => (
+          <TaskRow key={task.id} task={task} index={index} completeTask={completeTask} />
+        ))}
+      </div>
+    );
+  }
+
+  const slice = tasks.slice(range.start, range.end);
+
+  return (
+    <div ref={containerRef}>
+      <div style={{ height: range.start * ESTIMATED_ROW }} aria-hidden />
+      <div className="space-y-2.5">
+        {slice.map((task) => (
+          <TaskRow key={task.id} task={task} index={0} completeTask={completeTask} />
+        ))}
+      </div>
+      <div style={{ height: Math.max(0, (tasks.length - range.end) * ESTIMATED_ROW) }} aria-hidden />
+    </div>
   );
 }
 

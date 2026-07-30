@@ -10,6 +10,7 @@ import {
   Presentation,
   RefreshCcw,
   Settings,
+  Target,
   Users2,
 } from "lucide-react";
 import Link from "next/link";
@@ -195,6 +196,16 @@ export function MetroHome({
             icon={CircleDollarSign}
             tone="ink"
             onClick={(rect) => onSelectTab("operations", rect)}
+          />
+
+          <MetroTile
+            label="Track record"
+            eyebrow="Accountability"
+            stat="Score the board"
+            status="Open calls"
+            icon={Target}
+            tone="plum"
+            onClick={(rect) => onSelectTab("record", rect)}
           />
 
           <MetroTile

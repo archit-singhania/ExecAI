@@ -16,6 +16,7 @@ import {
   RefreshCcw,
   Search,
   Settings,
+  Target,
   Users2,
 } from "lucide-react";
 import { DashboardTab } from "@/lib/dashboard-data";
@@ -68,6 +69,7 @@ export function CommandPalette({
       { id: "tasks", label: "Task board", hint: "Execution layer", group: "Navigate", icon: ListChecks, run: go("tasks") },
       { id: "board", label: "Board and memory", hint: "Decision archive", group: "Navigate", icon: Presentation, run: go("board") },
       { id: "operations", label: "Operations", hint: "Conviction spread and runway", group: "Navigate", icon: Activity, run: go("operations") },
+      { id: "record", label: "Track record", hint: "How often each desk is right", group: "Navigate", icon: Target, run: go("record") },
       {
         id: "new-session",
         label: "Start a new session",

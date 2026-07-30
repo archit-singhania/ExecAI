@@ -164,6 +164,10 @@ export const api = {
     }),
   dashboard: () => request<DashboardSummary>("/api/dashboard"),
   getReviewSchedule: () => request<ReviewSchedule>("/api/review-schedule"),
+  createShareLink: (reportId: string) =>
+    request<{ slug: string; url: string }>(`/api/share/reports/${reportId}`, { method: "POST" }),
+  revokeShareLink: (reportId: string) =>
+    request<{ revoked: boolean }>(`/api/share/reports/${reportId}`, { method: "DELETE" }),
   updateReviewSchedule: (schedule: Omit<ReviewSchedule, "last_run_at" | "next_run_at">) =>
     request<ReviewSchedule>("/api/review-schedule", {
       method: "PUT",

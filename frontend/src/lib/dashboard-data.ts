@@ -52,7 +52,7 @@ export const operatingRoadmap: { name: string; status: PhaseStatus; note: string
 
 export type TaskFilter = "All" | "Open" | "Done" | "High";
 
-export type DashboardTab = "chat" | "agents" | "tasks" | "board" | "operations";
+export type DashboardTab = "chat" | "agents" | "tasks" | "board" | "operations" | "record";
 
 export const fallbackReports: AgentReport[] = [
   {

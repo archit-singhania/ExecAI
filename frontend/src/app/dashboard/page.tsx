@@ -1,22 +1,19 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { api, AgentReport, ChatMessage, DashboardSummary, Memory, ReportExport, Session, Task, streamMessage } from "@/lib/api";
 import { MetroHome } from "@/components/dashboard/metro-home";
 import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
 import { MetroTone } from "@/components/dashboard/metro-tile";
-import { BoardroomConvening } from "@/components/dashboard/boardroom-convening";
 import { pulseAmbient, resetAmbient, setAmbient } from "@/lib/ambient-state";
 import { toast, toastFromError } from "@/lib/toast";
 import { Toaster } from "@/components/ui/toaster";
-import { CommandPalette } from "@/components/dashboard/command-palette";
-import { hasOnboarded, Onboarding } from "@/components/dashboard/onboarding";
+import { hasOnboarded } from "@/components/dashboard/onboarding";
 import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
-import { BoardTheater } from "@/components/sections/board-theater";
-import { Operations } from "@/components/sections/operations";
 import { clearSession, getStoredUser, isDemoSession } from "@/lib/auth";
 import {
   DashboardTab,
@@ -35,7 +32,38 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   tasks: "Task board",
   board: "Board & memory",
   operations: "Operations",
+  record: "Track record",
 };
+
+const CommandPalette = dynamic(
+  () => import("@/components/dashboard/command-palette").then((m) => m.CommandPalette),
+  { ssr: false },
+);
+
+const Onboarding = dynamic(
+  () => import("@/components/dashboard/onboarding").then((m) => m.Onboarding),
+  { ssr: false },
+);
+
+const BoardroomConvening = dynamic(
+  () => import("@/components/dashboard/boardroom-convening").then((m) => m.BoardroomConvening),
+  { ssr: false },
+);
+
+const Operations = dynamic(
+  () => import("@/components/sections/operations").then((m) => m.Operations),
+  { ssr: false },
+);
+
+const BoardTheater = dynamic(
+  () => import("@/components/sections/board-theater").then((m) => m.BoardTheater),
+  { ssr: false },
+);
+
+const TrackRecord = dynamic(
+  () => import("@/components/sections/track-record").then((m) => m.TrackRecord),
+  { ssr: false },
+);
 
 const TAB_TONES: Record<DashboardTab, MetroTone> = {
   chat: "midnight",
@@ -43,9 +71,10 @@ const TAB_TONES: Record<DashboardTab, MetroTone> = {
   tasks: "cobalt",
   board: "teal",
   operations: "slate",
+  record: "plum",
 };
 
-const VALID_TABS: DashboardTab[] = ["chat", "agents", "tasks", "board", "operations"];
+const VALID_TABS: DashboardTab[] = ["chat", "agents", "tasks", "board", "operations", "record"];
 
 function parseTab(value: string | null): DashboardTab | null {
   return value && VALID_TABS.includes(value as DashboardTab) ? (value as DashboardTab) : null;
@@ -521,6 +550,7 @@ export default function DashboardPage() {
                 runway={runway}
               />
             ) : null}
+            {activeTab === "record" ? <TrackRecord isDemo={isDemo} /> : null}
           </MetroSectionShell>
         )}
       </div>

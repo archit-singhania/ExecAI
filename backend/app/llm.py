@@ -30,7 +30,14 @@ DISPLAY_NAMES = {
 RESPONSE_FORMAT_INSTRUCTIONS = (
     "Respond with ONLY valid JSON, no markdown fences, in this exact shape:\n"
     '{"title": "short headline", "summary": "2-3 sentence summary", '
-    '"bullets": ["point 1", "point 2", "point 3"], "score": <integer 0-100>}'
+    '"bullets": ["point 1", "point 2", "point 3"], "score": <integer 0-100>, '
+    '"prediction": {"statement": "...", "horizon_days": <integer 7-120>}}\n\n'
+    "The prediction must be a single falsifiable claim about THIS business that "
+    "can be judged true or false on the stated date. It must be specific and "
+    "measurable, and you must be willing to be wrong: do not hedge, do not use "
+    "'may' or 'could', and do not predict something guaranteed to happen. "
+    "Good: 'Fewer than 3 of the first 20 signups will still be active after 14 days.' "
+    "Bad: 'Growth may be challenging.'"
 )
 
 
@@ -73,16 +80,44 @@ def transcribe_audio(file_bytes: bytes, filename: str = "audio.webm") -> str | N
         return None
 
 
+def _parse_prediction(data: dict) -> dict | None:
+    raw = data.get("prediction")
+    if not isinstance(raw, dict):
+        return None
+
+    statement = str(raw.get("statement", "")).strip()
+    if len(statement) < 15 or len(statement) > 300:
+        return None
+
+    lowered = statement.lower()
+    hedges = (" may ", " might ", " could ", " possibly ", " perhaps ", " likely ")
+    if any(hedge in f" {lowered} " for hedge in hedges):
+        return None
+
+    try:
+        horizon = int(raw.get("horizon_days", 30))
+    except (TypeError, ValueError):
+        horizon = 30
+
+    return {"statement": statement, "horizon_days": max(7, min(120, horizon))}
+
+
 def _parse_report(agent_key: str, raw: str) -> dict:
     raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     data = json.loads(raw)
-    return {
+    report = {
         "agent": DISPLAY_NAMES[agent_key],
         "title": str(data["title"]),
         "summary": str(data["summary"]),
         "bullets": [str(b) for b in list(data["bullets"])[:5]],
         "score": max(0, min(100, int(data["score"]))),
     }
+
+    prediction = _parse_prediction(data)
+    if prediction:
+        report["prediction"] = prediction
+
+    return report
 
 
 def _run_tool_calls(client, model, messages: list[dict], tools: list[dict]) -> list[dict]:

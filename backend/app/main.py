@@ -20,12 +20,18 @@ from app.halcyon.models import HalcyonSession, HalcyonTurn
 from app.halcyon import router as halcyon_router
 from app.billing import router as billing_router
 from app.account import router as account_router
+from app.share import router as share_router
+from app.jobs import router as jobs_router
+from app.predictions import router as predictions_router
 from app.entitlements import enforce_run_quota, enforce_session_quota, require_feature
+from app.logging_setup import RequestContextMiddleware, configure_logging, log_event
+from app.store import store_backend
 from app.scheduling import (
     build_board_meeting,
     compute_next_run,
     get_or_create_schedule,
     run_due_reviews,
+    run_weekly_digests,
     serialize_report,
 )
 from app.ratelimit import limit_by_ip, limit_by_user
@@ -107,6 +113,13 @@ def health():
 app.include_router(halcyon_router)
 app.include_router(billing_router)
 app.include_router(account_router)
+app.include_router(share_router)
+app.include_router(jobs_router)
+app.include_router(predictions_router)
+
+configure_logging(as_json=settings.app_env != "development")
+app.add_middleware(RequestContextMiddleware)
+log_event("startup", env=settings.app_env, store=store_backend())
 
 agent_run_limit = limit_by_user("agent_run", limit=10, window_seconds=60)
 board_limit = limit_by_user("board_meeting", limit=6, window_seconds=300)
@@ -810,3 +823,15 @@ def trigger_due_reviews(request: Request, db: Session = Depends(get_db)):
 
     results = run_due_reviews(db)
     return {"ran": len(results), "results": results}
+
+
+@app.post("/api/internal/run-weekly-digests")
+def trigger_weekly_digests(request: Request, db: Session = Depends(get_db)):
+    if not settings.cron_secret:
+        raise HTTPException(status_code=503, detail="CRON_SECRET is not configured.")
+    if request.headers.get("x-cron-secret") != settings.cron_secret:
+        raise HTTPException(status_code=401, detail="Invalid cron secret.")
+
+    results = run_weekly_digests(db)
+    log_event("weekly digests sent", count=len(results))
+    return {"sent": len(results), "results": results}

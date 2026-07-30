@@ -173,3 +173,41 @@ def send_board_review(to: str, name: str, title: str, score: int, bullets: list[
         cta_url=f"{app_url}/dashboard",
     )
     return send(to, f"Board review: {score}/100", html)
+
+
+def send_weekly_digest(
+    to: str,
+    name: str,
+    health: int,
+    done: int,
+    open_tasks: int,
+    high_priority: list[str],
+    app_url: str,
+) -> bool:
+    if high_priority:
+        items = "".join(f'<li style="margin:0 0 9px;">{task}</li>' for task in high_priority[:5])
+        focus = f'<ul style="padding-left:18px;margin:14px 0 0;">{items}</ul>'
+    else:
+        focus = "<br>Nothing is marked high priority right now."
+
+    if done and not open_tasks:
+        lead = f"You closed everything on the board this week. {done} done, nothing left open."
+    elif done:
+        lead = f"You closed {done} task{'' if done == 1 else 's'} this week, with {open_tasks} still open."
+    elif open_tasks:
+        lead = f"Nothing closed this week. {open_tasks} task{'' if open_tasks == 1 else 's'} still open."
+    else:
+        lead = "The board is idle. Start a session and it will give you something to work on."
+
+    html = _shell(
+        title="Your week, from the board",
+        body_html=(
+            f"Hi {name or 'there'},<br><br>"
+            f"{lead}<br><br>"
+            f"Business health sits at <strong>{health}/100</strong>."
+            f"{focus}"
+        ),
+        cta_label="Open the boardroom",
+        cta_url=f"{app_url}/dashboard",
+    )
+    return send(to, f"Your week: {done} closed, {open_tasks} open", html)

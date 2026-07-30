@@ -177,9 +177,11 @@ def test_initial_state_has_every_key():
         "reports",
         "final",
         "tasks",
+        "predictions",
         "health_score",
         "runway_months",
     }
     assert expected == set(fresh.keys())
     assert fresh["reports"] == []
+    assert fresh["predictions"] == []
     assert fresh["memory_context"] == []

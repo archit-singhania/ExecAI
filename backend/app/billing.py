@@ -8,7 +8,7 @@ from app.auth import get_current_user
 from app.config import get_settings
 from app.database import get_db
 from app.entitlements import reset_period_if_due
-from app.models import User
+from app.models import ProcessedWebhookEvent, User
 from app.plans import PLANS, TierId, get_plan, plan_list
 from app.ratelimit import limit_by_user
 
@@ -146,7 +146,14 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     event_type = event.get("type", "")
+    event_id = event.get("id", "")
     obj = event.get("data", {}).get("object", {})
+
+    if event_id:
+        if db.get(ProcessedWebhookEvent, event_id):
+            return {"received": True, "duplicate": True}
+        db.add(ProcessedWebhookEvent(id=event_id, event_type=event_type))
+        db.commit()
 
     if event_type == "checkout.session.completed":
         user_id = obj.get("client_reference_id") or obj.get("metadata", {}).get("user_id")

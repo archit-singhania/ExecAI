@@ -77,7 +77,7 @@ input {
 }
 
 .scanline {
-  opacity: 0.22;
+  opacity: 0.14;
   background: repeating-linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.42) 0,
@@ -85,12 +85,10 @@ input {
     transparent 1px,
     transparent 6px
   );
-  mix-blend-mode: overlay;
 }
 
 .dark .scanline {
-  opacity: 0.08;
-  mix-blend-mode: soft-light;
+  opacity: 0.05;
 }
 
 .glass,
@@ -98,7 +96,7 @@ input {
   border: 1px solid rgba(16, 19, 23, 0.09);
   background: rgb(var(--color-surface) / 0.66);
   box-shadow: 0 20px 60px rgba(16, 19, 23, 0.12);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(7px);
   transition: background-color 150ms linear, border-color 150ms linear;
 }
 
@@ -907,7 +905,7 @@ textarea:focus-visible {
   box-shadow:
     0 1px 0 rgb(255 255 255 / 0.34) inset,
     0 18px 46px rgb(16 19 23 / 0.08);
-  backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(9px) saturate(1.06);
 }
 
 .metro-home-header::before {
@@ -4499,6 +4497,47 @@ a.hal-support-link:hover {
   .onb-panel {
     animation: none !important;
   }
+}
+
+.sec-card-due {
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ember) / 0.35);
+}
+
+.tr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 0.42rem;
+  padding: 0.38rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgb(var(--color-steel));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ink) / 0.1);
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.dark .tr-btn {
+  box-shadow: inset 0 0 0 1px rgb(var(--color-fog) / 0.12);
+}
+
+.tr-btn:hover {
+  color: rgb(var(--color-ink));
+  background: rgb(var(--color-ink) / 0.04);
+}
+
+.dark .tr-btn:hover {
+  color: rgb(var(--color-fog));
+  background: rgb(var(--color-fog) / 0.06);
+}
+
+.tr-btn-hit:hover {
+  color: #1d6f5f;
+  box-shadow: inset 0 0 0 1px rgba(29, 111, 95, 0.45);
+}
+
+.tr-btn-miss:hover {
+  color: rgb(var(--color-ember));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ember) / 0.45);
 }
 
 .sec-meter {

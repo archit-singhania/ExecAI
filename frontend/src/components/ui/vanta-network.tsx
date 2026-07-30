@@ -9,6 +9,7 @@ import {
   subscribeAmbient,
   subscribePulse,
 } from "@/lib/ambient-state";
+import { claimWebGL, releaseWebGL, webglBudget } from "@/lib/webgl-lock";
 
 type VantaEffectInstance = {
   destroy: () => void;
@@ -25,6 +26,19 @@ export function VantaNetworkBackground() {
   const [reducedMotion, setReducedMotion] = useState(true);
   const [visible, setVisible] = useState(true);
   const [pulsing, setPulsing] = useState(false);
+  const [capable, setCapable] = useState(false);
+
+  useEffect(() => {
+    const budget = webglBudget();
+    if (!budget.enabled) {
+      setCapable(false);
+      return;
+    }
+
+    const granted = claimWebGL("vanta-dashboard");
+    setCapable(granted);
+    return () => releaseWebGL("vanta-dashboard");
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -64,7 +78,7 @@ export function VantaNetworkBackground() {
   }, []);
 
   useEffect(() => {
-    if (reducedMotion || !visible || !containerRef.current) return;
+    if (reducedMotion || !visible || !capable || !containerRef.current) return;
 
     let cancelled = false;
 
@@ -83,16 +97,16 @@ export function VantaNetworkBackground() {
       effectRef.current = netFactoryRef.current({
         el: containerRef.current,
         THREE: threeModRef.current,
-        mouseControls: true,
-        touchControls: true,
+        mouseControls: false,
+        touchControls: false,
         gyroControls: false,
         minHeight: 200.0,
         minWidth: 200.0,
         scale: 1.0,
         scaleMobile: 1.0,
-        points: 7.0,
-        maxDistance: 18.0,
-        spacing: 20.0,
+        points: 5.0,
+        maxDistance: 16.0,
+        spacing: 24.0,
         showDots: true,
         backgroundAlpha: 0,
         color: healthColor(ambientRef.current.health, mode === "dark"),
@@ -107,9 +121,9 @@ export function VantaNetworkBackground() {
       effectRef.current?.destroy();
       effectRef.current = null;
     };
-  }, [mode, reducedMotion, visible]);
+  }, [capable, mode, reducedMotion, visible]);
 
-  if (reducedMotion) return null;
+  if (reducedMotion || !capable) return null;
 
   return (
     <div
