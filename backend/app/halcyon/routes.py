@@ -247,6 +247,7 @@ async def take_turn(
         )
 
     session.turn_count += 1
+    environment.subtitle = reply
     turn = HalcyonTurn(
         session_id=session.id,
         turn_index=session.turn_count,

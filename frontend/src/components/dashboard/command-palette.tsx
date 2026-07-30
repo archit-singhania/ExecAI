@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
+  BarChart3,
   CornerDownLeft,
   CreditCard,
+  FileText,
   Gauge,
   ListChecks,
   LogOut,
@@ -19,6 +21,7 @@ import {
   Target,
   Users2,
 } from "lucide-react";
+import { AgentReport, Task } from "@/lib/api";
 import { DashboardTab } from "@/lib/dashboard-data";
 import { cn } from "@/lib/utils";
 
@@ -37,12 +40,18 @@ export function CommandPalette({
   onBoardReview,
   onLogout,
   onReplayTour,
+  reports = [],
+  tasks = [],
+  onOpenReport,
 }: {
   onSelectTab: (tab: DashboardTab) => void;
   onStartNewSession: () => void;
   onBoardReview: () => void;
   onLogout: () => void;
   onReplayTour?: () => void;
+  reports?: AgentReport[];
+  tasks?: Task[];
+  onOpenReport?: (report: AgentReport) => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -70,6 +79,7 @@ export function CommandPalette({
       { id: "board", label: "Board and memory", hint: "Decision archive", group: "Navigate", icon: Presentation, run: go("board") },
       { id: "operations", label: "Operations", hint: "Conviction spread and runway", group: "Navigate", icon: Activity, run: go("operations") },
       { id: "record", label: "Track record", hint: "How often each desk is right", group: "Navigate", icon: Target, run: go("record") },
+      { id: "analytics", label: "Analytics", hint: "Charts across every session", group: "Navigate", icon: BarChart3, run: go("analytics") },
       {
         id: "new-session",
         label: "Start a new session",
@@ -150,16 +160,62 @@ export function CommandPalette({
     ];
   }, [close, onBoardReview, onLogout, onReplayTour, onSelectTab, onStartNewSession, router]);
 
+  const contentCommands = useMemo<Command[]>(() => {
+    const needle = query.trim().toLowerCase();
+    if (needle.length < 2) return [];
+
+    const matchedReports = reports
+      .filter(
+        (report) =>
+          report.title.toLowerCase().includes(needle) ||
+          report.summary.toLowerCase().includes(needle) ||
+          report.agent.toLowerCase().includes(needle),
+      )
+      .slice(0, 5)
+      .map<Command>((report) => ({
+        id: `report-${report.id ?? report.title}`,
+        label: report.title,
+        hint: `${report.agent} · ${report.score}`,
+        group: "Reports",
+        icon: FileText,
+        run: () => {
+          onSelectTab("agents");
+          onOpenReport?.(report);
+          close();
+        },
+      }));
+
+    const matchedTasks = tasks
+      .filter((task) => task.title.toLowerCase().includes(needle))
+      .slice(0, 5)
+      .map<Command>((task) => ({
+        id: `task-${task.id}`,
+        label: task.title,
+        hint: `${task.priority} · ${task.status}`,
+        group: "Tasks",
+        icon: ListChecks,
+        run: () => {
+          onSelectTab("tasks");
+          close();
+        },
+      }));
+
+    return [...matchedReports, ...matchedTasks];
+  }, [close, onOpenReport, onSelectTab, query, reports, tasks]);
+
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return commands;
-    return commands.filter(
+
+    const matched = commands.filter(
       (command) =>
         command.label.toLowerCase().includes(needle) ||
         command.hint.toLowerCase().includes(needle) ||
         command.group.toLowerCase().includes(needle),
     );
-  }, [commands, query]);
+
+    return [...matched, ...contentCommands];
+  }, [commands, contentCommands, query]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -227,7 +283,7 @@ export function CommandPalette({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Search commands…"
+            placeholder="Search commands, reports, tasks…"
             className="cmdk-input"
             aria-label="Search commands"
           />

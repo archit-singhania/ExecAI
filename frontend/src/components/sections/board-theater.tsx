@@ -11,6 +11,7 @@ import {
   SectionPanel,
 } from "@/components/dashboard/section-kit";
 import { ReviewCadenceCard } from "@/components/dashboard/review-cadence-card";
+import { FeatureLock } from "@/components/dashboard/feature-lock";
 
 export function BoardTheater({
   boardReport,
@@ -24,6 +25,7 @@ export function BoardTheater({
   canRunBoard,
   generateBoardMeeting,
   isDemo,
+  canSchedule = true,
 }: {
   boardReport: AgentReport | null;
   boardHistory: AgentReport[];
@@ -36,6 +38,7 @@ export function BoardTheater({
   canRunBoard: boolean;
   generateBoardMeeting: () => void;
   isDemo?: boolean;
+  canSchedule?: boolean;
 }) {
   const trail = memoryResults.length ? memoryResults : memories;
 
@@ -114,7 +117,14 @@ export function BoardTheater({
       )}
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <ReviewCadenceCard isDemo={isDemo} />
+        <FeatureLock
+          unlocked={canSchedule}
+          tier="pro"
+          title="Let the board meet without you"
+          body="Set a weekly cadence and the board scores your progress and emails the verdict, whether or not you open the app."
+        >
+          <ReviewCadenceCard isDemo={isDemo} />
+        </FeatureLock>
 
         <div className="sec-card rounded-lg p-4">
           <div className="mb-3 flex items-center gap-2">

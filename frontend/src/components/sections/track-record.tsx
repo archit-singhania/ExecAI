@@ -18,6 +18,56 @@ import {
 import { toastFromError, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
+const DEMO_PREDICTIONS: Prediction[] = [
+  {
+    id: "demo-1",
+    agent: "CFO",
+    statement: "Cost to acquire a customer will exceed first-month revenue per customer.",
+    confidence: 71,
+    due_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    status: "pending",
+    resolved_at: null,
+    note: null,
+    overdue: true,
+    days_remaining: -2,
+  },
+  {
+    id: "demo-2",
+    agent: "Sales",
+    statement: "At least one prospect will commit to a paid pilot.",
+    confidence: 84,
+    due_at: new Date(Date.now() + 86400000 * 11).toISOString(),
+    status: "pending",
+    resolved_at: null,
+    note: null,
+    overdue: false,
+    days_remaining: 11,
+  },
+  {
+    id: "demo-3",
+    agent: "Marketing",
+    statement: "Organic channels will produce more signups than paid in the first month.",
+    confidence: 58,
+    due_at: new Date(Date.now() + 86400000 * 19).toISOString(),
+    status: "pending",
+    resolved_at: null,
+    note: null,
+    overdue: false,
+    days_remaining: 19,
+  },
+];
+
+const DEMO_CALIBRATION: Calibration = {
+  overall: 64,
+  resolved_total: 22,
+  agents: [
+    { agent: "CTO", hit: 5, missed: 1, pending: 1, resolved: 6, accuracy: 83 },
+    { agent: "CFO", hit: 4, missed: 2, pending: 1, resolved: 6, accuracy: 67 },
+    { agent: "Product Manager", hit: 3, missed: 2, pending: 0, resolved: 5, accuracy: 60 },
+    { agent: "Marketing", hit: 2, missed: 3, pending: 1, resolved: 5, accuracy: 40 },
+  ],
+};
+
 function accuracyColor(accuracy: number | null) {
   if (accuracy === null) return "rgb(var(--color-steel))";
   if (accuracy >= 70) return "#1d6f5f";
@@ -33,6 +83,8 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
 
   const load = useCallback(async () => {
     if (isDemo) {
+      setPending(DEMO_PREDICTIONS);
+      setCalibration(DEMO_CALIBRATION);
       setLoading(false);
       return;
     }
@@ -58,6 +110,11 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
   async function resolve(id: string, status: "hit" | "missed" | "void") {
     const previous = pending;
     setPending((current) => current.filter((item) => item.id !== id));
+
+    if (isDemo) {
+      toast.info("Sign up to keep score", "Trial results aren't saved.");
+      return;
+    }
 
     try {
       await predictionsApi.resolve(id, status);

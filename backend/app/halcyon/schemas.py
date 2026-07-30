@@ -78,6 +78,7 @@ class EnvironmentCommand(BaseModel):
 
     invitation: Invitation = "none"
     invitation_label: str = ""
+    subtitle: str = ""
 
     breathing_guide: bool = False
     breathing_pace_seconds: float = Field(default=5.5, ge=3.0, le=8.0)

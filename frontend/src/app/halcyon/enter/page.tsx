@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUp, Loader2, Mic, Square, Trash2, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import {
   halcyon,
   handOverSession,
@@ -17,6 +17,7 @@ import {
 import { formatHour, WORLD_BASELINES, worldGradient } from "@/lib/halcyon-worlds";
 import { LaunchConsole } from "@/components/halcyon/launch-console";
 import { SupportPanel } from "@/components/halcyon/support-panel";
+import { VoiceConsole, VoiceState } from "@/components/halcyon/voice-console";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import { useSpeechSynthesis } from "@/lib/use-speech-synthesis";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,6 @@ export default function HalcyonEnterPage() {
   const [session, setSession] = useState<HalcyonSession | null>(null);
   const [environment, setEnvironment] = useState<HalcyonEnvironment | null>(null);
   const [reply, setReply] = useState("");
-  const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -47,6 +47,8 @@ export default function HalcyonEnterPage() {
   const [preferences, setPreferences] = useState<HalcyonPreferences | null>(null);
   const [spoken, setSpoken] = useState(true);
   const [support, setSupport] = useState<SupportResource[]>([]);
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const handsFree = useRef(true);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +72,7 @@ export default function HalcyonEnterPage() {
   async function begin() {
     setBusy(true);
     setError("");
+    setVoiceState("thinking");
     try {
       const started = await halcyon.startSession(world, consent);
       setSession(started);
@@ -92,14 +95,22 @@ export default function HalcyonEnterPage() {
       const turn = await halcyon.takeTurn(session.id, trimmed);
       setEnvironment(turn.environment);
       setReply(turn.reply);
-      setText("");
 
       if (turn.support?.length) {
         setSupport(turn.support);
       }
 
       if (spoken && synthesis.supported) {
-        synthesis.speak(turn.reply, () => undefined);
+        setVoiceState("speaking");
+        synthesis.speak(turn.reply, () => {
+          setVoiceState("idle");
+          if (handsFree.current && recognition.supported) {
+            startListening();
+          }
+        });
+      } else {
+        setVoiceState("idle");
+        if (handsFree.current && recognition.supported) startListening();
       }
 
       endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -110,17 +121,27 @@ export default function HalcyonEnterPage() {
     }
   }
 
-  function toggleMic() {
-    if (listening) {
-      recognition.stop();
-      setListening(false);
-      return;
-    }
+  function startListening() {
+    if (busy) return;
+    synthesis.cancel();
     setListening(true);
+    setVoiceState("listening");
     recognition.start((final: string) => {
       setListening(false);
       void speak(final);
     });
+  }
+
+  function toggleMic() {
+    if (listening) {
+      recognition.stop();
+      setListening(false);
+      setVoiceState("idle");
+      handsFree.current = false;
+      return;
+    }
+    handsFree.current = true;
+    startListening();
   }
 
   async function leave() {
@@ -259,42 +280,24 @@ export default function HalcyonEnterPage() {
 
             {support.length ? <SupportPanel resources={support} /> : null}
 
-            <form
-              onSubmit={(event: FormEvent) => {
-                event.preventDefault();
-                void speak(text);
-              }}
-              className="mt-4"
-            >
-              <div className="hal-composer">
-                <button
-                  type="button"
-                  onClick={toggleMic}
-                  disabled={busy || !recognition.supported}
-                  aria-label={listening ? "Stop listening" : "Speak"}
-                  className={cn("hal-mic", listening && "hal-mic-live")}
-                >
-                  {listening ? <Square size={15} strokeWidth={2.6} /> : <Mic size={16} />}
-                </button>
-
-                <input
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
-                  placeholder={listening ? "Listening…" : "Or type it"}
-                  disabled={busy}
-                  className="hal-composer-input"
-                />
-
-                <button
-                  type="submit"
-                  disabled={!text.trim() || busy}
-                  aria-label="Send"
-                  className="hal-send"
-                >
-                  {busy ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={16} strokeWidth={2.6} />}
-                </button>
-              </div>
-            </form>
+            <div className="mt-8">
+              <VoiceConsole
+                state={voiceState}
+                transcript={reply}
+                supported={recognition.supported}
+                spoken={spoken}
+                busy={busy}
+                onToggleMic={toggleMic}
+                onToggleSpoken={() => {
+                  if (spoken) synthesis.cancel();
+                  setSpoken((current) => !current);
+                }}
+                onSubmitText={(value) => {
+                  handsFree.current = false;
+                  void speak(value);
+                }}
+              />
+            </div>
 
             {environment ? (
               <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2">

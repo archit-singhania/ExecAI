@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +39,13 @@ function rgba(hex: string, alpha: number) {
   )}, ${alpha})`;
 }
 
-function Sparkline({ points, color }: { points: number[]; color: string }) {
+const Sparkline = memo(function Sparkline({
+  points,
+  color,
+}: {
+  points: number[];
+  color: string;
+}) {
   if (points.length < 2) return null;
 
   const max = Math.max(...points);
@@ -56,9 +62,9 @@ function Sparkline({ points, color }: { points: number[]; color: string }) {
       <polyline points={path} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
     </svg>
   );
-}
+});
 
-export function MetroTile({
+export const MetroTile = memo(function MetroTile({
   label,
   stat,
   eyebrow,
@@ -186,4 +192,4 @@ export function MetroTile({
       <span className="mt2-edge" aria-hidden="true" />
     </button>
   );
-}
+});

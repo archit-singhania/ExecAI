@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BarChart3,
   CircleDollarSign,
   Gauge,
   ListChecks,
@@ -18,6 +19,7 @@ import { Logo } from "@/components/logo";
 import { AuthUser } from "@/lib/auth";
 import { DashboardTab } from "@/lib/dashboard-data";
 import { MetroTile } from "@/components/dashboard/metro-tile";
+import { cn } from "@/lib/utils";
 
 function shapeFrom(seed: number, length = 7): number[] {
   const points: number[] = [];
@@ -45,6 +47,7 @@ export function MetroHome({
   taskCount,
   reportCount = 0,
   opportunityScore = 0,
+  plan,
 }: {
   user: AuthUser | null;
   isDemo: boolean;
@@ -57,6 +60,7 @@ export function MetroHome({
   taskCount: number;
   reportCount?: number;
   opportunityScore?: number;
+  plan?: { name: string; tier: string; runsUsed: number; runsIncluded: number; nearLimit: boolean };
 }) {
   const completion = taskCount ? Math.round((doneTasks / taskCount) * 100) : 0;
   const openTasks = Math.max(0, taskCount - doneTasks);
@@ -81,6 +85,27 @@ export function MetroHome({
         </div>
 
         <div className="flex items-center gap-2">
+          {plan ? (
+            <Link
+              href="/pricing"
+              className={cn("mh-usage", plan.nearLimit && "mh-usage-low")}
+              title={`${plan.runsUsed} of ${plan.runsIncluded} board runs used`}
+            >
+              <span className="mh-tier">{plan.name}</span>
+              <span className="mh-usage-bar">
+                <span
+                  className="mh-usage-fill"
+                  style={{
+                    width: `${Math.min(100, (plan.runsUsed / Math.max(1, plan.runsIncluded)) * 100)}%`,
+                  }}
+                />
+              </span>
+              <span className="text-[0.68rem] font-bold tabular-nums text-steel">
+                {plan.runsUsed}/{plan.runsIncluded}
+              </span>
+            </Link>
+          ) : null}
+
           <div className="mh-pills hidden items-center gap-1 md:flex">
             <span className="mh-pill">
               <span className="mh-pill-label">Health</span>
@@ -196,6 +221,16 @@ export function MetroHome({
             icon={CircleDollarSign}
             tone="ink"
             onClick={(rect) => onSelectTab("operations", rect)}
+          />
+
+          <MetroTile
+            label="Analytics"
+            eyebrow="Business intelligence"
+            stat="12 views"
+            status="Live data"
+            icon={BarChart3}
+            tone="cobalt"
+            onClick={(rect) => onSelectTab("analytics", rect)}
           />
 
           <MetroTile

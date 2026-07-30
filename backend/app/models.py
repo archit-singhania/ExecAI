@@ -32,7 +32,7 @@ class BusinessSession(Base):
     __tablename__ = "business_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(180))
     business_goal: Mapped[str] = mapped_column(Text)
     health_score: Mapped[int] = mapped_column(Integer, default=72)
@@ -117,7 +117,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"))
+    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"), index=True)
     role: Mapped[str] = mapped_column(String(24))
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -129,9 +129,9 @@ class AgentReport(Base):
     __tablename__ = "agent_reports"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"))
+    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"), index=True)
     agent: Mapped[str] = mapped_column(String(80))
-    report_type: Mapped[str] = mapped_column(String(40), default="agent")
+    report_type: Mapped[str] = mapped_column(String(40), default="agent", index=True)
     title: Mapped[str] = mapped_column(String(180))
     summary: Mapped[str] = mapped_column(Text)
     bullets: Mapped[str] = mapped_column(Text, default="")
@@ -145,7 +145,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"))
+    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"), index=True)
     title: Mapped[str] = mapped_column(String(220))
     description: Mapped[str] = mapped_column(Text, default="")
     priority: Mapped[str] = mapped_column(String(24), default="Medium")
@@ -161,7 +161,7 @@ class BusinessMemory(Base):
     __tablename__ = "business_memories"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"))
+    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id"), index=True)
     kind: Mapped[str] = mapped_column(String(40), default="decision")
     content: Mapped[str] = mapped_column(Text)
     importance: Mapped[float] = mapped_column(Float, default=0.5)

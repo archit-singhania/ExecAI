@@ -11,6 +11,7 @@ import { pulseAmbient, resetAmbient, setAmbient } from "@/lib/ambient-state";
 import { toast, toastFromError } from "@/lib/toast";
 import { Toaster } from "@/components/ui/toaster";
 import { hasOnboarded } from "@/components/dashboard/onboarding";
+import { usePlan } from "@/lib/use-plan";
 import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
 import { TaskBoard } from "@/components/sections/task-board";
@@ -33,6 +34,7 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   board: "Board & memory",
   operations: "Operations",
   record: "Track record",
+  analytics: "Analytics",
 };
 
 const CommandPalette = dynamic(
@@ -65,6 +67,11 @@ const TrackRecord = dynamic(
   { ssr: false },
 );
 
+const Analytics = dynamic(
+  () => import("@/components/sections/analytics").then((m) => m.Analytics),
+  { ssr: false },
+);
+
 const TAB_TONES: Record<DashboardTab, MetroTone> = {
   chat: "midnight",
   agents: "ink",
@@ -72,9 +79,18 @@ const TAB_TONES: Record<DashboardTab, MetroTone> = {
   board: "teal",
   operations: "slate",
   record: "plum",
+  analytics: "cobalt",
 };
 
-const VALID_TABS: DashboardTab[] = ["chat", "agents", "tasks", "board", "operations", "record"];
+const VALID_TABS: DashboardTab[] = [
+  "chat",
+  "agents",
+  "tasks",
+  "board",
+  "operations",
+  "record",
+  "analytics",
+];
 
 function parseTab(value: string | null): DashboardTab | null {
   return value && VALID_TABS.includes(value as DashboardTab) ? (value as DashboardTab) : null;
@@ -104,6 +120,7 @@ export default function DashboardPage() {
   const [liveFinal, setLiveFinal] = useState("");
   const [originRect, setOriginRect] = useState<DOMRect | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const plan = usePlan(isDemo);
 
   useEffect(() => {
     if (!hasOnboarded()) setShowOnboarding(true);
@@ -467,6 +484,13 @@ export default function DashboardPage() {
             taskCount={activeTasks.length}
             reportCount={latestReports.length}
             opportunityScore={opportunityScore}
+            plan={{
+              name: plan.name,
+              tier: plan.tier,
+              runsUsed: plan.runsUsed,
+              runsIncluded: plan.runsIncluded,
+              nearLimit: plan.nearLimit,
+            }}
           />
         ) : (
           <MetroSectionShell
@@ -513,6 +537,7 @@ export default function DashboardPage() {
                   setSelectedReport(null);
                   setReportExport(null);
                 }}
+                canShare={plan.shareLinks}
               />
             ) : null}
 
@@ -539,6 +564,7 @@ export default function DashboardPage() {
                 canRunBoard={!!session || isDemo}
                 generateBoardMeeting={generateBoardMeeting}
                 isDemo={isDemo}
+                canSchedule={plan.scheduledReviews}
               />
             ) : null}
 
@@ -551,6 +577,7 @@ export default function DashboardPage() {
               />
             ) : null}
             {activeTab === "record" ? <TrackRecord isDemo={isDemo} /> : null}
+            {activeTab === "analytics" ? <Analytics isDemo={isDemo} /> : null}
           </MetroSectionShell>
         )}
       </div>
@@ -561,6 +588,9 @@ export default function DashboardPage() {
         onBoardReview={generateBoardMeeting}
         onLogout={logout}
         onReplayTour={() => setShowOnboarding(true)}
+        reports={latestReports.length ? latestReports : fallbackReports}
+        tasks={activeTasks}
+        onOpenReport={openReport}
       />
       <Toaster />
 

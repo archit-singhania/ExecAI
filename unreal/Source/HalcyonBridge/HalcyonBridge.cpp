@@ -190,6 +190,7 @@ void AHalcyonBridge::ApplyTargetFromJson(const TSharedPtr<FJsonObject>& Data)
 
     Target.Invitation = ReadString(Data, TEXT("invitation"), TEXT("none"));
     Target.InvitationLabel = ReadString(Data, TEXT("invitation_label"), TEXT(""));
+    Target.Subtitle = ReadString(Data, TEXT("subtitle"), TEXT(""));
 
     Data->TryGetBoolField(TEXT("breathing_guide"), Target.bBreathingGuide);
     Target.BreathingPaceSeconds = ReadNumber(Data, TEXT("breathing_pace_seconds"), Target.BreathingPaceSeconds);
@@ -203,10 +204,19 @@ void AHalcyonBridge::ApplyTargetFromJson(const TSharedPtr<FJsonObject>& Data)
     Current.CompanionAction = Target.CompanionAction;
     Current.Invitation = Target.Invitation;
     Current.InvitationLabel = Target.InvitationLabel;
+
+    const bool bNewLine = !Target.Subtitle.IsEmpty() && Target.Subtitle != Current.Subtitle;
+    Current.Subtitle = Target.Subtitle;
+
     Current.bBreathingGuide = Target.bBreathingGuide;
     Current.BreathingPaceSeconds = Target.BreathingPaceSeconds;
 
     OnEnvironmentChanged.Broadcast(Target);
+
+    if (bNewLine)
+    {
+        OnSpoke.Broadcast(Current.Subtitle);
+    }
 }
 
 void AHalcyonBridge::StepTowardTarget(float DeltaSeconds)

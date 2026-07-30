@@ -23,6 +23,7 @@ from app.account import router as account_router
 from app.share import router as share_router
 from app.jobs import router as jobs_router
 from app.predictions import router as predictions_router
+from app.analytics import router as analytics_router
 from app.entitlements import enforce_run_quota, enforce_session_quota, require_feature
 from app.logging_setup import RequestContextMiddleware, configure_logging, log_event
 from app.store import store_backend
@@ -116,6 +117,7 @@ app.include_router(account_router)
 app.include_router(share_router)
 app.include_router(jobs_router)
 app.include_router(predictions_router)
+app.include_router(analytics_router)
 
 configure_logging(as_json=settings.app_env != "development")
 app.add_middleware(RequestContextMiddleware)

@@ -5,6 +5,7 @@ import { Brain, Check, FileText, Inbox, Link2 } from "lucide-react";
 import { AgentReport, api, ReportExport } from "@/lib/api";
 import { agentMeta } from "@/lib/dashboard-data";
 import { toastFromError } from "@/lib/toast";
+import { LockedInline } from "@/components/dashboard/feature-lock";
 import {
   DetailSheet,
   EmptyState,
@@ -25,6 +26,7 @@ export function AgentBriefing({
   openReport,
   loading = false,
   onCloseReport,
+  canShare = true,
 }: {
   reports: AgentReport[];
   selectedReport: AgentReport | null;
@@ -32,6 +34,7 @@ export function AgentBriefing({
   openReport: (report: AgentReport) => void;
   loading?: boolean;
   onCloseReport?: () => void;
+  canShare?: boolean;
 }) {
   const [agentFilter, setAgentFilter] = useState("All");
 
@@ -117,7 +120,13 @@ export function AgentBriefing({
       >
         {selectedReport ? (
           <div className="pt-4">
-            {selectedReport.id ? <ShareRow reportId={selectedReport.id} /> : null}
+            {selectedReport.id ? (
+              canShare ? (
+                <ShareRow reportId={selectedReport.id} />
+              ) : (
+                <LockedInline tier="pro" label="Share this report" />
+              )
+            ) : null}
             <p className="mt-4 text-sm font-medium leading-7 text-steel">{selectedReport.summary}</p>
 
             {selectedReport.bullets.length ? (

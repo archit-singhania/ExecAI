@@ -62,6 +62,9 @@ struct FHalcyonWorldState
     FString InvitationLabel;
 
     UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")
+    FString Subtitle;
+
+    UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")
     bool bBreathingGuide = false;
 
     UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Halcyon")
@@ -73,6 +76,7 @@ struct FHalcyonWorldState
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHalcyonEnvironmentChanged, const FHalcyonWorldState&, NewTarget);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHalcyonConnectionChanged, bool, bIsConnected);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHalcyonSpoke, const FString&, Line);
 
 UCLASS(Blueprintable)
 class AHalcyonBridge : public AActor
@@ -108,6 +112,9 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "Halcyon")
     FHalcyonConnectionChanged OnConnectionChanged;
+
+    UPROPERTY(BlueprintAssignable, Category = "Halcyon")
+    FHalcyonSpoke OnSpoke;
 
     UFUNCTION(BlueprintCallable, Category = "Halcyon")
     void Connect();
