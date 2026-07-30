@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Volume2, VolumeX } from "lucide-react";
 import {
   halcyon,
   handOverSession,
