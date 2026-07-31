@@ -24,6 +24,7 @@ from app.share import router as share_router
 from app.jobs import router as jobs_router
 from app.predictions import router as predictions_router
 from app.analytics import router as analytics_router
+from app.speech_routes import router as speech_router
 from app.entitlements import enforce_run_quota, enforce_session_quota, require_feature
 from app.logging_setup import RequestContextMiddleware, configure_logging, log_event
 from app.store import store_backend
@@ -111,6 +112,13 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/llm/status")
+def llm_status(current_user: User = Depends(get_current_user)):
+    from app import llm_router
+
+    return llm_router.status()
+
+
 app.include_router(halcyon_router)
 app.include_router(billing_router)
 app.include_router(account_router)
@@ -118,6 +126,7 @@ app.include_router(share_router)
 app.include_router(jobs_router)
 app.include_router(predictions_router)
 app.include_router(analytics_router)
+app.include_router(speech_router)
 
 configure_logging(as_json=settings.app_env != "development")
 app.add_middleware(RequestContextMiddleware)

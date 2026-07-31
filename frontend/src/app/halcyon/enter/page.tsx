@@ -19,7 +19,7 @@ import { LaunchConsole } from "@/components/halcyon/launch-console";
 import { SupportPanel } from "@/components/halcyon/support-panel";
 import { VoiceConsole, VoiceState } from "@/components/halcyon/voice-console";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
-import { useSpeechSynthesis } from "@/lib/use-speech-synthesis";
+import { useVoice } from "@/lib/use-voice";
 import { cn } from "@/lib/utils";
 
 function moodClass(env: HalcyonEnvironment | null): string {
@@ -32,7 +32,7 @@ function moodClass(env: HalcyonEnvironment | null): string {
 
 export default function HalcyonEnterPage() {
   const recognition = useSpeechRecognition();
-  const synthesis = useSpeechSynthesis();
+  const synthesis = useVoice();
 
   const [world, setWorld] = useState<HalcyonWorldId>("zen_garden");
   const [quality, setQuality] = useState<StreamQuality>("high");
@@ -102,7 +102,8 @@ export default function HalcyonEnterPage() {
 
       if (spoken && synthesis.supported) {
         setVoiceState("speaking");
-        synthesis.speak(turn.reply, () => {
+        const preset = turn.support?.length ? "crisis" : "halcyon";
+        void synthesis.speak(turn.reply, preset, () => {
           setVoiceState("idle");
           if (handsFree.current && recognition.supported) {
             startListening();

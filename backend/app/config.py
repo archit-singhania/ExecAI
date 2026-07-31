@@ -33,6 +33,30 @@ class Settings(BaseSettings):
     stripe_price_team: str | None = None
     stripe_price_agency: str | None = None
 
+    sarvam_api_key: str | None = None
+    sarvam_model: str = "bulbul:v2"
+
+    voice_provider: str = "sarvam"
+    voice_language: str = "en-IN"
+
+    elevenlabs_api_key: str | None = None
+    azure_speech_key: str | None = None
+    azure_speech_region: str = "westeurope"
+
+    llm_local_only: bool = False
+    groq_api_key: str | None = None
+    gemini_api_key: str | None = None
+    cerebras_api_key: str | None = None
+    nvidia_api_key: str | None = None
+    openrouter_api_key: str | None = None
+
+    ollama_model: str | None = None
+    groq_model: str | None = None
+    gemini_model: str | None = None
+    cerebras_model: str | None = None
+    nvidia_model: str | None = None
+    openrouter_model: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
