@@ -20,6 +20,7 @@ LLM_LOCAL_ONLY=true.
 """
 
 import json
+import random
 import time
 from dataclasses import dataclass, field
 
@@ -162,27 +163,38 @@ def complete(
     tier: str = "fast",
     json_mode: bool = False,
     max_tokens: int = 900,
+    passes: int = 2,
 ) -> tuple[str, str] | None:
-    """Returns (content, provider_name), or None when every provider failed."""
+    """Returns (content, provider_name), or None when every provider failed.
+
+    Two passes by default. Free tiers throttle in bursts, and nine agents
+    firing at once will trip a per-minute window on the way through. A short
+    jittered pause and a second sweep recovers most of those without the
+    caller ever seeing a failure.
+    """
     settings = get_settings()
 
     order = TIERS.get(tier, TIERS["fast"])
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-    for name in order:
-        provider = _by_name(name)
-        if not provider:
-            continue
+    for attempt in range(max(1, passes)):
+        for name in order:
+            provider = _by_name(name)
+            if not provider:
+                continue
 
-        if settings.llm_local_only and not provider.local:
-            continue
+            if settings.llm_local_only and not provider.local:
+                continue
 
-        if not provider.available(settings):
-            continue
+            if not provider.available(settings):
+                continue
 
-        content = _call(provider, settings, messages, json_mode, max_tokens)
-        if content:
-            return content, provider.name
+            content = _call(provider, settings, messages, json_mode, max_tokens)
+            if content:
+                return content, provider.name
+
+        if attempt + 1 < passes:
+            time.sleep(0.6 + random.random() * 0.9)
 
     return None
 
@@ -198,6 +210,29 @@ def complete_json(
         return None
 
     raw, provider = result
+    parsed = _extract_json(raw)
+    if parsed is not None:
+        return parsed, provider
+
+    repaired = complete(
+        system,
+        f"{user}\n\nYour previous reply was not valid JSON. Return ONLY the JSON "
+        f"object, no prose, no markdown fences, no explanation.",
+        tier=tier,
+        json_mode=True,
+        max_tokens=max_tokens,
+        passes=1,
+    )
+
+    if not repaired:
+        return None
+
+    raw, provider = repaired
+    parsed = _extract_json(raw)
+    return (parsed, provider) if parsed is not None else None
+
+
+def _extract_json(raw: str) -> dict | None:
     cleaned = raw.strip()
 
     if "</think>" in cleaned:
@@ -211,9 +246,11 @@ def complete_json(
         return None
 
     try:
-        return json.loads(cleaned[start : end + 1]), provider
+        parsed = json.loads(cleaned[start : end + 1])
     except json.JSONDecodeError:
         return None
+
+    return parsed if isinstance(parsed, dict) else None
 
 
 def status() -> dict:

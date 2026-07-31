@@ -5,6 +5,7 @@ API, so memory search works with zero extra cost and zero extra
 dependencies regardless of which LLM provider is configured. If Ollama is
 configured, we use its real embeddings endpoint instead for better quality.
 """
+import hashlib
 import json
 import math
 import re
@@ -20,13 +21,25 @@ def _tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(text.lower())
 
 
+def _stable_hash(token: str) -> int:
+    """Deterministic across processes and restarts.
+
+    Python's built-in hash() is randomised per process by default, so a
+    memory embedded before a restart and a query embedded after it landed in
+    different buckets entirely. Similarity between them was noise, which made
+    stored embeddings quietly worthless. blake2b is stable forever.
+    """
+    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "big")
+
+
 def _hashing_embedding(text: str) -> list[float]:
     vector = [0.0] * DIMENSIONS
     tokens = _tokenize(text)
     if not tokens:
         return vector
     for token in tokens:
-        h = hash(token)
+        h = _stable_hash(token)
         index = h % DIMENSIONS
         sign = 1.0 if (h // DIMENSIONS) % 2 == 0 else -1.0
         vector[index] += sign

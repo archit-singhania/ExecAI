@@ -1,10 +1,49 @@
 import json
+import math
+from datetime import datetime
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.embeddings import cosine_similarity, embed_text
 from app.models import BusinessMemory
+
+SIMILARITY_WEIGHT = 0.65
+IMPORTANCE_WEIGHT = 0.25
+RECENCY_WEIGHT = 0.10
+RECENCY_HALF_LIFE_DAYS = 21.0
+
+
+def _recency(created_at: datetime | None, now: datetime) -> float:
+    if not created_at:
+        return 0.5
+    age_days = max(0.0, (now - created_at).total_seconds() / 86400.0)
+    return math.exp(-age_days / RECENCY_HALF_LIFE_DAYS)
+
+
+def _rank(memory: BusinessMemory, query_vector: list[float], now: datetime) -> float:
+    """Blend similarity with importance and recency.
+
+    Similarity alone treats 'the CEO decided to delay the launch' and an
+    offhand remark as equal if they share vocabulary. Importance is already
+    recorded when memories are written — board decisions at 0.9, passing
+    questions at 0.65 — and was previously ignored at retrieval time.
+    """
+    if not memory.embedding:
+        return -1.0
+
+    try:
+        similarity = cosine_similarity(query_vector, json.loads(memory.embedding))
+    except (json.JSONDecodeError, TypeError):
+        return -1.0
+
+    normalised = (similarity + 1.0) / 2.0
+
+    return (
+        normalised * SIMILARITY_WEIGHT
+        + (memory.importance or 0.5) * IMPORTANCE_WEIGHT
+        + _recency(memory.created_at, now) * RECENCY_WEIGHT
+    )
 
 
 def store_memory(
@@ -30,9 +69,8 @@ def store_memory(
 
 
 def retrieve_relevant_memories(db: Session, session_id: str, query: str, top_k: int = 4) -> list[str]:
-    """Semantic search over this session's memories. Falls back gracefully
-    to the most recent/important memories if nothing has an embedding yet
-    (e.g. rows created before this feature existed)."""
+    """Semantic search over this session's memories, weighted by importance
+    and recency. Falls back to the most recent rows if nothing is embedded."""
     memories = (
         db.query(BusinessMemory)
         .filter(BusinessMemory.session_id == session_id)
@@ -44,31 +82,30 @@ def retrieve_relevant_memories(db: Session, session_id: str, query: str, top_k: 
         return []
 
     query_vector = embed_text(query)
+    now = datetime.utcnow()
+
     scored: list[tuple[float, BusinessMemory]] = []
     unembedded: list[BusinessMemory] = []
+
     for memory in memories:
-        if memory.embedding:
-            try:
-                vector = json.loads(memory.embedding)
-                scored.append((cosine_similarity(query_vector, vector), memory))
-                continue
-            except (json.JSONDecodeError, TypeError):
-                pass
-        unembedded.append(memory)
+        rank = _rank(memory, query_vector, now)
+        if rank < 0:
+            unembedded.append(memory)
+        else:
+            scored.append((rank, memory))
 
     scored.sort(key=lambda pair: pair[0], reverse=True)
     top = [memory.content for _, memory in scored[:top_k]]
 
     if len(top) < top_k:
-        top.extend(m.content for m in unembedded[: top_k - len(top)])
+        top.extend(memory.content for memory in unembedded[: top_k - len(top)])
 
     return top
 
 
 def search_memory_rows(db: Session, session_id: str, query: str, limit: int = 10) -> list[BusinessMemory]:
-    """Like retrieve_relevant_memories, but returns the full ORM rows
-    (ranked by semantic similarity) for API responses that need id/kind/
-    importance/created_at rather than just the text."""
+    """Like retrieve_relevant_memories, but returns full ORM rows for API
+    responses that need id, kind, importance and created_at."""
     memories = (
         db.query(BusinessMemory)
         .filter(BusinessMemory.session_id == session_id)
@@ -80,14 +117,7 @@ def search_memory_rows(db: Session, session_id: str, query: str, limit: int = 10
         return []
 
     query_vector = embed_text(query)
+    now = datetime.utcnow()
 
-    def score(memory: BusinessMemory) -> float:
-        if not memory.embedding:
-            return -1.0
-        try:
-            return cosine_similarity(query_vector, json.loads(memory.embedding))
-        except (json.JSONDecodeError, TypeError):
-            return -1.0
-
-    ranked = sorted(memories, key=score, reverse=True)
+    ranked = sorted(memories, key=lambda memory: _rank(memory, query_vector, now), reverse=True)
     return ranked[:limit]

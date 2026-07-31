@@ -11,6 +11,7 @@ import { pulseAmbient, resetAmbient, setAmbient } from "@/lib/ambient-state";
 import { toast, toastFromError } from "@/lib/toast";
 import { Toaster } from "@/components/ui/toaster";
 import { hasOnboarded } from "@/components/dashboard/onboarding";
+import { FirstRun } from "@/components/dashboard/first-run";
 import { usePlan } from "@/lib/use-plan";
 import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
@@ -99,6 +100,7 @@ function parseTab(value: string | null): DashboardTab | null {
 export default function DashboardPage() {
   const router = useRouter();
   const [isDemo] = useState(() => isDemoSession());
+  const [storedUser] = useState(() => getStoredUser());
   const [activeTab, setActiveTabState] = useState<DashboardTab | null>(null);
   const [goal, setGoal] = useState(starterPrompts[0]);
   const [session, setSession] = useState<Session | null>(null);
@@ -473,7 +475,7 @@ export default function DashboardPage() {
       <div className="relative flex h-full w-full">
         {activeTab === null ? (
           <MetroHome
-            user={getStoredUser()}
+            user={storedUser}
             isDemo={isDemo}
             onLogout={logout}
             onSelectTab={setActiveTab}
@@ -507,22 +509,34 @@ export default function DashboardPage() {
           >
             {activeTab === "chat" ? (
               <div className="glass-strong section-panel flex min-h-[560px] flex-col rounded-lg p-2 sm:min-h-[620px] sm:p-3 3xl:min-h-[680px]">
-                {loading || liveReports.length ? (
-                  <div className="px-2 pb-6 pt-4">
-                    <BoardroomConvening
-                      reports={liveReports}
-                      active={loading}
-                      finalText={liveFinal || undefined}
-                    />
-                  </div>
-                ) : null}
+                {!session && !isDemo && !loading && !liveReports.length ? (
+                  <FirstRun
+                    name={storedUser?.name}
+                    busy={loading}
+                    onStart={(goal) => {
+                      void handleVoiceUtterance(goal, () => undefined);
+                    }}
+                  />
+                ) : (
+                  <>
+                    {loading || liveReports.length ? (
+                      <div className="px-2 pb-6 pt-4">
+                        <BoardroomConvening
+                          reports={liveReports}
+                          active={loading}
+                          finalText={liveFinal || undefined}
+                        />
+                      </div>
+                    ) : null}
 
-                <VoiceStage
-                  subtitle={session?.title ?? (isDemo ? "Live demo" : "New session")}
-                  placeholderPrompt="Tap the mic and tell your CEO what's on your mind."
-                  onUtterance={handleVoiceUtterance}
-                  disabled={booting}
-                />
+                    <VoiceStage
+                      subtitle={session?.title ?? (isDemo ? "Live demo" : "New session")}
+                      placeholderPrompt="Tap the mic and tell your CEO what's on your mind."
+                      onUtterance={handleVoiceUtterance}
+                      disabled={booting}
+                    />
+                  </>
+                )}
               </div>
             ) : null}
 

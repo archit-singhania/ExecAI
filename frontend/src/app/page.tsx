@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
 import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
+import { LandingPillars } from "@/components/marketing/landing-pillars";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { SceneField } from "@/components/ui/scene-field";
 import { agentMeta } from "@/lib/dashboard-data";
@@ -34,7 +35,7 @@ export default function LandingPage() {
   const { t } = useLocale();
 
   return (
-    <main className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto overflow-x-hidden bg-radial-ui text-ink">
+    <main className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-radial-ui text-ink">
       <div className="scanline pointer-events-none absolute inset-0" />
       <div className="landing-aurora pointer-events-none absolute inset-0">
         <SceneField id="landing" variant="aurora" />
@@ -45,7 +46,7 @@ export default function LandingPage() {
       <div className="relative flex min-h-full flex-col">
         <MarketingNav />
 
-        <section className="mx-auto grid w-full max-w-[1400px] flex-1 grid-cols-1 items-center gap-6 px-4 pb-6 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:px-8">
+        <section className="mx-auto grid w-full max-w-[1400px] grid-cols-1 items-center gap-6 px-4 pb-6 pt-4 sm:px-6 lg:min-h-[calc(100dvh-8rem)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:px-8">
           <div className="animate-rise flex flex-col gap-5">
             <div className="inline-flex w-fit items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-1.5 text-[0.7rem] font-black shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark sm:text-xs">
               {t("hero.badge")}
@@ -105,6 +106,8 @@ export default function LandingPage() {
             <p className="text-[0.7rem] text-steel sm:text-xs">{t("hero.specialistsNote")}</p>
           </div>
         </section>
+
+        <LandingPillars />
 
         <footer className="relative flex shrink-0 items-center justify-center gap-3 px-4 pb-4 text-center text-[0.65rem] text-steel sm:px-6 sm:text-xs">
           <span>{t("hero.footerNote")}</span>

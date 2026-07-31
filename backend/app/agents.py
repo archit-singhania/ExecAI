@@ -1,5 +1,6 @@
-from typing import Iterator, TypedDict
+from typing import Callable, Iterator, TypedDict
 import hashlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langgraph.graph import END, StateGraph
 
@@ -27,6 +28,11 @@ class CEOState(TypedDict):
     predictions: list[dict[str, object]]
     health_score: int
     runway_months: int
+    conviction_spread: int
+    conviction_low: int
+    conviction_high: int
+    most_sceptical: str
+    most_convinced: str
 
 
 AGENT_PREDICTIONS: dict[str, tuple[str, int]] = {
@@ -265,6 +271,16 @@ def assistant_agent(state: CEOState) -> CEOState:
 def ceo_synthesis(state: CEOState) -> CEOState:
     average_score = round(sum(report["score"] for report in state["reports"]) / len(state["reports"]))
     state["health_score"] = average_score
+
+    scores = sorted(report["score"] for report in state["reports"])
+    state["conviction_low"] = scores[0]
+    state["conviction_high"] = scores[-1]
+    state["conviction_spread"] = scores[-1] - scores[0]
+
+    lowest = min(state["reports"], key=lambda report: report["score"])
+    highest = max(state["reports"], key=lambda report: report["score"])
+    state["most_sceptical"] = lowest["agent"]
+    state["most_convinced"] = highest["agent"]
     top_risk = "market saturation" if "food delivery" in state["message"].lower() else "building before validation"
     state["tasks"] = [
         {
@@ -325,13 +341,66 @@ def ceo_synthesis(state: CEOState) -> CEOState:
             }
         )
 
+    spread = state["conviction_spread"]
+    if spread <= 10:
+        dissent = (
+            f"The floor is aligned: {spread} points separate the highest and lowest desk. "
+            "That agreement is itself worth noting, and worth testing."
+        )
+    elif spread <= 22:
+        dissent = (
+            f"There is broad agreement with reservations — a {spread} point range. "
+            f"{state['most_sceptical']} is the desk to satisfy before committing."
+        )
+    else:
+        dissent = (
+            f"The floor is genuinely split: {spread} points between "
+            f"{state['most_convinced']} at {state['conviction_high']} and "
+            f"{state['most_sceptical']} at {state['conviction_low']}. "
+            "That gap is where the real risk sits, and it should be closed with "
+            "evidence rather than argument."
+        )
+
     state["final"] = (
-        f"CEO decision: proceed only with validation gates. The opportunity currently scores {average_score}/100. "
-        f"My main concern is {top_risk}. For the next 7 days, do not build the full product. "
-        "Validate demand, prove willingness to pay, and then build the narrowest MVP. "
-        "I recommend moving forward if at least 3 out of 10 target users show urgent pain or agree to a paid pilot."
+        f"CEO decision: proceed only with validation gates. The opportunity currently scores "
+        f"{average_score}/100. {dissent} My main concern is {top_risk}. For the next 7 days, "
+        "do not build the full product. Validate demand, prove willingness to pay, then build "
+        "the narrowest MVP. I recommend moving forward if at least 3 out of 10 target users "
+        "show urgent pain or agree to a paid pilot."
     )
     return state
+
+
+AGENT_SEQUENCE: list[tuple[str, Callable[["CEOState"], "CEOState"]]] = []
+
+
+def _register_sequence() -> None:
+    AGENT_SEQUENCE.clear()
+    AGENT_SEQUENCE.extend(
+        [
+            ("market", market_agent),
+            ("cfo", cfo_agent),
+            ("cto", cto_agent),
+            ("product", product_agent),
+            ("marketing", marketing_agent),
+            ("legal", legal_agent),
+            ("sales", sales_agent),
+            ("designer", designer_agent),
+            ("assistant", assistant_agent),
+        ]
+    )
+
+
+def _run_isolated(agent_fn: Callable[["CEOState"], "CEOState"], base: "CEOState") -> "CEOState":
+    local: CEOState = {**base, "reports": []}
+    agent_fn(local)
+    return local
+
+
+def _merge(state: "CEOState", name: str, local: "CEOState") -> None:
+    state["reports"].extend(local["reports"])
+    if name == "cfo":
+        state["runway_months"] = local["runway_months"]
 
 
 def build_ceo_graph():
@@ -372,6 +441,11 @@ def _initial_state(goal: str, message: str, memory_context: list[str] | None) ->
         "predictions": [],
         "health_score": 75,
         "runway_months": 6,
+        "conviction_spread": 0,
+        "conviction_low": 0,
+        "conviction_high": 0,
+        "most_sceptical": "",
+        "most_convinced": "",
     }
 
 
@@ -381,8 +455,21 @@ def _cache_key(goal: str, message: str) -> str:
 
 
 def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = None) -> CEOState:
+    """Run all nine specialists concurrently, then synthesise.
+
+    They were sequential, which meant nine round trips end to end. Each agent
+    only reads the goal and message, so there is no reason to wait: every one
+    gets an isolated state copy and the results merge afterwards.
+
+    Reports merge in declaration order rather than completion order, so the
+    board always reads in the same sequence even though the desks finish in
+    whatever order the providers respond.
+    """
     settings = get_settings()
     _ = settings.openai_api_key
+
+    if not AGENT_SEQUENCE:
+        _register_sequence()
 
     key = _cache_key(goal, message)
     if not memory_context:
@@ -390,22 +477,82 @@ def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = N
         if cached:
             return cached
 
-    graph = build_ceo_graph()
-    result = graph.invoke(_initial_state(goal, message, memory_context))
+    state = _initial_state(goal, message, memory_context)
+    collected: dict[str, CEOState] = {}
+
+    with ThreadPoolExecutor(max_workers=len(AGENT_SEQUENCE)) as pool:
+        futures = {
+            pool.submit(_run_isolated, agent_fn, state): name
+            for name, agent_fn in AGENT_SEQUENCE
+        }
+
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                collected[name] = future.result()
+            except Exception as exc:
+                print(f"[agents] {name} failed: {exc}")
+
+    for name, _agent in AGENT_SEQUENCE:
+        local = collected.get(name)
+        if local and local["reports"]:
+            _merge(state, name, local)
+
+    if not state["reports"]:
+        raise RuntimeError("Every specialist failed to file a report.")
+
+    ceo_synthesis(state)
 
     if not memory_context:
-        cache_set(key, result, ttl_seconds=86400)
+        cache_set(key, state, ttl_seconds=86400)
 
-    return result
+    return state
 
 
 def run_ceo_agents_stream(
     goal: str, message: str, memory_context: list[str] | None = None
 ) -> Iterator[tuple[str, CEOState]]:
-    """Yield (node_name, state_so_far) after each agent finishes, for SSE
-    streaming. `node_name` is one of the graph node names ("market", "cfo",
-    ..., "ceo"); the last yield is always ("ceo", final_state)."""
-    graph = build_ceo_graph()
-    for update in graph.stream(_initial_state(goal, message, memory_context), stream_mode="updates"):
-        for node_name, partial_state in update.items():
-            yield node_name, partial_state
+    """Yield (node_name, state_so_far) as each specialist finishes.
+
+    Runs concurrently and yields on completion, so a fast desk appears
+    immediately rather than waiting behind a slow one earlier in the list.
+    The last yield is always ("ceo", final_state).
+    """
+    if not AGENT_SEQUENCE:
+        _register_sequence()
+
+    state = _initial_state(goal, message, memory_context)
+    collected: dict[str, CEOState] = {}
+
+    with ThreadPoolExecutor(max_workers=len(AGENT_SEQUENCE)) as pool:
+        futures = {
+            pool.submit(_run_isolated, agent_fn, state): name
+            for name, agent_fn in AGENT_SEQUENCE
+        }
+
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                local = future.result()
+            except Exception as exc:
+                print(f"[agents] {name} failed: {exc}")
+                continue
+
+            if not local["reports"]:
+                continue
+
+            collected[name] = local
+            _merge(state, name, local)
+            yield name, {**state, "reports": list(local["reports"])}
+
+    if not state["reports"]:
+        raise RuntimeError("Every specialist failed to file a report.")
+
+    state["reports"] = []
+    for name, _agent in AGENT_SEQUENCE:
+        local = collected.get(name)
+        if local:
+            state["reports"].extend(local["reports"])
+
+    ceo_synthesis(state)
+    yield "ceo", state

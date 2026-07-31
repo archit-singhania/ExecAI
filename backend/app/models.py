@@ -37,6 +37,9 @@ class BusinessSession(Base):
     business_goal: Mapped[str] = mapped_column(Text)
     health_score: Mapped[int] = mapped_column(Integer, default=72)
     runway_months: Mapped[int] = mapped_column(Integer, default=6)
+    conviction_spread: Mapped[int] = mapped_column(Integer, default=0)
+    most_sceptical: Mapped[str] = mapped_column(String(80), default="")
+    most_convinced: Mapped[str] = mapped_column(String(80), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

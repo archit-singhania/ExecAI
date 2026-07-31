@@ -15,6 +15,22 @@ from app.agents import (
     sales_agent,
 )
 
+
+def _state_with(reports):
+    state = _initial_state("An AI board for founders", "Should I build now?", [])
+    state["reports"] = reports
+    return state
+
+
+def _report(agent, score=80):
+    return {
+        "agent": agent,
+        "title": "t",
+        "summary": "s",
+        "bullets": ["b"],
+        "score": score,
+    }
+
 ALL_AGENTS = [
     market_agent,
     cfo_agent,
@@ -180,8 +196,54 @@ def test_initial_state_has_every_key():
         "predictions",
         "health_score",
         "runway_months",
+        "conviction_spread",
+        "conviction_low",
+        "conviction_high",
+        "most_sceptical",
+        "most_convinced",
     }
     assert expected == set(fresh.keys())
     assert fresh["reports"] == []
     assert fresh["predictions"] == []
     assert fresh["memory_context"] == []
+
+
+def test_synthesis_measures_the_spread():
+    state = _state_with(
+        [_report("CTO", score=91), _report("CFO", score=70), _report("Marketing", score=44)]
+    )
+    ceo_synthesis(state)
+
+    assert state["conviction_low"] == 44
+    assert state["conviction_high"] == 91
+    assert state["conviction_spread"] == 47
+    assert state["most_sceptical"] == "Marketing"
+    assert state["most_convinced"] == "CTO"
+
+
+def test_a_split_board_is_named_in_the_verdict():
+    """The disagreement is the product, so it has to reach the verdict text."""
+    state = _state_with(
+        [_report("CTO", score=91), _report("Marketing", score=44)]
+    )
+    ceo_synthesis(state)
+
+    assert "genuinely split" in state["final"]
+    assert "Marketing" in state["final"]
+    assert "47" in state["final"]
+
+
+def test_an_aligned_board_says_so():
+    state = _state_with([_report("CTO", score=80), _report("CFO", score=78)])
+    ceo_synthesis(state)
+
+    assert "aligned" in state["final"]
+    assert state["conviction_spread"] == 2
+
+
+def test_middling_spread_names_the_desk_to_satisfy():
+    state = _state_with([_report("CTO", score=85), _report("Sales", score=68)])
+    ceo_synthesis(state)
+
+    assert "reservations" in state["final"]
+    assert "Sales" in state["final"]

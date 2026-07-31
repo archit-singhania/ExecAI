@@ -34,6 +34,9 @@ def execute_board_run(db: Session, session: BusinessSession, content: str) -> Me
 
     session.health_score = result["health_score"]
     session.runway_months = result["runway_months"]
+    session.conviction_spread = result.get("conviction_spread", 0)
+    session.most_sceptical = result.get("most_sceptical", "")
+    session.most_convinced = result.get("most_convinced", "")
 
     response = Message(session_id=session.id, role="assistant", content=result["final"])
     db.add(response)
