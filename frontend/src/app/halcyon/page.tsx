@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Compass, Ear, Waves } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { SceneField } from "@/components/ui/scene-field";
 import { formatHour, WORLD_BASELINES, worldGradient } from "@/lib/halcyon-worlds";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export default function HalcyonPage() {
     <main className={cn("hal-root", `hal-mood-${mood}`)}>
       <div className="hal-sky" aria-hidden="true" />
       <div className="hal-horizon" aria-hidden="true" />
+      <SceneField id="halcyon-landing" variant="aurora" className="opacity-90" />
 
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[1100px] flex-col px-5 py-6 sm:px-8">
         <nav className="flex items-center justify-between gap-3">

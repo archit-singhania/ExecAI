@@ -73,12 +73,12 @@ export function HeroField({
       const [r, g, b] = accent.split(" ").map((channel) => Number(channel.trim()) || 0);
       const accentColor = new THREE.Color(r / 255, g / 255, b / 255);
       const secondary =
-        mode === "dark" ? new THREE.Color(0.55, 0.68, 0.88) : new THREE.Color(0.12, 0.16, 0.22);
+        mode === "dark" ? new THREE.Color(0.55, 0.68, 0.88) : new THREE.Color(0.14, 0.2, 0.3);
 
       const geometry = new THREE.IcosahedronGeometry(0.34, 0);
       const material = new THREE.MeshBasicMaterial({
         transparent: true,
-        opacity: mode === "dark" ? 0.62 : 0.38,
+        opacity: mode === "dark" ? 0.62 : 0.58,
         vertexColors: true,
       });
 
@@ -112,7 +112,7 @@ export function HeroField({
       const lineMaterial = new THREE.LineBasicMaterial({
         color: accentColor,
         transparent: true,
-        opacity: mode === "dark" ? 0.16 : 0.1,
+        opacity: mode === "dark" ? 0.16 : 0.22,
       });
       const lines = new THREE.LineSegments(lineGeometry, lineMaterial);
       scene.add(lines);

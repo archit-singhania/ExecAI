@@ -7,6 +7,7 @@ import { billingApi, Plan } from "@/lib/billing";
 import { getToken } from "@/lib/auth";
 import { Logo } from "@/components/logo";
 import { HeroField } from "@/components/ui/hero-field";
+import { SceneField } from "@/components/ui/scene-field";
 import { cn } from "@/lib/utils";
 
 export default function PricingPage() {
@@ -54,7 +55,7 @@ export default function PricingPage() {
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-radial-ui px-5 py-10 text-ink sm:px-8">
-      <HeroField id="pricing" variant="orbit" className="opacity-70" />
+      <SceneField id="pricing" variant="reveal" className="opacity-70" />
       <div className="relative mx-auto w-full max-w-[1100px]">
         <nav className="flex items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-[0.8rem] font-bold text-steel hover:text-ink dark:hover:text-fog">

@@ -3,7 +3,7 @@
 import { VantaNetworkBackground } from "@/components/ui/vanta-network";
 import { CornerAccents } from "@/components/ui/corner-accents";
 
-export function AnimatedBackground() {
+export function AnimatedBackground({ webgl = true }: { webgl?: boolean }) {
   return (
     <>
       <div className="top-beam" aria-hidden />
@@ -12,7 +12,7 @@ export function AnimatedBackground() {
         <span className="orb orb-1" />
         <span className="orb orb-2" />
       </div>
-      <VantaNetworkBackground />
+      {webgl ? <VantaNetworkBackground /> : null}
       <CornerAccents />
     </>
   );

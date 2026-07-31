@@ -3630,7 +3630,7 @@ a.hal-support-link:hover {
 }
 
 .vanta-layer {
-  opacity: 0.55;
+  opacity: 0.72;
   transition: opacity 620ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -3639,7 +3639,7 @@ a.hal-support-link:hover {
 }
 
 .vanta-layer-pulse {
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .dark .vanta-layer-pulse {
@@ -6113,6 +6113,29 @@ select {
   .chart-stream-band {
     animation: none !important;
   }
+}
+
+.landing-aurora {
+  z-index: 0;
+}
+
+.landing-veil {
+  z-index: 0;
+  background: radial-gradient(
+    120% 80% at 50% 0%,
+    rgb(var(--color-surface) / 0.55) 0%,
+    rgb(var(--color-surface) / 0.2) 45%,
+    transparent 75%
+  );
+}
+
+.dark .landing-veil {
+  background: radial-gradient(
+    120% 80% at 50% 0%,
+    rgba(10, 12, 16, 0.5) 0%,
+    rgba(10, 12, 16, 0.16) 45%,
+    transparent 75%
+  );
 }
 
 .sec-meter {

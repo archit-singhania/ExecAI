@@ -7,6 +7,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
 import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
 import { AnimatedBackground } from "@/components/ui/animated-background";
+import { SceneField } from "@/components/ui/scene-field";
 import { agentMeta } from "@/lib/dashboard-data";
 import { useLocale } from "@/lib/i18n";
 
@@ -35,7 +36,11 @@ export default function LandingPage() {
   return (
     <main className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto overflow-x-hidden bg-radial-ui text-ink">
       <div className="scanline pointer-events-none absolute inset-0" />
-      <AnimatedBackground />
+      <div className="landing-aurora pointer-events-none absolute inset-0">
+        <SceneField id="landing" variant="aurora" />
+      </div>
+      <AnimatedBackground webgl={false} />
+      <div className="landing-veil pointer-events-none absolute inset-0" />
 
       <div className="relative flex min-h-full flex-col">
         <MarketingNav />

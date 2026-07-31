@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { SceneField } from "@/components/ui/scene-field";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { ThemeModeToggle, ThemeConfigurator } from "@/components/ui/theme-controls";
 import { LanguagePicker } from "@/components/ui/language-picker";
@@ -85,7 +86,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto bg-radial-ui text-ink">
       <div className="scanline pointer-events-none absolute inset-0" />
-      <AnimatedBackground />
+      <SceneField id="auth" variant="shafts" className="opacity-80" />
+      <AnimatedBackground webgl={false} />
 
       <div className="relative flex items-center justify-end gap-2 px-4 pt-4 sm:px-6">
         <ThemeModeToggle />

@@ -35,6 +35,7 @@ import {
   SkeletonCards,
 } from "@/components/dashboard/section-kit";
 import { getToken } from "@/lib/auth";
+import { SceneField } from "@/components/ui/scene-field";
 import { cn } from "@/lib/utils";
 
 type Point = { label: string; value: number };
@@ -208,6 +209,7 @@ export function Analytics({ isDemo }: { isDemo?: boolean }) {
 
   return (
     <SectionPanel tone="cobalt">
+      <SceneField id="analytics" variant="topography" className="opacity-50" />
       <SectionHeader
         eyebrow="Analytics"
         title="Business intelligence"
