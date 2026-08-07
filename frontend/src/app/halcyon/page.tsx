@@ -26,7 +26,7 @@ export default function HalcyonPage() {
     <main className={cn("hal-root", `hal-mood-${mood}`)}>
       <div className="hal-sky" aria-hidden="true" />
       <div className="hal-horizon" aria-hidden="true" />
-      <SceneField id="halcyon-landing" variant="aurora" className="opacity-90" />
+      <SceneField id="halcyon-landing" variant="caustics" className="opacity-90" />
 
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[1100px] flex-col px-5 py-6 sm:px-8">
         <nav className="flex items-center justify-between gap-3">

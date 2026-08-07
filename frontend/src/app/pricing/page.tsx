@@ -55,7 +55,7 @@ export default function PricingPage() {
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-radial-ui px-5 py-10 text-ink sm:px-8">
-      <SceneField id="pricing" variant="reveal" className="opacity-70" />
+      <SceneField id="pricing" variant="ribbons" className="opacity-70" />
       <div className="relative mx-auto w-full max-w-[1100px]">
         <nav className="flex items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-[0.8rem] font-bold text-steel hover:text-ink dark:hover:text-fog">

@@ -209,7 +209,7 @@ export function Analytics({ isDemo }: { isDemo?: boolean }) {
 
   return (
     <SectionPanel tone="cobalt">
-      <SceneField id="analytics" variant="topography" className="opacity-50" />
+      <SceneField id="analytics" variant="depthgrid" className="opacity-50" />
       <SectionHeader
         eyebrow="Analytics"
         title="Business intelligence"

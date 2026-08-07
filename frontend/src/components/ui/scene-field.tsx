@@ -5,13 +5,129 @@ import { useTheme } from "@/components/theme-provider";
 import { claimWebGL, onWebGLFreed, releaseWebGL, webglBudget } from "@/lib/webgl-lock";
 import { getAmbient, subscribeAmbient } from "@/lib/ambient-state";
 
-export type SceneVariant = "aurora" | "reveal" | "shafts" | "cloud" | "topography";
+export type SceneVariant =
+  | "aurora"
+  | "reveal"
+  | "shafts"
+  | "cloud"
+  | "topography"
+  | "caustics"
+  | "constellation"
+  | "ribbons"
+  | "depthgrid"
+  | "vortex"
+  | "liquid"
+  | "glass";
 
 const AURORA_VERT = `
 varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = vec4(position, 1.0);
+}
+`;
+
+const CAUSTICS_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform vec3 uAccent;
+uniform vec3 uSecondary;
+uniform float uDark;
+
+vec2 wave(vec2 p, float t) {
+  return vec2(
+    sin(p.x * 3.1 + t) + sin(p.y * 2.3 - t * 0.7),
+    cos(p.y * 2.8 - t * 0.9) + cos(p.x * 3.4 + t * 0.5)
+  );
+}
+
+void main() {
+  vec2 uv = vUv * 3.0;
+  float t = uTime * 0.28;
+
+  vec2 w = wave(uv, t);
+  w += wave(uv + w * 0.4, t * 1.3) * 0.5;
+
+  float caustic = pow(max(0.0, 1.0 - length(w) * 0.34), 3.2);
+  float secondary = pow(max(0.0, 1.0 - length(wave(uv * 1.7 + 4.0, t * 0.8)) * 0.4), 4.0);
+
+  vec3 color = mix(uSecondary, uAccent, caustic);
+  color += uAccent * secondary * 0.5;
+
+  float vignette = smoothstep(1.2, 0.3, length(vUv - 0.5));
+  float alpha = (caustic * 0.5 + secondary * 0.3) * vignette * mix(0.5, 0.42, uDark);
+
+  gl_FragColor = vec4(color, alpha);
+}
+`;
+
+const LIQUID_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform vec3 uAccent;
+uniform vec3 uSecondary;
+uniform float uDark;
+
+float blob(vec2 p, vec2 c, float r) {
+  return r / (length(p - c) + 0.001);
+}
+
+void main() {
+  vec2 uv = (vUv - 0.5) * vec2(1.7, 1.0);
+  float t = uTime * 0.16;
+
+  float field = 0.0;
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i);
+    vec2 c = vec2(
+      sin(t * (0.7 + fi * 0.13) + fi * 2.1) * 0.42,
+      cos(t * (0.5 + fi * 0.17) + fi * 1.7) * 0.3
+    );
+    field += blob(uv, c, 0.052);
+  }
+
+  float surface = smoothstep(0.9, 1.9, field);
+  float rim = smoothstep(1.7, 0.95, field) * smoothstep(0.85, 1.4, field);
+
+  vec3 color = mix(uSecondary, uAccent, surface);
+  color += rim * 0.7;
+
+  float alpha = (surface * 0.42 + rim * 0.3) * mix(0.55, 0.46, uDark);
+  gl_FragColor = vec4(color, alpha);
+}
+`;
+
+const GLASS_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform vec3 uAccent;
+uniform vec3 uSecondary;
+uniform float uDark;
+
+float panel(vec2 uv, float offset, float t) {
+  float x = fract(uv.x * 2.4 + offset + t * 0.03);
+  float edge = smoothstep(0.0, 0.06, x) * smoothstep(1.0, 0.94, x);
+  return edge;
+}
+
+void main() {
+  float t = uTime;
+  vec2 uv = vUv;
+
+  float a = panel(uv, 0.0, t);
+  float b = panel(uv + vec2(0.13, 0.0), 0.37, t * 1.4);
+  float c = panel(uv + vec2(0.29, 0.0), 0.71, t * 0.7);
+
+  float glass = a * 0.4 + b * 0.3 + c * 0.3;
+  float sheen = pow(1.0 - abs(uv.y - 0.5) * 2.0, 2.0);
+
+  vec3 color = mix(uSecondary, uAccent, glass * 0.7);
+  float alpha = glass * sheen * mix(0.3, 0.24, uDark);
+
+  gl_FragColor = vec4(color, alpha);
 }
 `;
 
@@ -88,6 +204,8 @@ void main() {
 }
 `;
 
+const SHADER_VARIANTS = new Set<SceneVariant>(["aurora", "caustics", "liquid", "glass"]);
+
 export function SceneField({
   variant = "aurora",
   id,
@@ -153,7 +271,7 @@ export function SceneField({
         : new THREE.Color(0.14, 0.2, 0.3);
 
       const renderer = new THREE.WebGLRenderer({
-        antialias: high && variant !== "aurora",
+        antialias: high && !SHADER_VARIANTS.has(variant),
         alpha: true,
         powerPreference: "high-performance",
       });
@@ -167,7 +285,16 @@ export function SceneField({
       let camera: THREE.Camera;
       let update: (time: number) => void = () => undefined;
 
-      if (variant === "aurora") {
+      const SHADERS: Partial<Record<SceneVariant, string>> = {
+        aurora: AURORA_FRAG,
+        caustics: CAUSTICS_FRAG,
+        liquid: LIQUID_FRAG,
+        glass: GLASS_FRAG,
+      };
+
+      const shaderSource = SHADERS[variant];
+
+      if (shaderSource) {
         camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
         const geometry = new THREE.PlaneGeometry(2, 2);
@@ -183,7 +310,7 @@ export function SceneField({
 
         const material = new THREE.ShaderMaterial({
           vertexShader: AURORA_VERT,
-          fragmentShader: AURORA_FRAG,
+          fragmentShader: shaderSource,
           uniforms,
           transparent: true,
           depthWrite: false,
@@ -198,6 +325,175 @@ export function SceneField({
             const health = ambientRef.current.health / 100;
             uniforms.uWarmth.value += (health - uniforms.uWarmth.value) * 0.02;
             uniforms.uBrightness.value += (0.4 + health * 0.5 - uniforms.uBrightness.value) * 0.02;
+          }
+        };
+      } else if (variant === "depthgrid") {
+        camera = new THREE.PerspectiveCamera(62, width / height, 0.1, 200);
+        camera.position.set(0, 4, 18);
+        camera.lookAt(0, 0, -40);
+
+        const group = new THREE.Group();
+        const lineMaterial = new THREE.LineBasicMaterial({
+          color: accentColor,
+          transparent: true,
+          opacity: dark ? 0.22 : 0.3,
+        });
+        disposables.push(lineMaterial);
+
+        const rows = high ? 26 : 16;
+        const spacing = 4;
+
+        for (let index = 0; index < rows; index += 1) {
+          const geometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-60, 0, 0),
+            new THREE.Vector3(60, 0, 0),
+          ]);
+          const line = new THREE.Line(geometry, lineMaterial);
+          line.position.z = -index * spacing;
+          group.add(line);
+          disposables.push(geometry);
+        }
+
+        for (let index = -12; index <= 12; index += 1) {
+          const geometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(index * 5, 0, 4),
+            new THREE.Vector3(index * 5, 0, -rows * spacing),
+          ]);
+          group.add(new THREE.Line(geometry, lineMaterial));
+          disposables.push(geometry);
+        }
+
+        scene.add(group);
+
+        update = (time) => {
+          const offset = (time * 0.004) % spacing;
+          group.position.z = offset;
+          group.position.x = (pointerRef.current.x - 0.5) * -4;
+        };
+      } else if (variant === "constellation" || variant === "vortex" || variant === "ribbons") {
+        camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 160);
+        camera.position.z = variant === "vortex" ? 34 : 30;
+
+        const count = high ? 300 : 170;
+        const geometry = new THREE.IcosahedronGeometry(variant === "ribbons" ? 0.2 : 0.26, 0);
+        const material = new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: dark ? 0.7 : 0.6,
+          vertexColors: true,
+        });
+
+        const mesh = new THREE.InstancedMesh(geometry, material, count);
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+        const colors = new Float32Array(count * 3);
+        const seeds = new Float32Array(count * 4);
+        const dummy = new THREE.Object3D();
+
+        for (let index = 0; index < count; index += 1) {
+          const color = Math.random() > 0.5 ? accentColor : secondary;
+          colors[index * 3] = color.r;
+          colors[index * 3 + 1] = color.g;
+          colors[index * 3 + 2] = color.b;
+
+          if (variant === "vortex") {
+            seeds[index * 4] = Math.random() * Math.PI * 2;
+            seeds[index * 4 + 1] = 3 + Math.random() * 26;
+            seeds[index * 4 + 2] = (Math.random() - 0.5) * 26;
+            seeds[index * 4 + 3] = 0.35 + Math.random() * 0.9;
+          } else {
+            seeds[index * 4] = (Math.random() - 0.5) * 54;
+            seeds[index * 4 + 1] = (Math.random() - 0.5) * 34;
+            seeds[index * 4 + 2] = (Math.random() - 0.5) * 30;
+            seeds[index * 4 + 3] = Math.random() * Math.PI * 2;
+          }
+        }
+
+        geometry.setAttribute("color", new THREE.InstancedBufferAttribute(colors, 3));
+        scene.add(mesh);
+        disposables.push(geometry, material);
+
+        let links: THREE.LineSegments | null = null;
+        let linkPositions: Float32Array | null = null;
+        const maxLinks = high ? 200 : 90;
+
+        if (variant === "constellation") {
+          const linkGeometry = new THREE.BufferGeometry();
+          linkPositions = new Float32Array(maxLinks * 6);
+          linkGeometry.setAttribute("position", new THREE.BufferAttribute(linkPositions, 3));
+          const linkMaterial = new THREE.LineBasicMaterial({
+            color: accentColor,
+            transparent: true,
+            opacity: dark ? 0.2 : 0.26,
+          });
+          links = new THREE.LineSegments(linkGeometry, linkMaterial);
+          scene.add(links);
+          disposables.push(linkGeometry, linkMaterial);
+        }
+
+        const positions = new Float32Array(count * 3);
+
+        update = (time) => {
+          const t = time * 0.0002;
+
+          for (let index = 0; index < count; index += 1) {
+            let x: number;
+            let y: number;
+            let z: number;
+
+            if (variant === "vortex") {
+              const angle = seeds[index * 4] + t * seeds[index * 4 + 3];
+              const radius = seeds[index * 4 + 1] * (0.72 + Math.sin(t * 0.8 + index) * 0.06);
+              x = Math.cos(angle) * radius;
+              y = Math.sin(angle) * radius * 0.55;
+              z = seeds[index * 4 + 2];
+            } else if (variant === "ribbons") {
+              const phase = seeds[index * 4 + 3];
+              x = seeds[index * 4] + Math.sin(t * 1.6 + phase) * 5.5;
+              y = seeds[index * 4 + 1] + Math.cos(t * 1.1 + phase * 1.7) * 4.2;
+              z = seeds[index * 4 + 2] + Math.sin(t + phase) * 3;
+            } else {
+              const phase = seeds[index * 4 + 3];
+              x = seeds[index * 4] + Math.cos(t * 0.8 + phase) * 1.6;
+              y = seeds[index * 4 + 1] + Math.sin(t + phase) * 1.9;
+              z = seeds[index * 4 + 2];
+            }
+
+            positions[index * 3] = x;
+            positions[index * 3 + 1] = y;
+            positions[index * 3 + 2] = z;
+
+            dummy.position.set(x, y, z);
+            dummy.rotation.set(t * 1.4 + index, t + index, 0);
+            dummy.scale.setScalar(0.5 + Math.sin(t * 2 + index) * 0.15);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(index, dummy.matrix);
+          }
+
+          mesh.instanceMatrix.needsUpdate = true;
+
+          if (links && linkPositions) {
+            let link = 0;
+            for (let a = 0; a < count && link < maxLinks; a += 4) {
+              for (let b = a + 4; b < count && link < maxLinks; b += 4) {
+                const dx = positions[a * 3] - positions[b * 3];
+                const dy = positions[a * 3 + 1] - positions[b * 3 + 1];
+                const dz = positions[a * 3 + 2] - positions[b * 3 + 2];
+                if (dx * dx + dy * dy + dz * dz < 90) {
+                  const offset = link * 6;
+                  linkPositions[offset] = positions[a * 3];
+                  linkPositions[offset + 1] = positions[a * 3 + 1];
+                  linkPositions[offset + 2] = positions[a * 3 + 2];
+                  linkPositions[offset + 3] = positions[b * 3];
+                  linkPositions[offset + 4] = positions[b * 3 + 1];
+                  linkPositions[offset + 5] = positions[b * 3 + 2];
+                  link += 1;
+                }
+              }
+            }
+            for (let index = link; index < maxLinks; index += 1) {
+              linkPositions.fill(0, index * 6, index * 6 + 6);
+            }
+            links.geometry.attributes.position.needsUpdate = true;
           }
         };
       } else if (variant === "topography") {

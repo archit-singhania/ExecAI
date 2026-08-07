@@ -8,7 +8,7 @@ import { MarketingNav } from "@/components/marketing/marketing-nav";
 import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
 import { LandingPillars } from "@/components/marketing/landing-pillars";
 import { AnimatedBackground } from "@/components/ui/animated-background";
-import { SceneField } from "@/components/ui/scene-field";
+import { SurpriseBackground } from "@/components/ui/surprise-background";
 import { agentMeta } from "@/lib/dashboard-data";
 import { useLocale } from "@/lib/i18n";
 
@@ -38,7 +38,10 @@ export default function LandingPage() {
     <main className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-radial-ui text-ink">
       <div className="scanline pointer-events-none absolute inset-0" />
       <div className="landing-aurora pointer-events-none absolute inset-0">
-        <SceneField id="landing" variant="aurora" />
+        <SurpriseBackground
+          pool={["vanta", "constellation", "aurora", "ribbons", "liquid", "vortex"]}
+          reactive
+        />
       </div>
       <AnimatedBackground webgl={false} />
       <div className="landing-veil pointer-events-none absolute inset-0" />

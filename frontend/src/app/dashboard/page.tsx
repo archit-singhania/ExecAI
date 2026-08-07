@@ -12,6 +12,7 @@ import { toast, toastFromError } from "@/lib/toast";
 import { Toaster } from "@/components/ui/toaster";
 import { hasOnboarded } from "@/components/dashboard/onboarding";
 import { FirstRun } from "@/components/dashboard/first-run";
+import { MobileTabBar } from "@/components/dashboard/mobile-tab-bar";
 import { usePlan } from "@/lib/use-plan";
 import { VoiceStage } from "@/components/voice/voice-stage";
 import { AgentBriefing } from "@/components/sections/agent-briefing";
@@ -607,6 +608,12 @@ export default function DashboardPage() {
         onOpenReport={openReport}
       />
       <Toaster />
+
+      <MobileTabBar
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        openTasks={activeTasks.filter((task) => task.status.toLowerCase() !== "done").length}
+      />
 
       {showOnboarding ? <Onboarding onDone={() => setShowOnboarding(false)} /> : null}
     </main>
