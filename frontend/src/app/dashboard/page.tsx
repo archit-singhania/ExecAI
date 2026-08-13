@@ -348,10 +348,11 @@ export default function DashboardPage() {
     setError("");
 
     if (isDemo) {
+      const before = demoTasks;
       setDemoTasks((current) =>
         current.map((task) => (task.id === taskId ? { ...task, status: "Done", completed_at: new Date().toISOString() } : task)),
       );
-      toast.success("Task closed");
+      toast.undo("Task closed", () => setDemoTasks(before));
       return;
     }
 
@@ -370,7 +371,14 @@ export default function DashboardPage() {
     try {
       await api.updateTask(taskId, "Done");
       setDashboard(await api.dashboard());
-      toast.success("Task closed");
+      toast.undo("Task closed", async () => {
+        try {
+          await api.updateTask(taskId, "Open");
+          setDashboard(await api.dashboard());
+        } catch (err) {
+          toastFromError(err, "Couldn't undo that");
+        }
+      });
     } catch (err) {
       if (previous) setDashboard(previous);
       toastFromError(err, "Unable to update task");

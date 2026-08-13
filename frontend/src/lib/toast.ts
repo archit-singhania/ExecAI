@@ -7,6 +7,8 @@ export type Toast = {
   detail?: string;
   actionLabel?: string;
   actionHref?: string;
+  undoLabel?: string;
+  onUndo?: () => void;
   duration: number;
 };
 
@@ -62,6 +64,15 @@ export const toast = {
       actionLabel: "See plans",
       actionHref: "/pricing",
       duration: 0,
+    }),
+  undo: (title: string, onUndo: () => void, detail?: string) =>
+    push({
+      tone: "info",
+      title,
+      detail,
+      undoLabel: "Undo",
+      onUndo,
+      duration: 8000,
     }),
 };
 

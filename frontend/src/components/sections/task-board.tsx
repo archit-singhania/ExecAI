@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, CircleCheck, ListChecks } from "lucide-react";
 import { Task } from "@/lib/api";
 import { TaskFilter } from "@/lib/dashboard-data";
+import { haptics, useSwipe } from "@/lib/use-interactions";
 import {
   EmptyState,
   FilterRail,
@@ -178,27 +179,47 @@ function TaskRow({
 }) {
   const complete = isDone(task);
 
+  const { offset, settling, handlers } = useSwipe({
+    onRight: () => {
+      if (!complete) completeTask(task.id);
+    },
+  });
+
   return (
-    <div
-      style={{ animationDelay: `${index * 45}ms` }}
-      className={cn(
-        "sec-card sec-card-edge rounded-lg p-4 pl-5 transition",
-        complete && "opacity-70",
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={() => (complete ? undefined : completeTask(task.id))}
-          disabled={complete}
-          aria-label={complete ? "Task complete" : `Mark ${task.title} done`}
-          className={cn(
-            "sec-check mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md",
-            complete && "sec-check-done",
-          )}
-        >
-          <Check size={13} strokeWidth={3} />
-        </button>
+    <div className="swipe-row" style={{ animationDelay: `${index * 45}ms` }}>
+      {offset !== 0 ? (
+        <div className="swipe-action">
+          <span className="swipe-action-done">{complete ? "" : "Mark done"}</span>
+          <span />
+        </div>
+      ) : null}
+
+      <div
+        {...handlers}
+        className={cn(
+          "swipe-surface sec-card sec-card-edge rounded-lg p-4 pl-5 transition",
+          settling && "swipe-surface-settling",
+          complete && "opacity-70",
+        )}
+        style={{ transform: offset ? `translateX(${offset}px)` : undefined }}
+      >
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (complete) return;
+              haptics.success();
+              completeTask(task.id);
+            }}
+            disabled={complete}
+            aria-label={complete ? "Task complete" : `Mark ${task.title} done`}
+            className={cn(
+              "sec-check mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md",
+              complete && "sec-check-done",
+            )}
+          >
+            <Check size={13} strokeWidth={3} />
+          </button>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -227,8 +248,12 @@ function TaskRow({
             <span className="text-[0.7rem] font-bold text-steel">
               {complete ? "Completed" : task.status}
             </span>
+            <span className="ml-auto hidden text-[0.66rem] font-semibold text-steel/70 sm:inline">
+              {complete ? "" : "Swipe right to close"}
+            </span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

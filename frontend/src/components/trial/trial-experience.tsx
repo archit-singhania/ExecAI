@@ -1,168 +1,342 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Sparkles, X } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Link2,
+  Lock,
+  RotateCcw,
+  Sparkles,
+  Target,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
-import { StatusPill } from "@/components/ui/status-pill";
 import { AnimatedBackground } from "@/components/ui/animated-background";
-import { trialSuggestions } from "@/lib/trial-suggestions";
+import { BoardroomConvening } from "@/components/dashboard/boardroom-convening";
+import { ConvictionSpread } from "@/components/dashboard/conviction-spread";
+import { Reveal } from "@/components/ui/reveal";
+import { ScrollProgress } from "@/components/ui/scroll-chrome";
 import { AgentReport } from "@/lib/api";
-import { VoiceStage, VoiceStageHandle } from "@/components/voice/voice-stage";
+import { fallbackReports } from "@/lib/dashboard-data";
+import { toast } from "@/lib/toast";
+import { Toaster } from "@/components/ui/toaster";
+import { cn } from "@/lib/utils";
 
-const DEMO_REPLY =
-  "Here's how the boardroom would open this up: Market Research would pressure-test demand with real interviews before any build, CFO would cap validation spend and track runway, and CTO would scope the narrowest workflow that still proves repeat value. Sign up free to run this for real, with memory, tasks, and weekly board reviews.";
+const PRELOADED_GOAL = "AI invoicing for freelance designers";
 
-const DEMO_REPORTS: AgentReport[] = [
-  {
-    agent: "Market Research",
-    title: "Demand looks real, but the niche needs sharpening",
-    summary: "Start with one painful, frequent workflow for one segment before automating anything broad.",
-    bullets: ["Interview users already paying with time or money.", "Reject broad markets until there's a sharper wedge."],
-    score: 84,
-  },
-  {
-    agent: "CFO",
-    title: "Keep first validation under $2,500",
-    summary: "Spend only on interviews, a landing page test, and one paid channel experiment before building.",
-    bullets: ["Cap validation spend.", "Define a CAC ceiling before running ads."],
-    score: 78,
-  },
+const VERDICT =
+  "CEO decision: proceed only with validation gates. The opportunity scores 71/100. The floor is genuinely split — 44 points between your CTO at 88 and Marketing at 44. That gap is where the real risk sits, and it should be closed with evidence rather than argument. For the next 7 days, do not build. Talk to ten freelance designers and find out what they pay for invoicing today.";
+
+const SECOND_STEP =
+  "Marketing scored this 44 while your CTO scored it 88. Ask the board to argue that out.";
+
+const DEBATE_REPLY =
+  "Marketing holds: designers already have Wave, Bonsai and a spreadsheet that works. Switching costs are emotional, not technical, and no one wakes up wanting new invoicing software. CTO counters: the wedge isn't invoicing, it's the twenty minutes of chasing late payers every week — a job nobody has automated for this segment. The board's resolution: neither is provable from here. Ask ten designers what they did the last time an invoice went unpaid. If fewer than three describe it as painful, Marketing was right.";
+
+const HISTORY = [
+  { agent: "CTO", hit: 7, missed: 2, accuracy: 78 },
+  { agent: "CFO", hit: 6, missed: 3, accuracy: 67 },
+  { agent: "Product", hit: 5, missed: 4, accuracy: 56 },
+  { agent: "Sales", hit: 4, missed: 4, accuracy: 50 },
+  { agent: "Marketing", hit: 3, missed: 6, accuracy: 33 },
 ];
+
+const RESOLVED = [
+  { agent: "CFO", statement: "Cost to acquire will exceed first-month revenue.", outcome: "hit" },
+  { agent: "Marketing", statement: "Organic will beat paid in month one.", outcome: "missed" },
+  { agent: "CTO", statement: "Core workflow shippable in six weeks by one engineer.", outcome: "hit" },
+];
+
+function accuracyColor(value: number) {
+  if (value >= 70) return "#1d6f5f";
+  if (value >= 50) return "#5b7ad6";
+  if (value >= 35) return "#b7ca5d";
+  return "#d45f3a";
+}
 
 export function TrialExperience() {
   const router = useRouter();
-  const [started, setStarted] = useState(false);
   const [reports, setReports] = useState<AgentReport[]>([]);
-  const voiceStageRef = useRef<VoiceStageHandle>(null);
+  const [phase, setPhase] = useState<"idle" | "convening" | "verdict" | "debated">("idle");
+  const [debating, setDebating] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [exitOffered, setExitOffered] = useState(false);
+  const timers = useRef<number[]>([]);
 
-  async function handleUtterance(text: string, onProgress: (label: string) => void): Promise<string> {
-    setStarted(true);
-    onProgress("The boardroom is weighing in\u2026");
-    await new Promise((resolve) => window.setTimeout(resolve, 900));
-    setReports(DEMO_REPORTS);
-    return DEMO_REPLY;
+  const clearTimers = useCallback(() => {
+    timers.current.forEach((id) => window.clearTimeout(id));
+    timers.current = [];
+  }, []);
+
+  const convene = useCallback(() => {
+    clearTimers();
+    setReports([]);
+    setPhase("convening");
+
+    fallbackReports.forEach((report, index) => {
+      const id = window.setTimeout(() => {
+        setReports(fallbackReports.slice(0, index + 1));
+        if (index === fallbackReports.length - 1) {
+          timers.current.push(window.setTimeout(() => setPhase("verdict"), 700));
+        }
+      }, 420 + index * 340);
+      timers.current.push(id);
+    });
+  }, [clearTimers]);
+
+  useEffect(() => {
+    const id = window.setTimeout(convene, 900);
+    timers.current.push(id);
+    return clearTimers;
+  }, [convene, clearTimers]);
+
+  useEffect(() => {
+    function onLeave(event: MouseEvent) {
+      if (event.clientY <= 0 && !exitOffered && phase === "verdict") {
+        setExitOffered(true);
+        toast.upgrade(
+          "Want this report by email?",
+          "Sign up free and we'll send the full board verdict, plus weekly reviews.",
+        );
+      }
+    }
+
+    document.addEventListener("mouseout", onLeave);
+    return () => document.removeEventListener("mouseout", onLeave);
+  }, [exitOffered, phase]);
+
+  function debate() {
+    setDebating(true);
+    window.setTimeout(() => {
+      setDebating(false);
+      setPhase("debated");
+    }, 1400);
+  }
+
+  async function share() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/trial`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch {
+      toast.error("Couldn't copy the link");
+    }
   }
 
   return (
-    <main className="relative flex h-[100dvh] min-h-[560px] flex-col overflow-hidden bg-radial-ui text-ink">
+    <main className="relative min-h-[100dvh] overflow-x-hidden bg-radial-ui text-ink">
+      <ScrollProgress />
       <div className="scanline pointer-events-none absolute inset-0" />
       <AnimatedBackground />
 
-      <div className="relative flex h-full min-h-0 flex-col">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-6 sm:py-3">
+      <div className="relative mx-auto w-full max-w-[1100px] px-4 pb-24 sm:px-6">
+        <header className="flex flex-wrap items-center justify-between gap-2 py-4">
           <div className="flex items-center gap-2.5">
-            <Logo size={30} />
-            <span className="text-sm font-black tracking-tight sm:text-base">CEO.ai</span>
-            <span className="hidden sm:inline">
-              <StatusPill icon={Sparkles} label="Live demo · sample data" pulse />
+            <span className="vt-logo">
+              <Logo size={30} />
+            </span>
+            <span className="text-sm font-bold tracking-tight">CEO.ai</span>
+            <span className="tr-live">
+              <span className="tr-live-dot" />
+              Live demo · sample data
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-ink/10 bg-white/55 px-3 text-xs font-bold text-ink transition hover:bg-white dark:border-ink/20 dark:bg-ink/[0.08] dark:hover:bg-ink/[0.14] sm:h-10 sm:px-4 sm:text-sm"
-            >
+            <button type="button" onClick={() => router.push("/")} className="err-btn">
               <X size={14} />
-              Exit demo
+              Exit
             </button>
             <Link href="/signup">
-              <Button className="h-9 px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
+              <Button className="h-10 px-4">
                 Sign up free <ArrowRight size={15} />
               </Button>
             </Link>
           </div>
         </header>
 
-        <section className="mx-auto grid w-full max-w-[1400px] flex-1 grid-cols-1 gap-4 overflow-hidden px-4 pb-3 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-6 lg:px-8 lg:pb-4">
-          <div className="flex min-h-0 flex-col gap-3">
-            {!started ? (
-              <div className="animate-rise shrink-0 space-y-2 pb-1">
-                <div className="inline-flex w-fit items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-1.5 text-[0.7rem] font-black shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark sm:text-xs">
-                  No account needed
-                </div>
-                <h1 className="max-w-xl text-[1.7rem] font-black leading-[1.05] sm:text-4xl">
-                  Put the boardroom to work on your idea.
-                </h1>
-                <p className="max-w-lg text-sm leading-6 text-steel sm:text-base sm:leading-7">
-                  This is a live demo with sample data — no signup required. Tap the mic and tell the CEO what
-                  you&apos;re building, or pick one of the boardroom moves on the right to hear how it responds.
-                </p>
+        <section className="pt-6 text-center">
+          <p className="sec-eyebrow">No account needed</p>
+          <h1 className="fr-title mt-3">Your board is already convening.</h1>
+          <p className="mx-auto mt-3 max-w-xl text-[0.95rem] leading-8 text-steel">
+            We&apos;ve given them a real question so you can watch them work:{" "}
+            <span className="tr-goal">{PRELOADED_GOAL}</span>
+          </p>
+        </section>
+
+        <section className="mt-8">
+          <div className="glass-strong rounded-xl p-4 sm:p-6">
+            <BoardroomConvening
+              reports={reports}
+              active={phase === "convening"}
+              finalText={phase !== "idle" && phase !== "convening" ? VERDICT : undefined}
+            />
+
+            {phase !== "idle" && phase !== "convening" ? (
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onClick={convene} className="err-btn">
+                  <RotateCcw size={14} />
+                  Watch it again
+                </button>
+                <button type="button" onClick={share} className="err-btn">
+                  {copied ? <Check size={14} /> : <Link2 size={14} />}
+                  {copied ? "Link copied" : "Share this result"}
+                </button>
               </div>
             ) : null}
-
-            <div className="glass-strong min-h-0 flex-1 rounded-lg p-2 sm:p-3">
-              <VoiceStage
-                ref={voiceStageRef}
-                subtitle="Live demo"
-                placeholderPrompt="Tap the mic and tell the CEO what you're building."
-                onUtterance={handleUtterance}
-              />
-            </div>
           </div>
+        </section>
 
-          <aside className="flex min-h-0 flex-col gap-2.5 overflow-hidden">
-            <p className="shrink-0 text-[0.7rem] font-black uppercase tracking-wide text-steel sm:text-xs">
-              Or try one of these
-            </p>
-            <div className="command-scroll grid min-h-0 flex-1 auto-rows-min grid-cols-1 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-1">
-              {trialSuggestions.map((suggestion) => {
-                const Icon = suggestion.icon;
-                return (
-                  <button
-                    key={suggestion.id}
-                    type="button"
-                    onClick={() => voiceStageRef.current?.submit(suggestion.prompt)}
-                    className="glass animate-rise flex min-w-0 flex-col gap-2 rounded-lg p-3 text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 sm:p-3.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${suggestion.tone}`}>
-                        <Icon size={16} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-black leading-none sm:text-sm">{suggestion.title}</p>
-                        <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-wide text-steel">
-                          {suggestion.agent}
-                        </p>
+        {phase === "verdict" || phase === "debated" ? (
+          <Reveal>
+            <section className="mt-4">
+              <div className="glass rounded-xl p-4 sm:p-6">
+                <p className="sec-eyebrow">The verdict</p>
+                <p className="mt-3 text-[0.95rem] leading-8">{VERDICT}</p>
+              </div>
+            </section>
+          </Reveal>
+        ) : null}
+
+        {phase === "verdict" ? (
+          <Reveal delay={120}>
+            <section className="tr-next mt-4">
+              <div>
+                <p className="sec-eyebrow">Try this next</p>
+                <p className="mt-2 text-[0.95rem] font-semibold leading-7">{SECOND_STEP}</p>
+              </div>
+              <button type="button" onClick={debate} disabled={debating} className="tr-next-btn">
+                {debating ? "The floor is arguing…" : "Make them argue"}
+                {!debating ? <ArrowRight size={15} /> : null}
+              </button>
+            </section>
+          </Reveal>
+        ) : null}
+
+        {phase === "debated" ? (
+          <Reveal>
+            <section className="mt-4">
+              <div className="glass rounded-xl p-4 sm:p-6">
+                <p className="sec-eyebrow">CTO vs Marketing</p>
+                <p className="mt-3 text-[0.95rem] leading-8">{DEBATE_REPLY}</p>
+              </div>
+            </section>
+          </Reveal>
+        ) : null}
+
+        {reports.length >= 4 ? (
+          <Reveal delay={80}>
+            <section className="mt-4">
+              <div className="glass rounded-xl p-4 sm:p-6">
+                <ConvictionSpread reports={reports} />
+              </div>
+            </section>
+          </Reveal>
+        ) : null}
+
+        <Reveal delay={140}>
+          <section className="mt-4">
+            <div className="lock-root">
+              <div className="lock-content glass rounded-xl p-4 sm:p-6">
+                <div className="flex items-center gap-2">
+                  <Target size={15} className="text-steel" />
+                  <p className="sec-eyebrow">Track record · after three months</p>
+                </div>
+
+                <div className="mt-4 space-y-2.5">
+                  {HISTORY.map((entry) => (
+                    <div key={entry.agent}>
+                      <div className="mb-1 flex items-baseline justify-between gap-3">
+                        <p className="text-[0.8rem] font-bold">{entry.agent}</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[0.68rem] font-semibold text-steel">
+                            {entry.hit}/{entry.hit + entry.missed}
+                          </span>
+                          <span
+                            className="text-[0.82rem] font-black tabular-nums"
+                            style={{ color: accuracyColor(entry.accuracy) }}
+                          >
+                            {entry.accuracy}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="sec-bar">
+                        <div
+                          className="sec-bar-fill"
+                          style={{
+                            width: `${entry.accuracy}%`,
+                            background: accuracyColor(entry.accuracy),
+                          }}
+                        />
                       </div>
                     </div>
-                    <p className="text-[0.72rem] leading-5 text-steel sm:text-xs">{suggestion.pitch}</p>
-                  </button>
-                );
-              })}
-
-              {reports.map((report) => (
-                <div key={report.title} className="glass animate-rise rounded-lg p-3 sm:p-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[0.65rem] font-black uppercase tracking-wide text-steel">{report.agent}</p>
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[0.65rem] font-black text-ink">
-                      {report.score}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs font-black leading-5 sm:text-sm">{report.title}</p>
-                  <p className="mt-1 text-[0.72rem] leading-5 text-steel sm:text-xs">{report.summary}</p>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className="glass-strong relative shrink-0 overflow-hidden rounded-lg p-4">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-ember via-accent to-basil" />
-              <p className="text-xs font-black leading-5 sm:text-sm">Like what you see?</p>
-              <p className="mt-1 text-[0.72rem] leading-5 text-steel sm:text-xs">
-                Sign up free to unlock memory, tasks, agent history, and weekly board reviews.
-              </p>
-              <Link href="/signup" className="mt-3 inline-block">
-                <Button className="h-9 px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
-                  Sign up free <ArrowRight size={14} />
-                </Button>
-              </Link>
+                <div className="mt-5 space-y-2">
+                  {RESOLVED.map((entry) => (
+                    <div key={entry.statement} className="sec-card rounded-lg px-3.5 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="sec-eyebrow">{entry.agent}</span>
+                        <span
+                          className={cn(
+                            "text-[0.66rem] font-black uppercase tracking-widest",
+                            entry.outcome === "hit" ? "text-basil" : "text-ember",
+                          )}
+                        >
+                          {entry.outcome === "hit" ? "Right" : "Wrong"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[0.8rem] font-semibold leading-6">{entry.statement}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lock-veil">
+                <div className="lock-card">
+                  <span className="lock-badge">
+                    <Lock size={11} />
+                    Simulated
+                  </span>
+                  <p className="lock-title">This is what three months looks like</p>
+                  <p className="lock-body">
+                    Every prediction your board makes is dated and scored. Accuracy only means
+                    something once history accumulates — so this one is simulated, honestly
+                    labelled. Yours starts building the day you sign up.
+                  </p>
+                  <Link href="/signup" className="lock-cta">
+                    Start building yours
+                    <ArrowRight size={13} />
+                  </Link>
+                </div>
+              </div>
             </div>
-          </aside>
-        </section>
+          </section>
+        </Reveal>
+
+        <Reveal delay={160}>
+          <section className="mt-8 text-center">
+            <p className="sec-eyebrow">Ready?</p>
+            <h2 className="fr-title mt-3">Nothing here is saved.</h2>
+            <p className="mx-auto mt-3 max-w-lg text-[0.95rem] leading-8 text-steel">
+              Sign up free and the board remembers what you decided, scores your progress weekly,
+              and starts building a track record you can hold it to.
+            </p>
+            <Link href="/signup" className="mt-6 inline-block">
+              <Button className="h-12 px-7">
+                <Sparkles size={16} />
+                Convene your own board
+              </Button>
+            </Link>
+          </section>
+        </Reveal>
       </div>
+
+      <Toaster />
     </main>
   );
 }

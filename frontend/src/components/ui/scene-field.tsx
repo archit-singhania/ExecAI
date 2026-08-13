@@ -17,7 +17,10 @@ export type SceneVariant =
   | "depthgrid"
   | "vortex"
   | "liquid"
-  | "glass";
+  | "glass"
+  | "iridescent"
+  | "volumetric"
+  | "repel";
 
 const AURORA_VERT = `
 varying vec2 vUv;
@@ -131,6 +134,123 @@ void main() {
 }
 `;
 
+const IRIDESCENT_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform vec2 uPointer;
+uniform vec3 uAccent;
+uniform float uDark;
+
+// Thin-film interference. The colour shift comes from path difference
+// across a film thickness, which is why it reads as oil on water or
+// anodised metal rather than a rainbow gradient.
+vec3 thinFilm(float cosTheta, float thickness) {
+  vec3 wavelength = vec3(680.0, 550.0, 440.0);
+  vec3 phase = (4.0 * 3.14159 * thickness * cosTheta) / wavelength;
+  return 0.5 + 0.5 * cos(phase);
+}
+
+float sphere(vec2 uv, vec2 c, float r) {
+  float d = length(uv - c);
+  return smoothstep(r, r - 0.004, d);
+}
+
+void main() {
+  vec2 uv = (vUv - 0.5) * vec2(1.8, 1.0);
+  float t = uTime * 0.22;
+
+  vec2 center = uPointer * 0.16;
+  float radius = 0.3 + sin(t * 0.6) * 0.012;
+
+  float d = length(uv - center);
+  float mask = sphere(uv, center, radius);
+
+  // Fake a normal so we get a believable fresnel and view angle.
+  float z = sqrt(max(0.0, radius * radius - d * d)) / radius;
+  vec3 normal = normalize(vec3((uv - center) / radius, z));
+  vec3 view = normalize(vec3(0.0, 0.0, 1.0));
+  float cosTheta = clamp(dot(normal, view), 0.0, 1.0);
+
+  float thickness = 320.0 + sin(uv.x * 5.0 + t) * 90.0 + cos(uv.y * 6.0 - t * 1.3) * 70.0;
+  vec3 film = thinFilm(cosTheta, thickness);
+
+  float fresnel = pow(1.0 - cosTheta, 3.0);
+  vec3 color = mix(film * uAccent * 1.5, vec3(1.0), fresnel * 0.55);
+
+  // Specular pip, offset toward the light.
+  float spec = pow(max(0.0, dot(normal, normalize(vec3(-0.45, 0.55, 0.8)))), 42.0);
+  color += spec * 0.9;
+
+  float glow = smoothstep(radius + 0.22, radius, d) * 0.28;
+  float alpha = mask * mix(0.72, 0.62, uDark) + glow * 0.5;
+
+  gl_FragColor = vec4(color, alpha);
+}
+`;
+
+const VOLUMETRIC_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform vec3 uAccent;
+uniform vec3 uSecondary;
+uniform float uDark;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+    u.y
+  );
+}
+
+float fbm(vec2 p) {
+  float total = 0.0;
+  float amp = 0.5;
+  for (int i = 0; i < 5; i++) {
+    total += noise(p) * amp;
+    p *= 2.03;
+    amp *= 0.5;
+  }
+  return total;
+}
+
+void main() {
+  vec2 uv = vUv;
+  float t = uTime * 0.05;
+
+  // Light source above and to the left; rays scatter through the medium.
+  vec2 light = vec2(0.24, -0.12);
+  vec2 dir = uv - light;
+  float dist = length(dir);
+
+  float scatter = 0.0;
+  for (int i = 0; i < 12; i++) {
+    float s = float(i) / 12.0;
+    vec2 p = light + dir * s;
+    scatter += fbm(p * 3.4 + vec2(t, t * 0.6)) * (1.0 - s);
+  }
+  scatter /= 12.0;
+
+  float shaft = pow(max(0.0, 1.0 - dist * 0.85), 2.2) * scatter * 2.4;
+  float fog = fbm(uv * 2.2 + vec2(-t * 0.7, t * 0.4)) * 0.5;
+
+  vec3 color = mix(uSecondary, uAccent, shaft);
+  color += shaft * 0.4;
+
+  float alpha = (shaft * 0.5 + fog * 0.16) * mix(0.5, 0.44, uDark);
+  gl_FragColor = vec4(color, alpha);
+}
+`;
+
 const AURORA_FRAG = `
 precision highp float;
 varying vec2 vUv;
@@ -204,7 +324,14 @@ void main() {
 }
 `;
 
-const SHADER_VARIANTS = new Set<SceneVariant>(["aurora", "caustics", "liquid", "glass"]);
+const SHADER_VARIANTS = new Set<SceneVariant>([
+  "aurora",
+  "caustics",
+  "liquid",
+  "glass",
+  "iridescent",
+  "volumetric",
+]);
 
 export function SceneField({
   variant = "aurora",
@@ -290,6 +417,8 @@ export function SceneField({
         caustics: CAUSTICS_FRAG,
         liquid: LIQUID_FRAG,
         glass: GLASS_FRAG,
+        iridescent: IRIDESCENT_FRAG,
+        volumetric: VOLUMETRIC_FRAG,
       };
 
       const shaderSource = SHADERS[variant];
@@ -303,6 +432,7 @@ export function SceneField({
           uWarmth: { value: 0.5 },
           uFog: { value: 0.2 },
           uBrightness: { value: 0.7 },
+          uPointer: { value: new THREE.Vector2(0, 0) },
           uAccent: { value: accentColor },
           uSecondary: { value: secondary },
           uDark: { value: dark ? 1 : 0 },
@@ -321,6 +451,12 @@ export function SceneField({
 
         update = (time) => {
           uniforms.uTime.value = time * 0.001;
+
+          uniforms.uPointer.value.x +=
+            ((pointerRef.current.x - 0.5) * 2 - uniforms.uPointer.value.x) * 0.045;
+          uniforms.uPointer.value.y +=
+            ((0.5 - pointerRef.current.y) * 2 - uniforms.uPointer.value.y) * 0.045;
+
           if (reactive) {
             const health = ambientRef.current.health / 100;
             uniforms.uWarmth.value += (health - uniforms.uWarmth.value) * 0.02;
@@ -370,7 +506,12 @@ export function SceneField({
           group.position.z = offset;
           group.position.x = (pointerRef.current.x - 0.5) * -4;
         };
-      } else if (variant === "constellation" || variant === "vortex" || variant === "ribbons") {
+      } else if (
+        variant === "constellation" ||
+        variant === "vortex" ||
+        variant === "ribbons" ||
+        variant === "repel"
+      ) {
         camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 160);
         camera.position.z = variant === "vortex" ? 34 : 30;
 
@@ -430,17 +571,55 @@ export function SceneField({
           disposables.push(linkGeometry, linkMaterial);
         }
 
-        const positions = new Float32Array(count * 3);
+        const positions = variant === "constellation" ? new Float32Array(count * 3) : null;
+        const velocities = variant === "repel" ? new Float32Array(count * 2) : null;
 
         update = (time) => {
           const t = time * 0.0002;
+          const px = (pointerRef.current.x - 0.5) * 54;
+          const py = (0.5 - pointerRef.current.y) * 34;
 
           for (let index = 0; index < count; index += 1) {
             let x: number;
             let y: number;
             let z: number;
 
-            if (variant === "vortex") {
+            if (variant === "repel" && velocities) {
+              // Verlet-lite: push away from the pointer, spring back home,
+              // damp each frame. Cheap enough for 300 instances and it
+              // settles rather than oscillating.
+              const homeX = seeds[index * 4];
+              const homeY = seeds[index * 4 + 1];
+
+              let vx = velocities[index * 2];
+              let vy = velocities[index * 2 + 1];
+
+              const curX = homeX + vx * 8;
+              const curY = homeY + vy * 8;
+
+              const dx = curX - px;
+              const dy = curY - py;
+              const distSq = dx * dx + dy * dy;
+
+              if (distSq < 210 && distSq > 0.01) {
+                const dist = Math.sqrt(distSq);
+                const force = (1 - dist / 14.5) * 0.42;
+                vx += (dx / dist) * force;
+                vy += (dy / dist) * force;
+              }
+
+              vx *= 0.9;
+              vy *= 0.9;
+              vx -= vx * 0.06;
+              vy -= vy * 0.06;
+
+              velocities[index * 2] = vx;
+              velocities[index * 2 + 1] = vy;
+
+              x = homeX + vx * 8;
+              y = homeY + vy * 8;
+              z = seeds[index * 4 + 2];
+            } else if (variant === "vortex") {
               const angle = seeds[index * 4] + t * seeds[index * 4 + 3];
               const radius = seeds[index * 4 + 1] * (0.72 + Math.sin(t * 0.8 + index) * 0.06);
               x = Math.cos(angle) * radius;
@@ -458,9 +637,11 @@ export function SceneField({
               z = seeds[index * 4 + 2];
             }
 
-            positions[index * 3] = x;
-            positions[index * 3 + 1] = y;
-            positions[index * 3 + 2] = z;
+            if (positions) {
+              positions[index * 3] = x;
+              positions[index * 3 + 1] = y;
+              positions[index * 3 + 2] = z;
+            }
 
             dummy.position.set(x, y, z);
             dummy.rotation.set(t * 1.4 + index, t + index, 0);
@@ -471,7 +652,7 @@ export function SceneField({
 
           mesh.instanceMatrix.needsUpdate = true;
 
-          if (links && linkPositions) {
+          if (links && linkPositions && positions) {
             let link = 0;
             for (let a = 0; a < count && link < maxLinks; a += 4) {
               for (let b = a + 4; b < count && link < maxLinks; b += 4) {
@@ -650,13 +831,18 @@ export function SceneField({
         };
       }
 
-      const needsPointer = variant === "reveal" || variant === "shafts";
+      const needsPointer =
+        variant === "reveal" ||
+        variant === "shafts" ||
+        variant === "iridescent" ||
+        variant === "repel" ||
+        variant === "depthgrid";
       if (needsPointer) window.addEventListener("pointermove", onPointer, { passive: true });
 
       let frameId = 0;
       let last = 0;
       let running = true;
-      const step = 1000 / (variant === "aurora" ? 30 : 30);
+      const step = 1000 / 30;
 
       function animate(time: number) {
         frameId = requestAnimationFrame(animate);

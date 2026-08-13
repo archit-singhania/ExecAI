@@ -7,6 +7,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
 import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
 import { LandingPillars } from "@/components/marketing/landing-pillars";
+import { MeshDivider, ScrollProgress } from "@/components/ui/scroll-chrome";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { SurpriseBackground } from "@/components/ui/surprise-background";
 import { agentMeta } from "@/lib/dashboard-data";
@@ -36,6 +37,7 @@ export default function LandingPage() {
 
   return (
     <main className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-radial-ui text-ink">
+      <ScrollProgress />
       <div className="scanline pointer-events-none absolute inset-0" />
       <div className="landing-aurora pointer-events-none absolute inset-0">
         <SurpriseBackground
@@ -109,6 +111,8 @@ export default function LandingPage() {
             <p className="text-[0.7rem] text-steel sm:text-xs">{t("hero.specialistsNote")}</p>
           </div>
         </section>
+
+        <MeshDivider />
 
         <LandingPillars />
 

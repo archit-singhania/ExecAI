@@ -20,6 +20,7 @@ import { SupportPanel } from "@/components/halcyon/support-panel";
 import { VoiceConsole, VoiceState } from "@/components/halcyon/voice-console";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import { useVoice } from "@/lib/use-voice";
+import { useHalcyonAudio } from "@/lib/use-halcyon-audio";
 import { cn } from "@/lib/utils";
 
 function moodClass(env: HalcyonEnvironment | null): string {
@@ -33,6 +34,7 @@ function moodClass(env: HalcyonEnvironment | null): string {
 export default function HalcyonEnterPage() {
   const recognition = useSpeechRecognition();
   const synthesis = useVoice();
+  const ambient = useHalcyonAudio();
 
   const [world, setWorld] = useState<HalcyonWorldId>("zen_garden");
   const [quality, setQuality] = useState<StreamQuality>("high");
@@ -69,6 +71,16 @@ export default function HalcyonEnterPage() {
     };
   }, [listening, recognition]);
 
+  useEffect(() => {
+    if (!environment) return;
+    ambient.apply({
+      wind: environment.wind,
+      waterMotion: environment.water_motion,
+      brightness: environment.brightness,
+      breathing: environment.breathing_guide,
+    });
+  }, [ambient, environment]);
+
   async function begin() {
     setBusy(true);
     setError("");
@@ -78,6 +90,7 @@ export default function HalcyonEnterPage() {
       setSession(started);
       setEnvironment(started.environment);
       setReply("");
+      void ambient.enable();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't open the world.");
     } finally {
@@ -185,6 +198,16 @@ export default function HalcyonEnterPage() {
           </Link>
           {session ? (
             <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={ambient.toggleMute}
+                aria-pressed={!ambient.muted}
+                className="hal-back"
+                title="Ambient sound"
+              >
+                {ambient.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                <span>Ambience</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {

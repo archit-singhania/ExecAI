@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Check, Info, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, Info, RotateCcw, Sparkles, X } from "lucide-react";
 import { dismissToast, subscribeToasts, Toast, ToastTone } from "@/lib/toast";
 
 const ICONS: Record<ToastTone, React.ElementType> = {
@@ -39,6 +39,20 @@ export function Toaster() {
                   {item.actionLabel}
                   <ArrowUpRight size={12} />
                 </Link>
+              ) : null}
+
+              {item.undoLabel && item.onUndo ? (
+                <button
+                  type="button"
+                  className="toast-undo"
+                  onClick={() => {
+                    item.onUndo?.();
+                    dismissToast(item.id);
+                  }}
+                >
+                  <RotateCcw size={12} />
+                  {item.undoLabel}
+                </button>
               ) : null}
             </div>
 
