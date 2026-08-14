@@ -597,6 +597,8 @@ export default function DashboardPage() {
                 opportunityScore={opportunityScore}
                 healthScore={healthScore}
                 runway={runway}
+                goal={session?.business_goal ?? session?.title}
+                verdict={liveFinal || undefined}
               />
             ) : null}
             {activeTab === "record" ? <TrackRecord isDemo={isDemo} /> : null}

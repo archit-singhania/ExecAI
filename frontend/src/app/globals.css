@@ -7758,6 +7758,209 @@ body.dof-active > *:not([data-overlay]) {
   }
 }
 
+.sec-note {
+  margin-bottom: 1rem;
+  max-width: 46rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.75;
+  color: rgb(var(--color-steel));
+  padding-left: 0.7rem;
+  border-left: 2px solid rgb(var(--color-accent) / 0.32);
+}
+
+.br-wrap {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.br-canvas {
+  width: 100%;
+  cursor: grab;
+}
+
+.br-canvas:active {
+  cursor: grabbing;
+}
+
+.br-hint {
+  position: absolute;
+  bottom: 0.6rem;
+  right: 0.8rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(var(--color-steel));
+  pointer-events: none;
+}
+
+.dt-wrap {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: rgb(var(--color-ink) / 0.02);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ink) / 0.06);
+}
+
+.dark .dt-wrap {
+  background: rgb(var(--color-fog) / 0.02);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-fog) / 0.07);
+}
+
+.dt-svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.dt-svg:active {
+  cursor: grabbing;
+}
+
+.dt-link {
+  fill: none;
+  stroke-width: 1.5;
+  opacity: 0.32;
+}
+
+.dt-node {
+  cursor: pointer;
+  transition: opacity var(--dur-fast, 160ms) var(--ease-out, ease);
+}
+
+.dt-node:hover {
+  opacity: 0.82;
+}
+
+.dt-node-on circle,
+.dt-node-on rect {
+  stroke: rgb(var(--color-accent));
+  stroke-width: 2;
+}
+
+.dt-root {
+  fill: rgb(var(--color-ink));
+}
+
+.dark .dt-root {
+  fill: rgb(var(--color-fog) / 0.12);
+}
+
+.dt-root-label {
+  fill: rgb(var(--color-fog));
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.dark .dt-root-label {
+  fill: rgb(var(--color-fog));
+}
+
+.dt-score {
+  fill: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.dt-label {
+  fill: rgb(var(--color-steel));
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.dt-action {
+  fill: rgb(var(--color-ink) / 0.06);
+  stroke: rgb(var(--color-ink) / 0.12);
+}
+
+.dark .dt-action {
+  fill: rgb(var(--color-fog) / 0.07);
+  stroke: rgb(var(--color-fog) / 0.12);
+}
+
+.dt-action-label {
+  fill: rgb(var(--color-steel));
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.dt-controls {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dt-btn {
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgb(var(--color-steel));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ink) / 0.12);
+}
+
+.dark .dt-btn {
+  box-shadow: inset 0 0 0 1px rgb(var(--color-fog) / 0.14);
+}
+
+.dt-hint {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgb(var(--color-steel));
+}
+
+.dt-detail {
+  position: absolute;
+  bottom: 0.7rem;
+  left: 0.7rem;
+  right: 0.7rem;
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  background: rgb(var(--lg-tint) / calc(var(--lg-tint-alpha) * 1.1));
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: inset 0 1px 0 0 rgb(var(--lg-rim) / var(--lg-rim-alpha));
+}
+
+.dt-detail-body {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.glyph-toggle {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 20;
+  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(232, 238, 244, 0.62);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(232, 238, 244, 0.16);
+  backdrop-filter: blur(10px);
+  transition: color var(--dur-fast, 160ms) var(--ease-out, ease);
+}
+
+.glyph-toggle:hover {
+  color: #e7c988;
+  box-shadow: inset 0 0 0 1px rgba(231, 201, 136, 0.45);
+}
+
 .sec-meter {
   height: 5px;
   border-radius: 999px;

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Compass, Ear, Waves } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import { SceneField } from "@/components/ui/scene-field";
+import { SceneStack } from "@/components/ui/scene-stack";
 import { formatHour, WORLD_BASELINES, worldGradient } from "@/lib/halcyon-worlds";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,10 @@ export default function HalcyonPage() {
     <main className={cn("hal-root", `hal-mood-${mood}`)}>
       <div className="hal-sky" aria-hidden="true" />
       <div className="hal-horizon" aria-hidden="true" />
-      <SceneField id="halcyon-landing" variant="caustics" className="opacity-90" />
+      <SceneStack
+        id="halcyon-landing"
+        layers={["caustics", "aurora", "volumetric", "liquid", "constellation"]}
+      />
 
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[1100px] flex-col px-5 py-6 sm:px-8">
         <nav className="flex items-center justify-between gap-3">
@@ -85,6 +88,11 @@ export default function HalcyonPage() {
 
           <p key={active.value} className="hal-response mt-6">
             {active.response}
+          </p>
+
+          <p className="hal-world-note mt-4">
+            Four states, four different skies. In the real world the shift is continuous and
+            driven by what you actually say, not a button.
           </p>
         </section>
 

@@ -86,6 +86,11 @@ export function AgentBriefing({
         />
       </MetricRow>
 
+      <p className="sec-note">
+        Each specialist examined your goal independently. The score is their conviction, not a
+        rating of the idea &mdash; a low one means that desk sees a problem in its own area.
+      </p>
+
       {agents.length > 2 ? (
         <FilterRail options={agents} value={agentFilter} onChange={setAgentFilter} counts={counts} />
       ) : null}

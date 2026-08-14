@@ -164,6 +164,11 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
         />
       </MetricRow>
 
+      <p className="sec-note">
+        Every session commits each desk to something dated and checkable. Mark them right or
+        wrong and their accuracy builds &mdash; which is how you learn whose 90 to believe.
+      </p>
+
       {loading ? (
         <SkeletonCards count={2} />
       ) : (

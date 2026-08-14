@@ -9,7 +9,7 @@ import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
 import { LandingPillars } from "@/components/marketing/landing-pillars";
 import { MeshDivider, ScrollProgress } from "@/components/ui/scroll-chrome";
 import { AnimatedBackground } from "@/components/ui/animated-background";
-import { SurpriseBackground } from "@/components/ui/surprise-background";
+import { SceneStack } from "@/components/ui/scene-stack";
 import { agentMeta } from "@/lib/dashboard-data";
 import { useLocale } from "@/lib/i18n";
 
@@ -40,9 +40,10 @@ export default function LandingPage() {
       <ScrollProgress />
       <div className="scanline pointer-events-none absolute inset-0" />
       <div className="landing-aurora pointer-events-none absolute inset-0">
-        <SurpriseBackground
-          pool={["vanta", "constellation", "aurora", "ribbons", "liquid", "vortex"]}
+        <SceneStack
+          id="landing"
           reactive
+          layers={["aurora", "volumetric", "liquid", "ribbons", "vortex", "constellation"]}
         />
       </div>
       <AnimatedBackground webgl={false} />

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileCode2, TerminalSquare, Sparkles } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { AnimatedBackground } from "@/components/ui/animated-background";
+import { PointCloudPortrait } from "@/components/ui/point-cloud-portrait";
 
 const LINE_COUNT = 34;
 
@@ -206,11 +207,27 @@ function FullPortraitGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivEle
 }
 
 function RealisticGlyph({ panelRef }: { panelRef?: React.RefObject<HTMLDivElement | null> }) {
+  const [cloud, setCloud] = useState(false);
+
   return (
     <div className="glyph-portrait relative h-full w-full overflow-hidden">
       <div className="glyph-portrait-halo pointer-events-none absolute inset-0" />
+
+      <button
+        type="button"
+        onClick={() => setCloud((current) => !current)}
+        className="glyph-toggle"
+        title={cloud ? "Show glyph render" : "Show point cloud"}
+      >
+        {cloud ? "Glyphs" : "Particles"}
+      </button>
+
       <div className="relative z-10 h-full w-full">
-        <FullPortraitGlyph panelRef={panelRef} />
+        {cloud ? (
+          <PointCloudPortrait src="/images/author-source.jpg" height={520} />
+        ) : (
+          <FullPortraitGlyph panelRef={panelRef} />
+        )}
       </div>
     </div>
   );

@@ -6,8 +6,7 @@ import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { billingApi, Plan } from "@/lib/billing";
 import { getToken } from "@/lib/auth";
 import { Logo } from "@/components/logo";
-import { HeroField } from "@/components/ui/hero-field";
-import { SceneField } from "@/components/ui/scene-field";
+import { SceneStack } from "@/components/ui/scene-stack";
 import { cn } from "@/lib/utils";
 
 export default function PricingPage() {
@@ -55,7 +54,11 @@ export default function PricingPage() {
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-radial-ui px-5 py-10 text-ink sm:px-8">
-      <SceneField id="pricing" variant="ribbons" className="opacity-70" />
+      <SceneStack
+        id="pricing"
+        layers={["volumetric", "ribbons", "grid", "constellation"]}
+        intensity={0.85}
+      />
       <div className="relative mx-auto w-full max-w-[1100px]">
         <nav className="flex items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-[0.8rem] font-bold text-steel hover:text-ink dark:hover:text-fog">
@@ -73,6 +76,10 @@ export default function PricingPage() {
           <p className="mt-4 text-[0.95rem] font-medium leading-8 text-steel">
             Every plan includes the conviction spread, so you always see where your specialists
             disagree. Cancel any time.
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-[0.8rem] font-medium leading-7 text-steel/80">
+            Prices are per account, not per seat. A board run is one question put to all nine
+            specialists.
           </p>
         </header>
 

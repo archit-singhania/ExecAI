@@ -67,6 +67,11 @@ export function TaskBoard({
         <div className="sec-meter-fill" style={{ width: `${progress}%` }} />
       </div>
 
+      <p className="sec-note">
+        These came out of your board sessions, not a template. Tick one and the board counts it
+        at the next review &mdash; on a phone, swipe right to close it.
+      </p>
+
       <FilterRail
         options={FILTERS}
         value={taskFilter}

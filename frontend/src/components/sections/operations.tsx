@@ -5,6 +5,8 @@ import { AgentReport } from "@/lib/api";
 import { OperatingPhases } from "@/components/sections/operating-phases";
 import { KpiRunway } from "@/components/sections/kpi-runway";
 import { ConvictionSpread } from "@/components/dashboard/conviction-spread";
+import { BoardRing } from "@/components/dashboard/board-ring";
+import { DecisionTree } from "@/components/dashboard/decision-tree";
 import {
   MetricRow,
   MetricStat,
@@ -18,13 +20,17 @@ export function Operations({
   opportunityScore,
   healthScore,
   runway,
+  goal,
+  verdict,
 }: {
   reports: AgentReport[];
   opportunityScore: number;
   healthScore: number;
   runway: number;
+  goal?: string;
+  verdict?: string;
 }) {
-  const verdict =
+  const readout =
     opportunityScore >= 85
       ? "Strong conviction across the floor. Move."
       : opportunityScore >= 70
@@ -52,7 +58,7 @@ export function Operations({
         <div className="relative">
           <p className="text-[0.625rem] font-bold uppercase tracking-[0.18em] text-fog/50">Executive read</p>
           <p className="mt-2.5 max-w-xl text-xl font-bold leading-tight tracking-[-0.015em] sm:text-2xl">
-            {verdict}
+            {readout}
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -65,6 +71,28 @@ export function Operations({
 
       <div className="sec-card mt-4 rounded-lg p-4">
         <ConvictionSpread reports={reports} />
+        <p className="sec-note mt-4 mb-0">
+          Each dot is one desk. The band is the distance between the most and least convinced.
+          A wide band is not a failure &mdash; it is the board telling you where the argument is.
+        </p>
+      </div>
+
+      <div className="sec-card mt-4 rounded-lg p-4">
+        <p className="sec-eyebrow mb-3">The floor, in the round</p>
+        <BoardRing reports={reports} mode="ring" />
+      </div>
+
+      <div className="sec-card mt-4 rounded-lg p-4">
+        <p className="sec-eyebrow mb-1">How the decision branches</p>
+        <p className="sec-note">
+          Your goal at the top, each desk beneath it, and what they want you to do. Click any
+          node to read it in full.
+        </p>
+        <DecisionTree
+          reports={reports}
+          goal={goal ?? "Your current goal"}
+          verdict={verdict}
+        />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
