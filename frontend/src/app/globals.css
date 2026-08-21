@@ -36,7 +36,7 @@ body {
   margin: 0;
   background: rgb(var(--color-fog));
   color: rgb(var(--color-ink));
-  font-family: Arial, Helvetica, sans-serif;
+  /* Typography is owned by src/styles/premium.css. Do not set font-family here. */
   transition: background-color 150ms linear, color 150ms linear;
 }
 

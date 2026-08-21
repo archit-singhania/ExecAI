@@ -59,3 +59,12 @@ def get_current_user(
         raise unauthorized
 
     return user
+
+def get_current_user_ws(token: str, db: Session) -> User:
+    user_id = decode_access_token(token)
+    if not user_id:
+        raise Exception("Invalid token")
+    user = db.get(User, user_id)
+    if not user:
+        raise Exception("User not found")
+    return user

@@ -21,7 +21,7 @@ import {
   Target,
   Users2,
 } from "lucide-react";
-import { AgentReport, Task } from "@/lib/api";
+import { api, AgentReport, Task } from "@/lib/api";
 import { DashboardTab } from "@/lib/dashboard-data";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +52,13 @@ export function CommandPalette({
   reports?: AgentReport[];
   tasks?: Task[];
   onOpenReport?: (report: AgentReport) => void;
+  sessionId?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
+  const [memories, setMemories] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -203,6 +205,19 @@ export function CommandPalette({
     return [...matchedReports, ...matchedTasks];
   }, [close, onOpenReport, onSelectTab, query, reports, tasks]);
 
+  useEffect(() => {
+    if (!sessionId || query.trim().length < 3) {
+      setMemories([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      api.searchMemories(sessionId, query.trim()).then(res => {
+        setMemories(res.results);
+      }).catch(console.error);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, sessionId]);
+
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return commands;
@@ -214,8 +229,20 @@ export function CommandPalette({
         command.group.toLowerCase().includes(needle),
     );
 
-    return [...matched, ...contentCommands];
-  }, [commands, contentCommands, query]);
+    const memoryCommands = memories.map<Command>((mem) => ({
+      id: `memory-${mem.id}`,
+      label: mem.content.length > 50 ? mem.content.substring(0, 50) + "..." : mem.content,
+      hint: `Memory · ${mem.kind}`,
+      group: "Knowledge Base",
+      icon: Search,
+      run: () => {
+        onSelectTab("board");
+        close();
+      },
+    }));
+
+    return [...matched, ...contentCommands, ...memoryCommands];
+  }, [commands, contentCommands, memories, query, close, onSelectTab]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

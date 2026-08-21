@@ -109,7 +109,20 @@ export function MetroSectionShell({
           <div className="glass shrink-0 rounded-md border border-ember/30 px-3 py-2 text-xs font-semibold text-ember">{error}</div>
         ) : null}
 
-        <div className="command-scroll min-h-0 flex-1 overflow-y-auto rounded-lg">{children}</div>
+        <div className="command-scroll min-h-0 flex-1 overflow-y-auto rounded-lg">
+          {booting ? (
+            <div className="flex flex-col gap-4 p-4 animate-pulse">
+              <div className="h-48 w-full rounded-xl bg-ink/10 dark:bg-fog/10" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="h-32 w-full rounded-xl bg-ink/10 dark:bg-fog/10" />
+                <div className="h-32 w-full rounded-xl bg-ink/10 dark:bg-fog/10" />
+              </div>
+              <div className="h-64 w-full rounded-xl bg-ink/10 dark:bg-fog/10" />
+            </div>
+          ) : (
+            children
+          )}
+        </div>
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ import { Logo } from "@/components/logo";
 import { AuthUser } from "@/lib/auth";
 import { DashboardTab } from "@/lib/dashboard-data";
 import { MetroTile } from "@/components/dashboard/metro-tile";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { cn } from "@/lib/utils";
 
 function shapeFrom(seed: number, length = 7): number[] {
@@ -109,15 +110,21 @@ export function MetroHome({
           <div className="mh-pills hidden items-center gap-1 md:flex">
             <span className="mh-pill">
               <span className="mh-pill-label">Health</span>
-              <span className="mh-pill-value">{healthScore}%</span>
+              <span className="mh-pill-value">
+                <AnimatedNumber value={healthScore} suffix="%" />
+              </span>
             </span>
             <span className="mh-pill">
               <span className="mh-pill-label">Runway</span>
-              <span className="mh-pill-value">{runway}mo</span>
+              <span className="mh-pill-value">
+                <AnimatedNumber value={runway} suffix="mo" duration={700} />
+              </span>
             </span>
             <span className="mh-pill">
               <span className="mh-pill-label">Open</span>
-              <span className="mh-pill-value">{openTasks}</span>
+              <span className="mh-pill-value">
+                <AnimatedNumber value={openTasks} duration={600} />
+              </span>
             </span>
           </div>
 

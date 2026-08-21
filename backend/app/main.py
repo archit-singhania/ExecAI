@@ -587,109 +587,124 @@ def send_message(
     )
 
 
-@app.post("/api/sessions/{session_id}/messages/stream")
-def send_message_stream(
-    session_id: str,
-    payload: MessageCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(enforce_run_quota),
-):
-    """Same as POST /messages, but streams each agent's report to the client
-    over Server-Sent Events as soon as it's ready, instead of waiting for
-    all 9 agents to finish. Event payloads:
-      {"type": "agent_report", "node": "cfo", "report": {...}}   (x9)
-      {"type": "done", "message_id": ..., "final": ..., "health_score": ..., "runway_months": ...}
-    """
-    session = _owned_session(session_id, db, current_user)
-    business_goal = session.business_goal
-    session_id_value = session.id
+from fastapi import WebSocket, WebSocketDisconnect
 
-    user_message = Message(session_id=session_id_value, role="user", content=payload.content)
-    db.add(user_message)
-    db.commit()
-
+@app.websocket("/api/sessions/{session_id}/messages/ws")
+async def send_message_ws(websocket: WebSocket, session_id: str, db: Session = Depends(get_db)):
+    await websocket.accept()
     try:
-        memory_context = _recent_history(db, session_id_value) + retrieve_relevant_memories(
-            db, session_id_value, payload.content
-        )
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        memory_context = _recent_history(db, session_id_value)
-
-    def event_stream():
-        stream_db = SessionLocal()
+        raw_data = await websocket.receive_text()
+        data = json.loads(raw_data)
+        content = data.get("content", "")
+        token = data.get("token")
+        
+        # Super simple auth for WS
+        if not token:
+            await websocket.send_json({"type": "error", "message": "Unauthorized"})
+            await websocket.close()
+            return
+            
+        from app.auth import get_current_user_ws
         try:
-            seen = 0
-            final_state = None
-            for node_name, state in run_ceo_agents_stream(business_goal, payload.content, memory_context):
-                if node_name != "ceo":
-                    for report in state["reports"][seen:]:
-                        yield f"data: {json.dumps({'type': 'agent_report', 'node': node_name, 'report': report})}\n\n"
-                    seen = len(state["reports"])
-                final_state = state
+            current_user = get_current_user_ws(token, db)
+        except Exception:
+            await websocket.send_json({"type": "error", "message": "Unauthorized"})
+            await websocket.close()
+            return
 
-            session_row = stream_db.get(BusinessSession, session_id_value)
-            session_row.health_score = final_state["health_score"]
-            session_row.runway_months = final_state["runway_months"]
+        session = _owned_session(session_id, db, current_user)
+        business_goal = session.business_goal
+        session_id_value = session.id
 
-            response = Message(session_id=session_id_value, role="assistant", content=final_state["final"])
-            stream_db.add(response)
-            stream_db.flush()
+        user_message = Message(session_id=session_id_value, role="user", content=content)
+        db.add(user_message)
+        db.commit()
 
-            for item in final_state["reports"]:
-                stream_db.add(
-                    AgentReport(
+        try:
+            memory_context = _recent_history(db, session_id_value) + retrieve_relevant_memories(
+                db, session_id_value, content
+            )
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            memory_context = _recent_history(db, session_id_value)
+
+        seen = 0
+        final_state = None
+        for node_name, state in run_ceo_agents_stream(business_goal, content, memory_context):
+            if node_name != "ceo":
+                for report in state["reports"][seen:]:
+                    await websocket.send_json({'type': 'agent_report', 'node': node_name, 'report': report})
+                seen = len(state["reports"])
+            final_state = state
+
+        if not final_state:
+             await websocket.send_json({"type": "error", "message": "No response generated"})
+             return
+
+        session.health_score = final_state["health_score"]
+        session.runway_months = final_state["runway_months"]
+
+        response = Message(session_id=session_id_value, role="assistant", content=final_state["final"])
+        db.add(response)
+        db.flush()
+
+        for item in final_state["reports"]:
+            db.add(
+                AgentReport(
+                    session_id=session_id_value,
+                    agent=item["agent"],
+                    report_type="agent",
+                    title=item["title"],
+                    summary=item["summary"],
+                    bullets="\n".join(item["bullets"]),
+                    score=item["score"],
+                )
+            )
+
+        for item in final_state["tasks"]:
+            exists = (
+                db.query(Task)
+                .filter(Task.session_id == session_id_value, Task.title == item["title"])
+                .first()
+            )
+            if not exists:
+                db.add(
+                    Task(
                         session_id=session_id_value,
-                        agent=item["agent"],
-                        report_type="agent",
                         title=item["title"],
-                        summary=item["summary"],
-                        bullets="\n".join(item["bullets"]),
-                        score=item["score"],
+                        description=item.get("description", ""),
+                        priority=item["priority"],
+                        status=item["status"],
+                        created_by_agent=item["created_by_agent"],
                     )
                 )
 
-            for item in final_state["tasks"]:
-                exists = (
-                    stream_db.query(Task)
-                    .filter(Task.session_id == session_id_value, Task.title == item["title"])
-                    .first()
-                )
-                if not exists:
-                    stream_db.add(
-                        Task(
-                            session_id=session_id_value,
-                            title=item["title"],
-                            description=item.get("description", ""),
-                            priority=item["priority"],
-                            status=item["status"],
-                            created_by_agent=item["created_by_agent"],
-                        )
-                    )
+        db.commit()
+        db.refresh(response)
 
-            stream_db.commit()
-            stream_db.refresh(response)
+        try:
+            store_memory(db, session_id_value, "user_question", f"User asked: {content}", importance=0.65)
+            store_memory(db, session_id_value, "ceo_decision", final_state["final"], importance=0.9)
+            db.commit()
+        except Exception:
+            db.rollback()
 
-            try:
-                store_memory(stream_db, session_id_value, "user_question", f"User asked: {payload.content}", importance=0.65)
-                store_memory(stream_db, session_id_value, "ceo_decision", final_state["final"], importance=0.9)
-                stream_db.commit()
-            except Exception:
-                import traceback
+        await websocket.send_json({
+            'type': 'done', 
+            'message_id': response.id, 
+            'final': final_state['final'], 
+            'health_score': final_state['health_score'], 
+            'runway_months': final_state['runway_months']
+        })
 
-                traceback.print_exc()
-                stream_db.rollback()
-
-            yield f"data: {json.dumps({'type': 'done', 'message_id': response.id, 'final': final_state['final'], 'health_score': final_state['health_score'], 'runway_months': final_state['runway_months']})}\n\n"
-        except Exception as exc:
-            stream_db.rollback()
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
-        finally:
-            stream_db.close()
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        try:
+            await websocket.send_json({'type': 'error', 'message': str(exc)})
+        except:
+            pass
 
 
 @app.get("/api/dashboard", response_model=DashboardOut)
@@ -778,16 +793,45 @@ def list_board_meetings(
     ]
 
 
+from fastapi import BackgroundTasks
+
+def _background_board_meeting(session_id: str):
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        session = db.get(BusinessSession, session_id)
+        if session:
+            build_board_meeting(db, session, trigger="manual")
+            db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
 @app.post("/api/sessions/{session_id}/board-meeting", response_model=AgentReportOut)
 def generate_board_meeting(
     session_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(board_limit),
 ):
     session = _owned_session(session_id, db, current_user)
-    report = build_board_meeting(db, session, trigger="manual")
+    
+    # Create placeholder report
+    report = AgentReport(
+        session_id=session.id,
+        agent="CEO Board",
+        report_type="board",
+        title="Board Meeting in Progress...",
+        summary="The board is convening in the background. Check back in a few moments.",
+        bullets="",
+        score=0,
+    )
+    db.add(report)
     db.commit()
     db.refresh(report)
+
+    background_tasks.add_task(_background_board_meeting, session.id)
     return serialize_report(report)
 
 

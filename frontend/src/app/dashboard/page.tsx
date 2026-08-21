@@ -9,6 +9,7 @@ import { MetroSectionShell } from "@/components/dashboard/metro-section-shell";
 import { MetroTone } from "@/components/dashboard/metro-tile";
 import { pulseAmbient, resetAmbient, setAmbient } from "@/lib/ambient-state";
 import { toast, toastFromError } from "@/lib/toast";
+import { SceneStack } from "@/components/ui/scene-stack";
 import { Toaster } from "@/components/ui/toaster";
 import { hasOnboarded } from "@/components/dashboard/onboarding";
 import { FirstRun } from "@/components/dashboard/first-run";
@@ -478,9 +479,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="relative flex h-[100dvh] min-h-[560px] overflow-hidden bg-radial-ui p-2.5 text-ink sm:p-3.5 lg:p-4">
-      <div className="scanline pointer-events-none absolute inset-0" />
+    <main
+      id="main"
+      data-surface="app"
+      className="relative flex h-[100dvh] min-h-[560px] overflow-hidden bg-radial-ui p-2.5 text-ink sm:p-3.5 lg:p-4"
+    >
 
+      <div className="pointer-events-none absolute inset-0 opacity-40 mix-blend-screen dark:opacity-30">
+        <SceneStack id="dashboard" layers={["grid", "caustics", "aurora"]} />
+      </div>
       <div className="relative flex h-full w-full">
         {activeTab === null ? (
           <MetroHome
@@ -616,6 +623,7 @@ export default function DashboardPage() {
         reports={latestReports.length ? latestReports : fallbackReports}
         tasks={activeTasks}
         onOpenReport={openReport}
+        sessionId={session?.id}
       />
       <Toaster />
 

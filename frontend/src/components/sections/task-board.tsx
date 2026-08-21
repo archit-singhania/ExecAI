@@ -79,96 +79,33 @@ export function TaskBoard({
         counts={counts}
       />
 
-      {tasks.length ? (
-        <TaskList tasks={tasks} completeTask={completeTask} />
-      ) : (
-        <EmptyState
-          icon={CircleCheck}
-          title={taskFilter === "Done" ? "Nothing closed yet" : "This lane is clear"}
-          body={
-            taskFilter === "Done"
-              ? "Completed tasks land here so you can see momentum building week over week."
-              : "Your specialists create tasks as the CEO works through your goal. Run a session to fill the board."
-          }
-        />
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <KanbanColumn title="Open" tasks={tasks.filter(t => t.status.toLowerCase() !== "done" && t.priority !== "High")} completeTask={completeTask} />
+        <KanbanColumn title="High Priority" tasks={tasks.filter(t => t.status.toLowerCase() !== "done" && t.priority === "High")} completeTask={completeTask} />
+        <KanbanColumn title="Done" tasks={tasks.filter(t => t.status.toLowerCase() === "done")} completeTask={completeTask} />
+      </div>
     </SectionPanel>
   );
 }
 
-const VIRTUALISE_ABOVE = 60;
-const ESTIMATED_ROW = 118;
-const OVERSCAN = 6;
-
-function TaskList({
-  tasks,
-  completeTask,
-}: {
-  tasks: Task[];
-  completeTask: (taskId: string) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [range, setRange] = useState({ start: 0, end: 40 });
-
-  const virtualise = tasks.length > VIRTUALISE_ABOVE;
-
-  useEffect(() => {
-    if (!virtualise) return;
-
-    const scroller = containerRef.current?.closest(".command-scroll") as HTMLElement | null;
-    if (!scroller) return;
-
-    let frame = 0;
-
-    function measure() {
-      frame = 0;
-      const node = containerRef.current;
-      if (!node || !scroller) return;
-
-      const offset = node.offsetTop;
-      const scrolled = Math.max(0, scroller.scrollTop - offset);
-      const start = Math.max(0, Math.floor(scrolled / ESTIMATED_ROW) - OVERSCAN);
-      const visible = Math.ceil(scroller.clientHeight / ESTIMATED_ROW) + OVERSCAN * 2;
-
-      setRange({ start, end: Math.min(tasks.length, start + visible) });
-    }
-
-    function onScroll() {
-      if (!frame) frame = requestAnimationFrame(measure);
-    }
-
-    measure();
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-
-    return () => {
-      scroller.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [tasks.length, virtualise]);
-
-  if (!virtualise) {
-    return (
-      <div className="sec-stagger space-y-2.5">
-        {tasks.map((task, index) => (
-          <TaskRow key={task.id} task={task} index={index} completeTask={completeTask} />
-        ))}
-      </div>
-    );
-  }
-
-  const slice = tasks.slice(range.start, range.end);
-
+function KanbanColumn({ title, tasks, completeTask }: { title: string; tasks: Task[]; completeTask: (taskId: string) => void }) {
   return (
-    <div ref={containerRef}>
-      <div style={{ height: range.start * ESTIMATED_ROW }} aria-hidden />
-      <div className="space-y-2.5">
-        {slice.map((task) => (
-          <TaskRow key={task.id} task={task} index={0} completeTask={completeTask} />
-        ))}
+    <div className="flex flex-col gap-3 p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-ink/5 dark:border-white/5">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold text-ink dark:text-fog">{title}</h3>
+        <span className="text-xs font-semibold text-steel bg-black/10 dark:bg-white/10 px-2 py-0.5 rounded-full">{tasks.length}</span>
       </div>
-      <div style={{ height: Math.max(0, (tasks.length - range.end) * ESTIMATED_ROW) }} aria-hidden />
+      {tasks.length === 0 ? (
+        <div className="text-xs text-steel/60 text-center py-6 border border-dashed border-ink/10 dark:border-white/10 rounded-lg">
+          Empty
+        </div>
+      ) : (
+        <div className="space-y-3 overflow-y-auto max-h-[500px] pr-1">
+          {tasks.map((task) => (
+            <TaskRow key={task.id} task={task} index={0} completeTask={completeTask} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

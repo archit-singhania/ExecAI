@@ -224,41 +224,31 @@ export async function streamMessage(
   content: string,
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/api/sessions/${sessionId}/messages/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeader(),
-    },
-    body: JSON.stringify({ content }),
-  });
+  const wsUrl = API_URL.replace("http://", "ws://").replace("https://", "wss://");
+  
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${wsUrl}/api/sessions/${sessionId}/messages/ws`);
+    
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ content, token: window.localStorage.getItem("ceoai-auth-token") }));
+    };
 
-  if (!response.ok || !response.body) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(detail || `Request failed: ${response.status}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      const rawEvent = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const dataLine = rawEvent.split("\n").find((line) => line.startsWith("data: "));
-      if (dataLine) {
-        try {
-          onEvent(JSON.parse(dataLine.slice(6)) as StreamEvent);
-        } catch {
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onEvent(data as StreamEvent);
+        if (data.type === "done" || data.type === "error") {
+          ws.close();
+          resolve();
         }
+      } catch (err) {
+        console.error("WebSocket parsing error:", err);
       }
-      boundary = buffer.indexOf("\n\n");
-    }
-  }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      reject(new Error("WebSocket connection failed"));
+    };
+  });
 }

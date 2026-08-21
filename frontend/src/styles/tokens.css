@@ -1,0 +1,123 @@
+/* ============================================================================
+   CEO.ai — Design Tokens
+   ----------------------------------------------------------------------------
+   The single source of truth for colour, elevation, radius, motion, type and
+   layering. Nothing in this file describes a component. If you are adding a
+   rule that mentions a component name, it belongs somewhere else.
+
+   Loaded AFTER globals.css in layout.tsx so these definitions win.
+   ========================================================================= */
+
+:root {
+  /* --- Colour: core ------------------------------------------------------ */
+  --color-ink: 16 19 23;
+  --color-fog: 246 244 238;
+  --color-steel: 72 88 99;          /* darkened from 96 113 124 -> passes WCAG AA */
+  --color-surface: 255 255 255;
+  --color-accent: 91 122 214;
+
+  /* --- Colour: semantic roles -------------------------------------------- */
+  --color-positive: 29 111 95;      /* basil      */
+  --color-caution: 183 202 93;      /* chartreuse */
+  --color-critical: 212 95 58;      /* ember      */
+  --color-info: 91 122 214;
+
+  /* --- Surfaces: elevation raises lightness, not darkness ---------------- */
+  --surface-sunken: 250 249 245;
+  --surface-base: 255 255 255;
+  --surface-raised: 255 255 255;
+  --surface-overlay: 255 255 255;
+
+  /* --- Hairlines: one border weight, three intensities ------------------- */
+  --line-faint: rgb(var(--color-ink) / 0.05);
+  --line: rgb(var(--color-ink) / 0.07);
+  --line-strong: rgb(var(--color-ink) / 0.12);
+
+  /* --- Elevation ramp ---------------------------------------------------- */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgb(var(--color-ink) / 0.04), 0 0 0 1px rgb(var(--color-ink) / 0.05);
+  --elev-2: 0 2px 8px rgb(var(--color-ink) / 0.06), 0 0 0 1px rgb(var(--color-ink) / 0.06);
+  --elev-3: 0 8px 24px rgb(var(--color-ink) / 0.08), 0 0 0 1px rgb(var(--color-ink) / 0.06);
+  --elev-4: 0 18px 48px rgb(var(--color-ink) / 0.12);
+  --elev-5: 0 32px 80px rgb(var(--color-ink) / 0.18);
+
+  /* --- Radius: four values, no more -------------------------------------- */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-full: 999px;
+
+  /* --- Motion: this is where "premium" actually lives --------------------- */
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1);          /* expo-out — the expensive curve */
+  --e-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* overshoot — use sparingly */
+  --e-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* alias consumed by the existing view-transition rules in globals.css */
+  --ease-out: var(--e-out);
+
+  --d-instant: 90ms;
+  --d-fast: 160ms;
+  --d-base: 240ms;
+  --d-slow: 420ms;
+  --d-scene: 700ms;
+
+  /* stagger step for list entrances: animation-delay: calc(var(--i) * var(--d-stagger)) */
+  --d-stagger: 40ms;
+
+  /* --- Layering: stop the z-index arms race ------------------------------ */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-sheet: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-cursor: 999;
+
+  /* --- Type -------------------------------------------------------------- */
+  --t-xs: 11px;
+  --t-sm: 13px;
+  --t-base: 15px;
+  --t-lg: 18px;
+  --t-xl: 24px;
+  --t-2xl: 34px;
+  --t-3xl: 48px;
+  --t-hero: clamp(40px, 7vw, 92px);
+
+  --lh-tight: 1.08;
+  --lh-snug: 1.28;
+  --lh-base: 1.55;
+
+  --track-tight: -0.022em;
+  --track-normal: 0;
+  --track-wide: 0.16em;
+
+  /* --- Layout ------------------------------------------------------------ */
+  --corner-clearance: 84px;
+}
+
+.dark {
+  --color-ink: 240 240 236;
+  --color-fog: 12 14 17;
+  --color-steel: 158 172 181;       /* lightened for AA on the dark fog */
+  --color-surface: 23 27 32;
+
+  /* In dark mode elevation adds light. This is the single biggest
+     tell between a considered dark theme and an inverted light one. */
+  --surface-sunken: 15 18 22;
+  --surface-base: 23 27 32;
+  --surface-raised: 30 35 42;
+  --surface-overlay: 38 44 52;
+
+  --line-faint: rgb(var(--color-fog) / 0.05);
+  --line: rgb(var(--color-fog) / 0.08);
+  --line-strong: rgb(var(--color-fog) / 0.14);
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(var(--color-fog) / 0.06);
+  --elev-2: 0 2px 8px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(var(--color-fog) / 0.07);
+  --elev-3: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(var(--color-fog) / 0.08);
+  --elev-4: 0 18px 48px rgb(0 0 0 / 0.55);
+  --elev-5: 0 32px 80px rgb(0 0 0 / 0.65);
+}

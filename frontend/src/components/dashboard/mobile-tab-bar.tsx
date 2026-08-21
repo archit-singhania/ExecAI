@@ -39,7 +39,10 @@ export function MobileTabBar({
       <div className="mtb-inner">
         <button
           type="button"
-          onClick={() => onSelectTab(null)}
+          onClick={() => {
+            if ("vibrate" in navigator) navigator.vibrate(30);
+            onSelectTab(null);
+          }}
           aria-current={activeTab === null}
           className={cn("mtb-item", activeTab === null && "mtb-item-on")}
         >
@@ -57,7 +60,10 @@ export function MobileTabBar({
             <button
               key={entry.tab}
               type="button"
-              onClick={() => onSelectTab(entry.tab)}
+              onClick={() => {
+                if ("vibrate" in navigator) navigator.vibrate(30);
+                onSelectTab(entry.tab);
+              }}
               aria-current={active}
               className={cn("mtb-item", active && "mtb-item-on")}
             >

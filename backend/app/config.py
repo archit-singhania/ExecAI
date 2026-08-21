@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ceo_ai.db"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
-    llm_provider: str = "none"  
+    llm_provider: str = "ollama"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
     groq_whisper_model: str = "whisper-large-v3-turbo"
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     azure_speech_key: str | None = None
     azure_speech_region: str = "westeurope"
 
-    llm_local_only: bool = False
+    llm_local_only: bool = True
     groq_api_key: str | None = None
     gemini_api_key: str | None = None
     cerebras_api_key: str | None = None

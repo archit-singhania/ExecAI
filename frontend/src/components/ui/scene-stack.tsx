@@ -242,8 +242,7 @@ export function SceneStack({
       const high = budget.tier === "high";
       const dark = mode === "dark";
 
-      // On mid-tier hardware, cap how many layers actually render.
-      const active = high ? layers.slice(0, 6) : layers.slice(0, 3);
+      const active = high ? layers : layers.slice(0, 4);
 
       const [ar, ag, ab] = accent.split(" ").map((c) => Number(c.trim()) || 0);
       const accentColor = new THREE.Color(ar / 255, ag / 255, ab / 255);
@@ -252,7 +251,7 @@ export function SceneStack({
         : new THREE.Color(0.14, 0.2, 0.3);
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, high ? 1.5 : 1.15));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, high ? 1.0 : 0.75));
       renderer.setSize(mount.clientWidth || window.innerWidth, mount.clientHeight || window.innerHeight);
       renderer.autoClear = false;
       mount.appendChild(renderer.domElement);

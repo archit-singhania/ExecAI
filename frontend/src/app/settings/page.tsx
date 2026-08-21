@@ -3,13 +3,48 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CreditCard, Download, Loader2, Lock, Trash2, User } from "lucide-react";
+import {
+  ArrowLeft,
+  CreditCard,
+  Download,
+  Loader2,
+  Lock,
+  Trash2,
+  User,
+} from "lucide-react";
 import { accountApi } from "@/lib/account";
 import { billingApi, Subscription } from "@/lib/billing";
 import { AuthUser, clearSession, getStoredUser, getToken } from "@/lib/auth";
 import { toast, toastFromError } from "@/lib/toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Logo } from "@/components/logo";
+import { AnimatedNumber } from "@/components/ui/animated-number";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
+import { Field, Input } from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function SectionHead({
+  icon: Icon,
+  title,
+  tone,
+}: {
+  icon: typeof User;
+  title: string;
+  tone?: "critical";
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-2">
+      <Icon
+        size={15}
+        strokeWidth={1.75}
+        className={tone === "critical" ? "text-critical" : "text-steel"}
+      />
+      <h2 className="text-sm font-bold tracking-tightest">{title}</h2>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -24,6 +59,7 @@ export default function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   const [exporting, setExporting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -79,7 +115,9 @@ export default function SettingsPage() {
     setExporting(true);
     try {
       const payload = await accountApi.exportData();
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
       const url = URL.createObjectURL(blob);
 
       const anchor = document.createElement("a");
@@ -120,15 +158,26 @@ export default function SettingsPage() {
     }
   }
 
+  const usagePercent = subscription
+    ? Math.min(
+        100,
+        (subscription.runs_used / Math.max(1, subscription.runs_included)) * 100,
+      )
+    : 0;
+
   return (
-    <main className="min-h-[100dvh] bg-radial-ui px-5 py-8 text-ink sm:px-8">
+    <main
+      id="main"
+      data-surface="app"
+      className="min-h-[100dvh] bg-radial-ui px-5 py-8 text-ink sm:px-8"
+    >
       <div className="mx-auto w-full max-w-2xl">
         <nav className="flex items-center justify-between gap-3">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 text-[0.8rem] font-bold text-steel hover:text-ink dark:hover:text-fog"
+            className="inline-flex items-center gap-2 text-xs font-bold text-steel transition-colors duration-fast ease-out hover:text-ink"
           >
-            <ArrowLeft size={15} />
+            <ArrowLeft size={15} strokeWidth={1.75} />
             Dashboard
           </Link>
           <Logo size={28} />
@@ -136,194 +185,250 @@ export default function SettingsPage() {
 
         <header className="mt-10">
           <p className="sec-eyebrow">Account</p>
-          <h1 className="mt-3 text-2xl font-bold tracking-[-0.02em] sm:text-3xl">Settings</h1>
-          <p className="mt-2 text-[0.88rem] font-medium leading-7 text-steel">
-            {user?.email}
-          </p>
+          <h1 className="mt-3 font-display text-2xl tracking-tightest sm:text-3xl">
+            Settings
+          </h1>
+          <p className="ui-card-desc">{user?.email}</p>
         </header>
 
-        <section className="set-card mt-8">
-          <div className="set-head">
-            <User size={15} className="text-steel" />
-            <h2 className="set-title">Profile</h2>
-          </div>
+        <div className="mt-8 space-y-4" data-stagger>
+          {/* ---------------------------------------------------------- */}
+          <Card style={{ "--i": 0 } as React.CSSProperties}>
+            <SectionHead icon={User} title="Profile" />
 
-          <form onSubmit={saveName} className="mt-4">
-            <label htmlFor="name" className="sec-eyebrow">
-              Display name
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <input
-                id="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="sec-input h-11 min-w-0 flex-1 rounded-md px-3 text-[0.88rem] font-semibold"
-              />
-              <button type="submit" disabled={savingName} className="err-btn err-btn-primary">
-                {savingName ? <Loader2 size={14} className="animate-spin" /> : null}
-                Save
-              </button>
-            </div>
-          </form>
-        </section>
+            <form onSubmit={saveName}>
+              <Field label="Display name">
+                {(props) => (
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="min-w-0 flex-1"
+                      {...props}
+                    />
+                    <Button type="submit" disabled={savingName || !name.trim()}>
+                      {savingName ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : null}
+                      Save
+                    </Button>
+                  </div>
+                )}
+              </Field>
+            </form>
+          </Card>
 
-        <section className="set-card mt-4">
-          <div className="set-head">
-            <Lock size={15} className="text-steel" />
-            <h2 className="set-title">Password</h2>
-          </div>
+          {/* ---------------------------------------------------------- */}
+          <Card style={{ "--i": 1 } as React.CSSProperties}>
+            <SectionHead icon={Lock} title="Password" />
 
-          <form onSubmit={savePassword} className="mt-4 space-y-3">
-            <div>
-              <label htmlFor="current" className="sec-eyebrow">
-                Current password
-              </label>
-              <input
-                id="current"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                className="sec-input mt-2 h-11 w-full rounded-md px-3 text-[0.88rem] font-semibold"
-              />
-            </div>
+            <form onSubmit={savePassword} className="space-y-3">
+              <Field label="Current password">
+                {(props) => (
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    {...props}
+                  />
+                )}
+              </Field>
 
-            <div>
-              <label htmlFor="new" className="sec-eyebrow">
-                New password
-              </label>
-              <input
-                id="new"
-                type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                className="sec-input mt-2 h-11 w-full rounded-md px-3 text-[0.88rem] font-semibold"
-              />
-              <p className="mt-1.5 text-[0.72rem] font-semibold text-steel">
-                At least 8 characters.
-              </p>
-            </div>
+              <Field
+                label="New password"
+                hint="At least 8 characters."
+                error={
+                  newPassword && newPassword.length < 8
+                    ? "Too short — use at least 8 characters."
+                    : undefined
+                }
+              >
+                {(props) => (
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    {...props}
+                  />
+                )}
+              </Field>
 
-            <button
-              type="submit"
-              disabled={savingPassword || newPassword.length < 8 || !currentPassword}
-              className="err-btn err-btn-primary disabled:opacity-50"
-            >
-              {savingPassword ? <Loader2 size={14} className="animate-spin" /> : null}
-              Change password
-            </button>
-          </form>
-        </section>
-
-        <section className="set-card mt-4">
-          <div className="set-head">
-            <CreditCard size={15} className="text-steel" />
-            <h2 className="set-title">Plan</h2>
-          </div>
-
-          {subscription ? (
-            <>
-              <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                  <p className="text-[1.05rem] font-bold">
-                    {subscription.name}
-                    <span className="ml-2 text-[0.8rem] font-semibold text-steel">
-                      €{subscription.price_eur.toFixed(2)}/mo
-                    </span>
-                  </p>
-                  <p className="mt-1 text-[0.78rem] font-semibold text-steel">
-                    {subscription.runs_used} of {subscription.runs_included} board runs used
-                  </p>
-                </div>
-              </div>
-
-              <div className="sec-meter mt-3">
-                <div
-                  className="sec-meter-fill"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (subscription.runs_used / Math.max(1, subscription.runs_included)) * 100,
-                    )}%`,
-                  }}
-                />
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Link href="/pricing" className="err-btn">
-                  Compare plans
-                </Link>
-                {subscription.manageable ? (
-                  <button type="button" onClick={openPortal} className="err-btn">
-                    Manage billing
-                  </button>
+              <Button
+                type="submit"
+                variant="ghost"
+                disabled={
+                  savingPassword || newPassword.length < 8 || !currentPassword
+                }
+              >
+                {savingPassword ? (
+                  <Loader2 size={14} className="animate-spin" />
                 ) : null}
+                Change password
+              </Button>
+            </form>
+          </Card>
+
+          {/* ---------------------------------------------------------- */}
+          <Card style={{ "--i": 2 } as React.CSSProperties}>
+            <SectionHead icon={CreditCard} title="Plan" />
+
+            {subscription ? (
+              <>
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-bold">
+                      {subscription.name}
+                      <span className="ml-2 text-sm font-semibold text-steel tabular">
+                        €{subscription.price_eur.toFixed(2)}/mo
+                      </span>
+                    </p>
+                    <p className="ui-card-desc">
+                      <AnimatedNumber value={subscription.runs_used} /> of{" "}
+                      {subscription.runs_included} board runs used
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10"
+                  role="progressbar"
+                  aria-valuenow={Math.round(usagePercent)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Board runs used"
+                >
+                  <div
+                    className="h-full rounded-full bg-accent transition-[width] duration-slow ease-out"
+                    style={{ width: `${usagePercent}%` }}
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href="/pricing">
+                    <Button variant="ghost" size="sm">
+                      Compare plans
+                    </Button>
+                  </Link>
+                  {subscription.manageable ? (
+                    <Button variant="ghost" size="sm" onClick={openPortal}>
+                      Manage billing
+                    </Button>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-3 w-56" />
+                <Skeleton className="h-1.5 w-full rounded-full" />
               </div>
-            </>
-          ) : (
-            <div className="sec-skel mt-4 h-9 w-40 rounded-md" />
-          )}
-        </section>
+            )}
+          </Card>
 
-        <section className="set-card mt-4">
-          <div className="set-head">
-            <Download size={15} className="text-steel" />
-            <h2 className="set-title">Your data</h2>
-          </div>
+          {/* ---------------------------------------------------------- */}
+          <Card style={{ "--i": 3 } as React.CSSProperties}>
+            <SectionHead icon={Download} title="Your data" />
 
-          <p className="mt-3 text-[0.82rem] font-medium leading-7 text-steel">
-            Download everything tied to this account as JSON: sessions, messages, reports, tasks,
-            memories, and review settings.
-          </p>
+            <p className="ui-card-desc">
+              Download everything tied to this account as JSON: sessions,
+              messages, reports, tasks, memories, and review settings.
+            </p>
 
-          <button type="button" onClick={exportData} disabled={exporting} className="err-btn mt-4">
-            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Export my data
-          </button>
-        </section>
+            <div className="mt-4">
+              <Button variant="ghost" onClick={exportData} disabled={exporting}>
+                {exporting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Download size={14} strokeWidth={1.75} />
+                )}
+                Export my data
+              </Button>
+            </div>
+          </Card>
 
-        <section className="set-card set-card-danger mt-4">
-          <div className="set-head">
-            <Trash2 size={15} className="text-ember" />
-            <h2 className="set-title">Delete account</h2>
-          </div>
+          {/* ---------------------------------------------------------- */}
+          <Card tone="critical" elev={1} style={{ "--i": 4 } as React.CSSProperties}>
+            <SectionHead icon={Trash2} title="Delete account" tone="critical" />
 
-          <p className="mt-3 text-[0.82rem] font-medium leading-7 text-steel">
-            This removes your account and every session, report, task, and memory attached to it.
-            It cannot be undone. Export your data first if you want a copy.
-          </p>
+            <p className="ui-card-desc">
+              This removes your account and every session, report, task, and
+              memory attached to it. It cannot be undone. Export your data first
+              if you want a copy.
+            </p>
 
-          <form onSubmit={deleteAccount} className="mt-4 space-y-3">
-            <input
-              type="password"
-              placeholder="Your password"
-              autoComplete="current-password"
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-              className="sec-input h-11 w-full rounded-md px-3 text-[0.88rem] font-semibold"
-            />
-            <input
-              placeholder="Type DELETE to confirm"
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-              className="sec-input h-11 w-full rounded-md px-3 text-[0.88rem] font-semibold"
-            />
-            <button
-              type="submit"
-              disabled={
-                deleting || !deletePassword || confirmation.trim().toUpperCase() !== "DELETE"
-              }
-              className="set-danger-btn"
-            >
-              {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              Permanently delete
-            </button>
-          </form>
-        </section>
+            <div className="mt-4">
+              <Button variant="ghost" onClick={() => setConfirmOpen(true)}>
+                <Trash2 size={14} strokeWidth={1.75} />
+                Delete my account
+              </Button>
+            </div>
+          </Card>
+        </div>
 
         <div className="h-16" />
       </div>
+
+      {/* Destructive action moved behind a modal: the two inputs no longer sit
+          on the page waiting to be filled in by accident. */}
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Delete your account?"
+        description="Every session, report, task and memory goes with it. This cannot be undone."
+      >
+        <form onSubmit={deleteAccount} className="space-y-3">
+          <Field label="Confirm your password">
+            {(props) => (
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                {...props}
+              />
+            )}
+          </Field>
+
+          <Field label="Type DELETE to confirm">
+            {(props) => (
+              <Input
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                placeholder="DELETE"
+                {...props}
+              />
+            )}
+          </Field>
+
+          <div className="ui-dialog-foot">
+            <Button
+              type="button"
+              variant="quiet"
+              onClick={() => setConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              disabled={
+                deleting ||
+                !deletePassword ||
+                confirmation.trim().toUpperCase() !== "DELETE"
+              }
+            >
+              {deleting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Trash2 size={14} strokeWidth={1.75} />
+              )}
+              Permanently delete
+            </Button>
+          </div>
+        </form>
+      </Dialog>
 
       <Toaster />
     </main>

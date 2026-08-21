@@ -3,6 +3,11 @@ import { Instrument_Serif, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LocaleProvider } from "@/lib/i18n";
 import "./globals.css";
+// Order matters. tokens.css redefines the custom properties globals.css sets;
+// premium.css refines component rules and must therefore load last.
+import "@/styles/tokens.css";
+import "@/styles/primitives.css";
+import "@/styles/premium.css";
 
 const sans = Inter({
   subsets: ["latin"],
@@ -57,6 +62,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
       </head>
       <body suppressHydrationWarning>
+        <a href="#main" className="skip-link">
+          Skip to content
+        </a>
         <LocaleProvider>
           <ThemeProvider>{children}</ThemeProvider>
         </LocaleProvider>

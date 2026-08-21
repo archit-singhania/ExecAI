@@ -43,10 +43,10 @@ export default function LandingPage() {
         <SceneStack
           id="landing"
           reactive
-          layers={["aurora", "volumetric", "liquid", "ribbons", "vortex", "constellation"]}
+          layers={["aurora", "volumetric", "liquid", "ribbons", "vortex", "constellation", "caustics", "grid"]}
         />
       </div>
-      <AnimatedBackground webgl={false} />
+      <AnimatedBackground webgl={true} />
       <div className="landing-veil pointer-events-none absolute inset-0" />
 
       <div className="relative flex min-h-full flex-col">
@@ -58,7 +58,7 @@ export default function LandingPage() {
               {t("hero.badge")}
             </div>
 
-            <h1 className="max-w-xl text-[2.15rem] font-black leading-[1.02] sm:text-5xl lg:text-[3.1rem]">
+            <h1 className="max-w-xl text-[2.15rem] font-black leading-[1.02] sm:text-5xl lg:text-[3.1rem] bg-clip-text text-transparent bg-gradient-to-r from-ink to-steel dark:from-white dark:to-fog">
               {t("hero.title")}
             </h1>
 
@@ -76,7 +76,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
               <Link href="/trial">
-                <Button variant="quiet" className="h-12 px-6">
+                <Button variant="quiet" className="h-12 px-6 hover:bg-white/10 transition-colors">
                   <Sparkles size={16} />
                   {t("hero.ctaTertiary")}
                 </Button>
@@ -98,14 +98,15 @@ export default function LandingPage() {
               {FEATURED_AGENTS.map((agent) => {
                 const meta = agentMeta[agent.name];
                 return (
-                  <AgentPreviewCard
-                    key={agent.name}
-                    icon={meta.icon}
-                    name={agent.name}
-                    orbit={meta.orbit}
-                    tone={meta.tone}
-                    pitch={agent.pitch}
-                  />
+                  <div key={agent.name} className="transition-transform duration-300 hover:scale-105 hover:-translate-y-1">
+                    <AgentPreviewCard
+                      icon={meta.icon}
+                      name={agent.name}
+                      orbit={meta.orbit}
+                      tone={meta.tone}
+                      pitch={agent.pitch}
+                    />
+                  </div>
                 );
               })}
             </div>
