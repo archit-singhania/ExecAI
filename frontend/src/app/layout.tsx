@@ -12,7 +12,7 @@ import "@/styles/material.css";
 export const metadata: Metadata = {
   title: "CEO.ai — Executive Studio",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/brand/compass.svg", apple: "/brand/compass.svg" },
+  icons: { icon: "/brand/compass.svg", apple: "/brand/compass-180.png" },
   description: "Hire an AI CEO to plan, challenge, and operate your startup.",
 };
 

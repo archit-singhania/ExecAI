@@ -28,6 +28,7 @@ export async function studioRequest<T>(
   return r.json() as Promise<T>;
 }
 export type StudioRecord = {
+  author_id?: string;
   id: string;
   session_id: string;
   kind: string;

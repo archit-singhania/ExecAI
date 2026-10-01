@@ -380,12 +380,67 @@
   }
 }
 
-.hal-browser-world { height: 100%; min-height: 360px; overflow: hidden; position: relative; transition: filter 3s ease; }
-.hal-browser-sun { position: absolute; top: 16%; right: 28%; width: 75px; height: 75px; background: #ffeac2; border-radius: 50%; box-shadow: 0 0 110px 45px #ffd9a855; }
-.hal-browser-mountain { position: absolute; inset: 32% -10% 20%; background: #677fa6; clip-path: polygon(0 100%,20% 25%,38% 70%,60% 0,80% 50%,100% 25%,100% 100%); opacity: .55; }
-.hal-browser-water { position: absolute; inset: 66% 0 0; background: repeating-linear-gradient(0deg,#92b6c322 0,#c0d7df44 3px,#577a9622 5px); }
-.hal-breath { position: absolute; inset: 0; display: grid; place-items: center; color: white; font-size: 18px; text-shadow: 0 2px 15px #0008; }
-.hal-breath span { padding: 28px; border: 1px solid #fff5; border-radius: 50%; background: #ffffff12; backdrop-filter: blur(8px); }
-.hal-breath.is-breathing span { animation: hal-breathe 8s ease-in-out infinite; }
-@keyframes hal-breathe { 50% { transform: scale(1.18); background: #ffffff30; } }
-@media (prefers-reduced-motion:reduce) { .hal-breath.is-breathing span { animation: none; } }
+.hal-browser-world {
+  height: 100%;
+  min-height: 360px;
+  overflow: hidden;
+  position: relative;
+  transition: filter 3s ease;
+}
+.hal-browser-sun {
+  position: absolute;
+  top: 16%;
+  right: 28%;
+  width: 75px;
+  height: 75px;
+  background: #ffeac2;
+  border-radius: 50%;
+  box-shadow: 0 0 110px 45px #ffd9a855;
+}
+.hal-browser-mountain {
+  position: absolute;
+  inset: 32% -10% 20%;
+  background: #677fa6;
+  clip-path: polygon(0 100%, 20% 25%, 38% 70%, 60% 0, 80% 50%, 100% 25%, 100% 100%);
+  opacity: 0.55;
+}
+.hal-browser-water {
+  position: absolute;
+  inset: 66% 0 0;
+  background: repeating-linear-gradient(
+    0deg,
+    #92b6c322 0,
+    #c0d7df44 3px,
+    #577a9622 5px
+  );
+}
+.hal-breath {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 18px;
+  text-shadow: 0 2px 15px #0008;
+}
+.hal-breath span {
+  padding: 28px;
+  border: 1px solid #fff5;
+  border-radius: 50%;
+  background: #ffffff12;
+  backdrop-filter: blur(8px);
+}
+.hal-breath.is-breathing span {
+  animation: hal-breathe 8s ease-in-out infinite;
+}
+@keyframes hal-breathe {
+  50% {
+    transform: scale(1.18);
+    background: #ffffff30;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hal-breath.is-breathing span {
+    animation: none;
+  }
+}

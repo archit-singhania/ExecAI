@@ -96,6 +96,7 @@ def view_shared_report(
         "summary": report.summary,
         "bullets": report.bullets.splitlines(),
         "score": report.score,
+        "source": report.source,
         "created_at": report.created_at,
         "author": owner.name if owner else "A founder",
     }

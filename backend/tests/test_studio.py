@@ -7,8 +7,33 @@ from app.main import app
 from app.database import SessionLocal
 from app.models import User, Job
 from app.studio_models import StudioRecord, RunEvent
+from app.llm import _client as REAL_LLM_CLIENT
 
 client = TestClient(app)
+
+def test_reading_review_settings_does_not_opt_in_to_scheduled_email():
+    owner, _, _ = account()
+    value = client.get("/api/review-schedule", headers=owner).json()
+    assert value["cadence"] == "off" and not value["email_enabled"]
+
+def test_legacy_client_obeys_local_only_before_constructing_hosted_client(monkeypatch):
+    from app import llm, llm_router
+    from types import SimpleNamespace
+    settings = SimpleNamespace(llm_provider="groq", llm_local_only=False, groq_api_key="configured", groq_model="test")
+    monkeypatch.setattr(llm, "get_settings", lambda: settings)
+    # Capture the real function at collection; all normal tests keep providers isolated.
+    real_client = REAL_LLM_CLIENT
+    token = llm_router.RUN_OPTIONS.set({"local_only": True})
+    try:
+        assert real_client() == (None, None)
+    finally:
+        llm_router.RUN_OPTIONS.reset(token)
+
+def test_shared_viewer_cannot_change_tasks_through_legacy_route():
+    owner, _, _ = account(); viewer, _, email = account(); sid = workspace(owner)
+    task = client.post(f"/api/studio/{sid}/tasks", headers=owner, json={"title": "Owned task"}).json()
+    client.post(f"/api/studio/{sid}/members", headers=owner, json={"email": email, "role": "viewer"})
+    assert client.patch(f"/api/tasks/{task['id']}", headers=viewer, json={"status": "Done"}).status_code == 403
 
 def test_specialist_debate_is_scoped_and_preserves_two_sources():
     owner, _, _ = account(); other, _, _ = account(); sid = workspace(owner)
@@ -145,6 +170,8 @@ def test_revocation_and_password_change_invalidate_existing_tokens():
 
 def test_board_review_is_completed_and_export_is_a_real_pdf():
     owner, _, _ = account(); sid = workspace(owner)
+    assert client.post(f"/api/sessions/{sid}/board-meeting", headers=owner).status_code == 422
+    client.post(f"/api/studio/{sid}/tasks", headers=owner, json={"title": "Interview buyers", "status": "Done"})
     review = client.post(f"/api/sessions/{sid}/board-meeting", headers=owner)
     assert review.status_code == 200, review.text
     assert "Progress" not in review.json()["title"]

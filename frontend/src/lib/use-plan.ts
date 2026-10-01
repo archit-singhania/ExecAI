@@ -70,7 +70,7 @@ export function usePlan(isDemo = false): PlanFeatures {
     workspaces: rank >= 2,
     whiteLabel: rank >= 3,
     apiAccess: rank >= 3,
-    allAgents: rank >= 1,
+    allAgents: true,
     runsUsed,
     runsIncluded,
     runsRemaining,

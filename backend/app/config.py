@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -54,6 +55,15 @@ class Settings(BaseSettings):
     cerebras_model: str | None = None
     nvidia_model: str | None = None
     openrouter_model: str | None = None
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_installed_postgres_driver(cls, value: str) -> str:
+        # Managed hosts commonly supply these aliases; psycopg 3 is installed.
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix):]
+        return value
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

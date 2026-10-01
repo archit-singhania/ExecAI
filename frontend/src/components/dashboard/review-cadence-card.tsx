@@ -44,6 +44,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
   }, [isDemo]);
 
   async function persist(next: ReviewSchedule) {
+    const previous = schedule;
     setSchedule(next);
     if (isDemo) return;
 
@@ -59,8 +60,11 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
         email_enabled: next.email_enabled,
       });
       setSchedule(saved);
-    } catch {
-      setError("Couldn't save that. Try again.");
+    } catch (error) {
+      setSchedule(previous);
+      setError(
+        error instanceof Error ? error.message : "Couldn't save that. Try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -115,7 +119,10 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
                 type="button"
                 onClick={() => persist({ ...schedule, weekday: index })}
                 aria-pressed={schedule.weekday === index}
-                className={cn("sec-day", schedule.weekday === index && "sec-day-active")}
+                className={cn(
+                  "sec-day",
+                  schedule.weekday === index && "sec-day-active",
+                )}
               >
                 {day}
               </button>
@@ -123,13 +130,18 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
           </div>
 
           <div className="mb-3 flex items-center gap-2">
-            <label htmlFor="review-hour" className="text-[0.75rem] font-semibold text-steel">
+            <label
+              htmlFor="review-hour"
+              className="text-[0.75rem] font-semibold text-steel"
+            >
               at
             </label>
             <select
               id="review-hour"
               value={schedule.hour}
-              onChange={(event) => persist({ ...schedule, hour: Number(event.target.value) })}
+              onChange={(event) =>
+                persist({ ...schedule, hour: Number(event.target.value) })
+              }
               className="sec-input h-8 rounded-md px-2 text-[0.78rem] font-semibold"
             >
               {Array.from({ length: 24 }).map((_, hour) => (
@@ -138,15 +150,25 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
                 </option>
               ))}
             </select>
-            <span className="text-[0.72rem] font-semibold text-steel">{schedule.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} · daylight saving aware</span>
+            <span className="text-[0.72rem] font-semibold text-steel">
+              {schedule.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} ·
+              daylight saving aware
+            </span>
           </div>
 
           <button
             type="button"
-            onClick={() => persist({ ...schedule, email_enabled: !schedule.email_enabled })}
+            onClick={() =>
+              persist({ ...schedule, email_enabled: !schedule.email_enabled })
+            }
             className="mb-3 flex items-center gap-2 text-left"
           >
-            <span className={cn("sec-check grid h-4 w-4 place-items-center rounded", schedule.email_enabled && "sec-check-done")}>
+            <span
+              className={cn(
+                "sec-check grid h-4 w-4 place-items-center rounded",
+                schedule.email_enabled && "sec-check-done",
+              )}
+            >
               <Check size={10} strokeWidth={3.2} />
             </span>
             <span className="text-[0.78rem] font-semibold">Email me the verdict</span>
@@ -164,13 +186,18 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
         </>
       ) : (
         <p className="text-[0.75rem] font-medium leading-6 text-steel">
-          Reviews are manual. Turn on a cadence and the board scores your progress on its own.
+          Reviews are manual. Turn on a cadence and the board scores your progress on
+          its own.
         </p>
       )}
 
-      {error ? <p className="mt-2 text-[0.75rem] font-bold text-ember">{error}</p> : null}
+      {error ? (
+        <p className="mt-2 text-[0.75rem] font-bold text-ember">{error}</p>
+      ) : null}
       {isDemo ? (
-        <p className="mt-2 text-[0.72rem] font-semibold text-steel">Demo mode — this cadence isn&apos;t saved.</p>
+        <p className="mt-2 text-[0.72rem] font-semibold text-steel">
+          Demo mode — this cadence isn&apos;t saved.
+        </p>
       ) : null}
     </div>
   );

@@ -22,6 +22,7 @@ LLM_LOCAL_ONLY=true.
 import json
 from contextvars import ContextVar
 RUN_OPTIONS = ContextVar("ceo_run_options", default={})
+RUN_SOURCE = ContextVar("ceo_run_source", default=None)
 import random
 import time
 from dataclasses import dataclass, field
@@ -121,7 +122,7 @@ def _call(provider: Provider, settings, messages: list[dict], json_mode: bool, m
     try:
         with httpx.Client(timeout=TIMEOUT) as client:
             response = client.post(
-                f"{provider.base_url}/chat/completions",
+                f"{settings.ollama_base_url.rstrip('/') if provider.local else provider.base_url}/chat/completions",
                 json=payload,
                 headers={
                     "Authorization": f"Bearer {_key_for(provider, settings)}",
@@ -197,6 +198,7 @@ def complete(
 
             content = _call(provider, settings, messages, json_mode, max_tokens)
             if content:
+                RUN_SOURCE.set(f"model:{provider.name}:{_model_for(provider, settings)}"[:80])
                 return content, provider.name
 
         if attempt + 1 < passes:

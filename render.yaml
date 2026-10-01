@@ -1,14 +1,30 @@
 services:
   - type: web
     name: ceo-ai-api
-    env: python
+    runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: python -m pip install -r requirements.txt
+    preDeployCommand: python -m app.deployment migrate
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-graceful-shutdown 240
+    healthCheckPath: /health
+    numInstances: 1
+    maxShutdownDelaySeconds: 300
+    autoDeployTrigger: "off"
+    # Existing paid service only: preserve its compute plan, region and database.
+    # Disable any existing autoscaling in the dashboard before applying this file.
     envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.12.14
       - key: DATABASE_URL
         sync: false
-      - key: OPENAI_API_KEY
+      - key: JWT_SECRET
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: LLM_LOCAL_ONLY
+        value: "true"
+    # Set optional provider/email/payment/cron credentials in the existing account.

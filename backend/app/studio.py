@@ -122,7 +122,7 @@ def report_pdf(session_id: str, report_id: str, db: Session = Depends(get_db), u
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     styles = getSampleStyleSheet()
     output = io.BytesIO()
-    flow = [Paragraph("CEO.ai · Executive brief", styles["Heading2"]), Paragraph(escape(report.title), styles["Title"]), Paragraph(escape(report.agent) + " · " + str(report.score) + "/100", styles["Normal"]), Spacer(1, 20), Paragraph(escape(report.summary), styles["BodyText"]), Spacer(1, 16)]
+    flow = [Paragraph("CEO.ai · Executive brief", styles["Heading2"]), Paragraph(escape(report.title), styles["Title"]), Paragraph(escape(report.agent) + " · " + str(report.score) + "/100", styles["Normal"]), Paragraph("Source: " + escape(report.source), styles["Normal"]), Spacer(1, 20), Paragraph(escape(report.summary), styles["BodyText"]), Spacer(1, 16)]
     flow += [Paragraph("• " + escape(item), styles["BodyText"]) for item in report.bullets.splitlines()]
     SimpleDocTemplate(output, title=report.title, author="CEO.ai", rightMargin=48, leftMargin=48).build(flow)
     return Response(output.getvalue(), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="ceoai-report-{report.id}.pdf"'})
@@ -171,9 +171,11 @@ def record_activity(db, session_id, user, title, body=""):
     db.add(StudioRecord(session_id=session_id, author_id=user.id, kind="activity", title=title, body=body, data="{}"))
 
 def mention_notifications(db, session_id, user, body, topic):
-    for member in db.query(WorkspaceMember).filter_by(session_id=session_id):
-        target = db.get(User, member.user_id)
-        if target and ("@" + target.email.lower()) in body.lower():
+    session = db.get(BusinessSession, session_id)
+    ids = {session.user_id, *[member.user_id for member in db.query(WorkspaceMember).filter_by(session_id=session_id)]}
+    for target_id in ids:
+        target = db.get(User, target_id)
+        if target and target.id != user.id and ("@" + target.email.lower()) in body.lower():
             db.add(StudioRecord(session_id=session_id, author_id=user.id, kind="notification", title=f"Mention in {topic}"[:240], body=body, data=json.dumps({"recipient_id": target.id, "read": False})))
 
 @router.get("/workspaces")
@@ -201,7 +203,9 @@ def records(session_id: str, kind: str | None = None, db: Session = Depends(get_
 
 @router.post("/{session_id}/records", status_code=201)
 def create_record(session_id: str, payload: RecordIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    workspace_access(db, session_id, user, write=True)
+    session = workspace_access(db, session_id, user, write=True)
+    if payload.kind == "archive" and session.user_id != user.id:
+        raise HTTPException(403, "Only the owner can archive this workspace.")
     validate_data(payload)
     if payload.kind == "profile":
         old = db.query(StudioRecord).filter_by(session_id=session_id, kind="profile").first()
@@ -243,10 +247,12 @@ def update_record(session_id: str, record_id: str, payload: RecordIn, db: Sessio
 
 @router.delete("/{session_id}/records/{record_id}")
 def delete_record(session_id: str, record_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    workspace_access(db, session_id, user, write=True)
+    session = workspace_access(db, session_id, user, write=True)
     r = db.get(StudioRecord, record_id)
     if not r or r.session_id != session_id:
         raise HTTPException(404, "Record not found.")
+    if r.kind == "archive" and session.user_id != user.id:
+        raise HTTPException(403, "Only the owner can restore this workspace.")
     db.query(KnowledgeChunk).filter_by(record_id=r.id).delete()
     db.delete(r)
     db.commit()

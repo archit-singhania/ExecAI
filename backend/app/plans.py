@@ -27,7 +27,7 @@ PLANS: dict[TierId, Plan] = {
         name="Free",
         price_eur=0.0,
         tagline="See the board work.",
-        agent_limit=3,
+        agent_limit=9,
         session_limit=1,
         monthly_runs=20,
         scheduled_reviews=False,
@@ -36,7 +36,7 @@ PLANS: dict[TierId, Plan] = {
         white_label=False,
         api_access=False,
         features=[
-            "3 specialists",
+            "9 specialist perspectives",
             "1 active session",
             "20 board runs a month",
             "Conviction spread",
@@ -82,7 +82,7 @@ PLANS: dict[TierId, Plan] = {
             "25 active sessions",
             "1,500 board runs a month",
             "Shared workspaces and seats",
-            "Priority run queue",
+            "Workspace roles and activity",
         ],
     ),
     "agency": Plan(
@@ -103,8 +103,8 @@ PLANS: dict[TierId, Plan] = {
             "200 active sessions",
             "10,000 board runs a month",
             "Multi-client workspaces",
-            "White-label branding",
-            "API access",
+            "Versioned client decisions",
+            "Authenticated API workflows",
         ],
     ),
 }

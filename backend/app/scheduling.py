@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.email import send_board_review, send_weekly_digest
 from app.models import AgentReport, BusinessMemory, BusinessSession, ReviewSchedule, Task, User
+from app.studio_models import StudioRecord
 
 CADENCE_DAYS = {"weekly": 7, "biweekly": 14, "monthly": 28}
 
@@ -68,26 +69,25 @@ def build_board_meeting(db: Session, session: BusinessSession, trigger: str = "m
 
     completed = len([task for task in tasks if task.status.lower() in {"done", "complete", "completed"}])
     missed_or_open = len(tasks) - completed
-    average_score = round(sum(r.score for r in reports) / len(reports)) if reports else session.health_score
+    if not reports and not tasks:
+        from fastapi import HTTPException
+        raise HTTPException(422, "Create tasks or convene the board before reviewing this workspace.")
+    average_score = round(sum(r.score for r in reports) / len(reports)) if reports else round(completed / len(tasks) * 100)
 
     bullets = [
         f"Completed tasks: {completed}",
         f"Open or missed tasks: {missed_or_open}",
-        f"Business health score: {average_score}/100",
-        "Next recommendation: prove demand before expanding scope or spending on acquisition.",
+        f"Specialist assessment average: {average_score}/100 across {len(reports)} reports" if reports else f"Task completion score: {average_score}/100",
+        "Review open tasks, evidence and assumptions before approving further scope or spend.",
     ]
 
     if trigger == "scheduled" and missed_or_open and not completed:
         bullets.insert(
             0,
-            "Nothing closed since the last review — the board is treating this as a stall, not a delay.",
+            "None of the currently tracked tasks is complete. Inspect dependencies and blockers.",
         )
 
-    summary = (
-        "This board review approves continued validation, but blocks full-scale buildout until customer "
-        "evidence improves. The CEO wants sharper buyer proof, clearer pricing, and weekly accountability "
-        "on tasks."
-    )
+    summary = f"Execution review: {completed} of {len(tasks)} tracked tasks complete, with {missed_or_open} open. This workspace contains {len(reports)} specialist reports. The score summarizes recorded assessments or task completion; it is not a measurement of business health. Review the evidence and decide the next move."
 
     report = AgentReport(
         session_id=session.id,
@@ -97,6 +97,7 @@ def build_board_meeting(db: Session, session: BusinessSession, trigger: str = "m
         summary=summary,
         bullets="\n".join(bullets),
         score=average_score,
+        source="execution-review-rules",
     )
     db.add(report)
     db.add(
@@ -120,6 +121,7 @@ def serialize_report(report: AgentReport) -> dict:
         "summary": report.summary,
         "bullets": report.bullets.splitlines(),
         "score": report.score,
+        "source": report.source,
         "created_at": report.created_at,
     }
 
@@ -129,7 +131,7 @@ def get_or_create_schedule(db: Session, user_id: str) -> ReviewSchedule:
     if schedule:
         return schedule
 
-    schedule = ReviewSchedule(user_id=user_id, cadence="weekly", weekday=0, hour=9, tz_offset_minutes=0, email_enabled=True)
+    schedule = ReviewSchedule(user_id=user_id, cadence="off", weekday=0, hour=9, tz_offset_minutes=0, email_enabled=False)
     schedule.next_run_at = compute_next_run(
         schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes
     )
@@ -208,9 +210,15 @@ def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) 
 
     results: list[dict] = []
     for schedule in due:
+        from app.plans import get_plan
+        account = db.get(User, schedule.user_id)
+        if not account or not get_plan(account.tier).scheduled_reviews:
+            schedule.next_run_at = compute_next_run(schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now, timezone=schedule.timezone)
+            results.append({"user_id": schedule.user_id, "status": "skipped_entitlement"})
+            continue
         session = (
             db.query(BusinessSession)
-            .filter(BusinessSession.user_id == schedule.user_id)
+            .filter(BusinessSession.user_id == schedule.user_id, BusinessSession.id.notin_(db.query(StudioRecord.session_id).filter_by(kind="archive")))
             .order_by(desc(BusinessSession.updated_at))
             .first()
         )
@@ -223,7 +231,15 @@ def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) 
             results.append({"user_id": schedule.user_id, "status": "skipped_no_session"})
             continue
 
-        report = build_board_meeting(db, session, trigger="scheduled")
+        try:
+            report = build_board_meeting(db, session, trigger="scheduled")
+        except Exception as error:
+            from fastapi import HTTPException
+            if not isinstance(error, HTTPException) or error.status_code != 422:
+                raise
+            schedule.next_run_at = compute_next_run(schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now, timezone=schedule.timezone)
+            results.append({"user_id": schedule.user_id, "status": "skipped_no_history"})
+            continue
         schedule.last_run_at = now
         schedule.next_run_at = compute_next_run(
             schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now, timezone=schedule.timezone
@@ -248,6 +264,7 @@ def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) 
                 "session_id": session.id,
                 "status": "generated",
                 "score": report.score,
+        "source": report.source,
                 "email_sent": delivered,
             }
         )

@@ -5,47 +5,464 @@ import { jobsApi, pollJob, JobState } from "@/lib/jobs";
 import { studioRequest, StudioRecord } from "@/lib/studio";
 import { VoiceStage } from "@/components/voice/voice-stage";
 
-const SPECIALISTS = ["market", "cfo", "cto", "product", "marketing", "legal", "sales", "designer", "assistant"];
-const BRIEFS = [
-  { title: "Product launch", body: "Assess the launch plan. Identify customer evidence, launch gates, operational risks, and a go/no-go recommendation with explicit assumptions." },
-  { title: "Funding decision", body: "Compare bootstrapping and fundraising. Assess runway, dilution, revenue milestones, downside risks, and conditions under which each option wins." },
-  { title: "Market expansion", body: "Evaluate entering a new market. Compare customer demand, distribution, legal constraints, unit economics, and a low-cost validation experiment." },
+const SPECIALISTS = [
+  "market",
+  "cfo",
+  "cto",
+  "product",
+  "marketing",
+  "legal",
+  "sales",
+  "designer",
+  "assistant",
 ];
-type Props = { id: string; records: StudioRecord[]; writable: boolean; refresh: () => Promise<void>; action: (work: () => Promise<void>) => Promise<void> };
+const BRIEFS = [
+  {
+    title: "Product launch",
+    body: "Assess the launch plan. Identify customer evidence, launch gates, operational risks, and a go/no-go recommendation with explicit assumptions.",
+  },
+  {
+    title: "Funding decision",
+    body: "Compare bootstrapping and fundraising. Assess runway, dilution, revenue milestones, downside risks, and conditions under which each option wins.",
+  },
+  {
+    title: "Market expansion",
+    body: "Evaluate entering a new market. Compare customer demand, distribution, legal constraints, unit economics, and a low-cost validation experiment.",
+  },
+];
+type Props = {
+  id: string;
+  records: StudioRecord[];
+  writable: boolean;
+  refresh: () => Promise<void>;
+  action: (work: () => Promise<void>) => Promise<void>;
+};
 
-export function BoardWorkflows({ id, records, writable, refresh, action, job, onJob }: Props & { job: JobState | null; onJob: (job: JobState) => void }) {
+export function BoardWorkflows({
+  id,
+  records,
+  writable,
+  refresh,
+  action,
+  job,
+  onJob,
+}: Props & { job: JobState | null; onJob: (job: JobState) => void }) {
   const [voice, setVoice] = useState(false);
-  const templates = records.filter(r => r.kind === "template");
-  function useBrief(body: string) {
-    const input = document.querySelector<HTMLTextAreaElement>('textarea[name="prompt"]');
-    if (input) { input.value = body; input.focus(); input.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  const templates = records.filter((r) => r.kind === "template");
+  function loadBrief(body: string) {
+    const input = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="prompt"]',
+    );
+    if (input) {
+      input.value = body;
+      input.focus();
+      input.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
   }
   const sorted = [...(job?.reports || [])].sort((a, b) => a.score - b.score);
-  return <>
-    <section className="st-card"><h2>Decision briefs</h2><p>Start with a reusable question structure, then add your actual constraints in the board prompt.</p><div className="st-form-actions">{BRIEFS.map(b => <button key={b.title} className="st-secondary" onClick={() => useBrief(b.body)}>{b.title}</button>)}{templates.map(t => <button key={t.id} className="st-secondary" onClick={() => useBrief(t.body)}>{t.title}</button>)}</div><details><summary>Save your own brief</summary><form onSubmit={e => { e.preventDefault(); const form = e.currentTarget; const data = new FormData(form); void action(async () => { await studioRequest(`/api/studio/${id}/records`, "POST", { kind: "template", title: data.get("title"), body: data.get("body"), data: {} }); form.reset(); await refresh(); }); }}><label className="st-field">Brief name<input name="title" required maxLength={240}/></label><label className="st-field">Reusable question<textarea name="body" required rows={3}/></label><button className="st-primary" disabled={!writable}>Save brief</button></form></details></section>
-    <section className="st-card"><div className="st-section-head"><h2>Voice boardroom</h2><button className="st-secondary" onClick={() => setVoice(v => !v)}>{voice ? "Close voice" : "Open voice"}</button></div><p>Captions remain visible. Microphone access starts only when you tap it; browser speech or configured server voice provides playback.</p>{voice && <VoiceStage autoListen={false} disabled={!writable || job?.status === "running"} onUtterance={async (question, progress) => { const run = await jobsApi.startBoardRun(id, question); sessionStorage.setItem(`ceoai-run-${id}`, run.job_id); const completed = await pollJob(run.job_id, state => { onJob(state); progress(state.progress_label); }, { timeoutMs: 360000 }); sessionStorage.removeItem(`ceoai-run-${id}`); await refresh(); return completed.final; }}/>}</section>
-    <section className="st-card"><h2>Specialist follow-up & debate</h2><p>Ask one specialist directly, or have a second specialist critique its recommendation. Each response records its source.</p><form onSubmit={e => { e.preventDefault(); const values = new FormData(e.currentTarget); void action(async () => { await studioRequest(`/api/studio/${id}/debate`, "POST", { question: values.get("question"), specialist: values.get("specialist"), challenger: values.get("challenger") || null }); await refresh(); }); }}><label className="st-field">Follow-up question<textarea name="question" required minLength={3} maxLength={8000} rows={3}/></label><div className="st-form-grid"><label className="st-field">First perspective<select name="specialist">{SPECIALISTS.map(s => <option key={s}>{s}</option>)}</select></label><label className="st-field">Challenge with<select name="challenger"><option value="">Focused follow-up only</option>{SPECIALISTS.map(s => <option key={s}>{s}</option>)}</select></label></div><button className="st-primary" disabled={!writable}>Discuss with specialists</button></form>{records.filter(r => r.kind === "debate").map(r => <details key={r.id}><summary>{r.title}</summary><div className="st-two-col">{(r.data.reports as (AgentReport & { source: string })[]).map(report => <article key={report.agent}><span className="st-eyebrow">{report.agent} · {report.source}</span><h3>{report.title}</h3><p>{report.summary}</p><ul>{report.bullets.map((b, i) => <li key={i}>{b}</li>)}</ul></article>)}</div></details>)}</section>
-    {sorted.length > 1 && <section className="st-card"><h2>Dissent & alternatives</h2><p>Scores reflect the specialists&apos; assessments, not a measured probability of success. Inspect the reasons behind the spread.</p><div className="st-two-col">{[sorted[0], sorted[sorted.length - 1]].map((r, i) => <article key={r.agent}><span className="st-eyebrow">{i === 0 ? "Most sceptical" : "Most convinced"} · {r.agent} · {r.score}/100</span><h3>{r.title}</h3><p>{r.summary}</p><ul>{r.bullets.map((b, k) => <li key={k}>{b}</li>)}</ul></article>)}</div><p>Assessment spread: {sorted[sorted.length - 1].score - sorted[0].score} points.</p></section>}
-    {job && <section className="st-card"><h2>Execution trace</h2><p>Run {job.id} · {job.status} · Updated {new Date(job.updated_at).toLocaleString()}</p>{job.reports.map((r, index) => <div className="st-compact-row" key={r.agent}><span>{index + 1}</span><strong>{r.agent}</strong><span className="st-chip">{(r as AgentReport & { source?: string }).source || "Persisted report"}</span></div>)}{job.error && <p role="alert">{job.error}</p>}</section>}
-  </>;
+  return (
+    <>
+      <section className="st-card">
+        <h2>Decision briefs</h2>
+        <p>
+          Start with a reusable question structure, then add your actual constraints in
+          the board prompt.
+        </p>
+        <div className="st-form-actions">
+          {BRIEFS.map((b) => (
+            <button
+              key={b.title}
+              className="st-secondary"
+              onClick={() => loadBrief(b.body)}
+            >
+              {b.title}
+            </button>
+          ))}
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              className="st-secondary"
+              onClick={() => loadBrief(t.body)}
+            >
+              {t.title}
+            </button>
+          ))}
+        </div>
+        <details>
+          <summary>Save your own brief</summary>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const data = new FormData(form);
+              void action(async () => {
+                await studioRequest(`/api/studio/${id}/records`, "POST", {
+                  kind: "template",
+                  title: data.get("title"),
+                  body: data.get("body"),
+                  data: {},
+                });
+                form.reset();
+                await refresh();
+              });
+            }}
+          >
+            <label className="st-field">
+              Brief name
+              <input name="title" required maxLength={240} />
+            </label>
+            <label className="st-field">
+              Reusable question
+              <textarea name="body" required rows={3} />
+            </label>
+            <button className="st-primary" disabled={!writable}>
+              Save brief
+            </button>
+          </form>
+        </details>
+      </section>
+      <section className="st-card">
+        <div className="st-section-head">
+          <h2>Voice boardroom</h2>
+          <button className="st-secondary" onClick={() => setVoice((v) => !v)}>
+            {voice ? "Close voice" : "Open voice"}
+          </button>
+        </div>
+        <p>
+          Captions remain visible. Microphone access starts only when you tap it;
+          browser speech or configured server voice provides playback.
+        </p>
+        {voice && (
+          <VoiceStage
+            autoListen={false}
+            disabled={!writable || job?.status === "running"}
+            onUtterance={async (question, progress) => {
+              const run = await jobsApi.startBoardRun(id, question);
+              sessionStorage.setItem(`ceoai-run-${id}`, run.job_id);
+              const completed = await pollJob(
+                run.job_id,
+                (state) => {
+                  onJob(state);
+                  progress(state.progress_label);
+                },
+                { timeoutMs: 360000 },
+              );
+              sessionStorage.removeItem(`ceoai-run-${id}`);
+              await refresh();
+              return completed.final;
+            }}
+          />
+        )}
+      </section>
+      <section className="st-card">
+        <h2>Specialist follow-up & debate</h2>
+        <p>
+          Ask one specialist directly, or have a second specialist critique its
+          recommendation. Each response records its source.
+        </p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const values = new FormData(e.currentTarget);
+            void action(async () => {
+              await studioRequest(`/api/studio/${id}/debate`, "POST", {
+                question: values.get("question"),
+                specialist: values.get("specialist"),
+                challenger: values.get("challenger") || null,
+              });
+              await refresh();
+            });
+          }}
+        >
+          <label className="st-field">
+            Follow-up question
+            <textarea
+              name="question"
+              required
+              minLength={3}
+              maxLength={8000}
+              rows={3}
+            />
+          </label>
+          <div className="st-form-grid">
+            <label className="st-field">
+              First perspective
+              <select name="specialist">
+                {SPECIALISTS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label className="st-field">
+              Challenge with
+              <select name="challenger">
+                <option value="">Focused follow-up only</option>
+                {SPECIALISTS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button className="st-primary" disabled={!writable}>
+            Discuss with specialists
+          </button>
+        </form>
+        {records
+          .filter((r) => r.kind === "debate")
+          .map((r) => (
+            <details key={r.id}>
+              <summary>{r.title}</summary>
+              <div className="st-two-col">
+                {(r.data.reports as (AgentReport & { source: string })[]).map(
+                  (report) => (
+                    <article key={report.agent}>
+                      <span className="st-eyebrow">
+                        {report.agent} · {report.source}
+                      </span>
+                      <h3>{report.title}</h3>
+                      <p>{report.summary}</p>
+                      <ul>
+                        {report.bullets.map((b, i) => (
+                          <li key={i}>{b}</li>
+                        ))}
+                      </ul>
+                    </article>
+                  ),
+                )}
+              </div>
+            </details>
+          ))}
+      </section>
+      {sorted.length > 1 && (
+        <section className="st-card">
+          <h2>Dissent & alternatives</h2>
+          <p>
+            Scores reflect the specialists&apos; assessments, not a measured probability
+            of success. Inspect the reasons behind the spread.
+          </p>
+          <div className="st-two-col">
+            {[sorted[0], sorted[sorted.length - 1]].map((r, i) => (
+              <article key={r.agent}>
+                <span className="st-eyebrow">
+                  {i === 0 ? "Most sceptical" : "Most convinced"} · {r.agent} ·{" "}
+                  {r.score}/100
+                </span>
+                <h3>{r.title}</h3>
+                <p>{r.summary}</p>
+                <ul>
+                  {r.bullets.map((b, k) => (
+                    <li key={k}>{b}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <p>
+            Assessment spread: {sorted[sorted.length - 1].score - sorted[0].score}{" "}
+            points.
+          </p>
+        </section>
+      )}
+      {job && (
+        <section className="st-card">
+          <h2>Execution trace</h2>
+          <p>
+            Run {job.id} · {job.status} · Updated{" "}
+            {new Date(job.updated_at).toLocaleString()}
+          </p>
+          {job.reports.map((r, index) => (
+            <div className="st-compact-row" key={r.agent}>
+              <span>{index + 1}</span>
+              <strong>{r.agent}</strong>
+              <span className="st-chip">
+                {(r as AgentReport & { source?: string }).source || "Persisted report"}
+              </span>
+            </div>
+          ))}
+          {job.error && <p role="alert">{job.error}</p>}
+        </section>
+      )}
+    </>
+  );
 }
 
 export function ScenarioComparison({ records }: { records: StudioRecord[] }) {
-  const scenarios = records.filter(r => r.kind === "scenario");
+  const scenarios = records.filter((r) => r.kind === "scenario");
   const [costChange, setCostChange] = useState(0);
   if (!scenarios.length) return null;
-  return <section className="st-card"><h2>Compare scenarios</h2><p>Adjust costs across your saved scenarios to see how their runway changes. This exploration does not overwrite your assumptions.</p><label className="st-field">Monthly cost sensitivity: {costChange > 0 ? "+" : ""}{costChange}%<input type="range" min={-50} max={50} step={5} value={costChange} onChange={e => setCostChange(Number(e.target.value))}/></label><div className="st-table-scroll"><table className="st-table"><thead><tr><th scope="col">Scenario</th><th scope="col">Net burn / month</th><th scope="col">Runway</th><th scope="col">CAC</th><th scope="col">LTV / CAC</th></tr></thead><tbody>{scenarios.map(r => { const burn = Number(r.data.monthly_cost) * (1 + costChange / 100) - Number(r.data.monthly_revenue); const result = r.data.result as Record<string, number | null>; return <tr key={r.id}><th scope="row">{r.title}</th><td>{burn.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td><td>{burn > 0 ? `${(Number(r.data.cash) / burn).toFixed(1)} months` : "Cash positive"}</td><td>{result.cac === null ? "Undefined" : result.cac?.toFixed(2)}</td><td>{result.ltv_cac === null ? "Undefined" : result.ltv_cac?.toFixed(2)}</td></tr>; })}</tbody></table></div></section>;
+  return (
+    <section className="st-card">
+      <h2>Compare scenarios</h2>
+      <p>
+        Adjust costs across your saved scenarios to see how their runway changes. This
+        exploration does not overwrite your assumptions.
+      </p>
+      <label className="st-field">
+        Monthly cost sensitivity: {costChange > 0 ? "+" : ""}
+        {costChange}%
+        <input
+          type="range"
+          min={-50}
+          max={50}
+          step={5}
+          value={costChange}
+          onChange={(e) => setCostChange(Number(e.target.value))}
+        />
+      </label>
+      <div className="st-table-scroll">
+        <table className="st-table">
+          <thead>
+            <tr>
+              <th scope="col">Scenario</th>
+              <th scope="col">Net burn / month</th>
+              <th scope="col">Runway</th>
+              <th scope="col">CAC</th>
+              <th scope="col">LTV / CAC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scenarios.map((r) => {
+              const burn =
+                Number(r.data.monthly_cost) * (1 + costChange / 100) -
+                Number(r.data.monthly_revenue);
+              const result = r.data.result as Record<string, number | null>;
+              return (
+                <tr key={r.id}>
+                  <th scope="row">{r.title}</th>
+                  <td>
+                    {burn.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </td>
+                  <td>
+                    {burn > 0
+                      ? `${(Number(r.data.cash) / burn).toFixed(1)} months`
+                      : "Cash positive"}
+                  </td>
+                  <td>{result.cac === null ? "Undefined" : result.cac?.toFixed(2)}</td>
+                  <td>
+                    {result.ltv_cac === null ? "Undefined" : result.ltv_cac?.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 }
 
 export function MetricHistory({ records }: { records: StudioRecord[] }) {
-  const metrics = records.filter(r => r.kind === "metric");
+  const metrics = records.filter((r) => r.kind === "metric");
   if (!metrics.length) return null;
-  return <section className="st-card"><h2>Historical scorecard</h2><p>Every metric edit preserves its previous observation. Group key results under an objective to track your operating goals.</p>{metrics.map(m => <details key={m.id}><summary>{String(m.data.objective || "Operating goals")} · {m.title} · {String(m.data.value)} / {String(m.data.target)}</summary><p>{String(m.data.owner || "No owner assigned")} · Review {String(m.data.review_date || "not scheduled")}</p><div className="st-table-scroll"><table className="st-table"><thead><tr><th>Date</th><th>Value</th><th>Target</th></tr></thead><tbody>{[{ ...m, data: { ...m.data, observed_at: m.updated_at } }, ...records.filter(r => r.kind === "metric_observation" && r.data.metric_id === m.id)].map(r => <tr key={r.id}><td>{new Date(String(r.data.observed_at || r.created_at)).toLocaleString()}</td><td>{String(r.data.value)}</td><td>{String(r.data.target)}</td></tr>)}</tbody></table></div></details>)}</section>;
+  return (
+    <section className="st-card">
+      <h2>Historical scorecard</h2>
+      <p>
+        Every metric edit preserves its previous observation. Group key results under an
+        objective to track your operating goals.
+      </p>
+      {metrics.map((m) => (
+        <details key={m.id}>
+          <summary>
+            {String(m.data.objective || "Operating goals")} · {m.title} ·{" "}
+            {String(m.data.value)} / {String(m.data.target)}
+          </summary>
+          <p>
+            {String(m.data.owner || "No owner assigned")} · Review{" "}
+            {String(m.data.review_date || "not scheduled")}
+          </p>
+          <div className="st-table-scroll">
+            <table className="st-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Value</th>
+                  <th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { ...m, data: { ...m.data, observed_at: m.updated_at } },
+                  ...records.filter(
+                    (r) => r.kind === "metric_observation" && r.data.metric_id === m.id,
+                  ),
+                ].map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      {new Date(
+                        String(r.data.observed_at || r.created_at),
+                      ).toLocaleString()}
+                    </td>
+                    <td>{String(r.data.value)}</td>
+                    <td>{String(r.data.target)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ))}
+    </section>
+  );
 }
 
 export function WorkspaceNotifications({ id }: { id: string }) {
   const [items, setItems] = useState<StudioRecord[]>([]);
   const [error, setError] = useState("");
-  useEffect(() => { let active = true; const refresh = () => studioRequest<StudioRecord[]>(`/api/studio/${id}/notifications`).then(value => { if (active) setItems(value); }).catch(() => undefined); void refresh(); const timer = setInterval(() => void refresh(), 30000); return () => { active = false; clearInterval(timer); }; }, [id]);
-  return <section className="st-card"><h2>Your notifications</h2><p>Mention a colleague with @their.email in a comment. Metric targets generate a notice when reached.</p>{error && <p role="alert">{error}</p>}{items.length ? items.map(item => <div key={item.id} className="st-compact-row"><div><strong>{item.title}</strong><small>{item.body.slice(0, 160)}</small></div><button className="st-secondary" disabled={!!item.data.read} onClick={async () => { try { await studioRequest(`/api/studio/${id}/notifications/${item.id}/read`, "POST"); setItems(await studioRequest(`/api/studio/${id}/notifications`)); } catch (e) { setError(e instanceof Error ? e.message : "Unable to update notification."); } }}>{item.data.read ? "Read" : "Mark read"}</button></div>) : <p>No notifications yet.</p>}</section>;
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      studioRequest<StudioRecord[]>(`/api/studio/${id}/notifications`)
+        .then((value) => {
+          if (active) setItems(value);
+        })
+        .catch(() => undefined);
+    void refresh();
+    const timer = setInterval(() => void refresh(), 30000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [id]);
+  return (
+    <section className="st-card">
+      <h2>Your notifications</h2>
+      <p>
+        Mention a colleague with @their.email in a comment. Metric targets generate a
+        notice when reached.
+      </p>
+      {error && <p role="alert">{error}</p>}
+      {items.length ? (
+        items.map((item) => (
+          <div key={item.id} className="st-compact-row">
+            <div>
+              <strong>{item.title}</strong>
+              <small>{item.body.slice(0, 160)}</small>
+            </div>
+            <button
+              className="st-secondary"
+              disabled={!!item.data.read}
+              onClick={async () => {
+                try {
+                  await studioRequest(
+                    `/api/studio/${id}/notifications/${item.id}/read`,
+                    "POST",
+                  );
+                  setItems(await studioRequest(`/api/studio/${id}/notifications`));
+                } catch (e) {
+                  setError(
+                    e instanceof Error ? e.message : "Unable to update notification.",
+                  );
+                }
+              }}
+            >
+              {item.data.read ? "Read" : "Mark read"}
+            </button>
+          </div>
+        ))
+      ) : (
+        <p>No notifications yet.</p>
+      )}
+    </section>
+  );
 }

@@ -115,6 +115,7 @@ def start_board_run(session_id: str, payload: MessageCreate, request: Request, d
 
 @router.get("")
 def list_jobs(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    recover_runs()
     return [serialize_job(db, j) for j in db.query(Job).filter_by(user_id=user.id).order_by(Job.created_at.desc()).limit(30)]
 
 @router.get("/{job_id}")

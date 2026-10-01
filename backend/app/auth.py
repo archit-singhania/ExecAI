@@ -67,6 +67,7 @@ def get_current_user(
     if not user:
         raise unauthorized
 
+    request.state.user_id = user.id
     return user
 
 def get_current_user_ws(token: str, db: Session) -> User:

@@ -31,8 +31,7 @@ async function authRequest<T>(path: string, body: unknown): Promise<T> {
     try {
       const parsed = await response.json();
       if (typeof parsed.detail === "string") detail = parsed.detail;
-    } catch {
-    }
+    } catch {}
     throw new Error(detail);
   }
 
@@ -56,6 +55,7 @@ export function getStoredUser(): AuthUser | null {
 }
 
 export function storeSession(auth: AuthResponse) {
+  window.localStorage.removeItem(DEMO_KEY);
   window.localStorage.removeItem(TOKEN_KEY);
   window.sessionStorage.setItem(TOKEN_KEY, auth.access_token);
   window.localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
@@ -63,11 +63,19 @@ export function storeSession(auth: AuthResponse) {
 
 export function clearSession() {
   const token = getToken();
-  void fetch(`${API_URL}/api/studio/security/logout`, { method: "POST", credentials: "include", keepalive: true, headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => undefined);
+  void fetch(`${API_URL}/api/studio/security/logout`, {
+    method: "POST",
+    credentials: "include",
+    keepalive: true,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }).catch(() => undefined);
   window.sessionStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
   window.localStorage.removeItem(DEMO_KEY);
+  Object.keys(window.sessionStorage)
+    .filter((key) => key.startsWith("ceoai-"))
+    .forEach((key) => window.sessionStorage.removeItem(key));
 }
 
 export function startDemoSession() {

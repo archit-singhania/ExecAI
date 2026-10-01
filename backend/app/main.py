@@ -80,7 +80,11 @@ if settings.sentry_dsn:
     except ImportError:
         print("[sentry] SENTRY_DSN is set but sentry-sdk isn't installed. Skipping.")
 
-Base.metadata.create_all(bind=engine)
+if settings.app_env == "production":
+    if settings.jwt_secret == "dev-only-change-me-in-prod" or len(settings.jwt_secret) < 32:
+        raise RuntimeError("Production requires a JWT_SECRET with at least 32 characters.")
+else:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CEO.ai API", version="0.1.0")
 
@@ -401,6 +405,7 @@ def list_reports(
             "summary": report.summary,
             "bullets": report.bullets.splitlines(),
             "score": report.score,
+            "source": report.source,
             "created_at": report.created_at,
         }
         for report in reports
@@ -425,6 +430,7 @@ def get_report(
         "summary": report.summary,
         "bullets": report.bullets.splitlines(),
         "score": report.score,
+            "source": report.source,
         "created_at": report.created_at,
     }
 
@@ -442,7 +448,7 @@ def export_report(
     bullets = "\n".join(f"- {bullet}" for bullet in report.bullets.splitlines())
     markdown = (
         f"# {report.title}\n\n"
-        f"**Agent:** {report.agent}\n\n"
+        f"**Agent:** {report.agent}\n\n**Source:** {report.source}\n\n"
         f"**Type:** {report.report_type}\n\n"
         f"**Score:** {report.score}/100\n\n"
         f"## Summary\n\n{report.summary}\n\n"
@@ -477,7 +483,7 @@ def update_task(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    _owned_session(task.session_id, db, current_user)
+    workspace_access(db, task.session_id, current_user, write=True)
     task.status = payload.status
     task.completed_at = datetime.utcnow() if payload.status.lower() in {"done", "complete", "completed"} else None
     db.commit()
@@ -588,7 +594,7 @@ async def send_message_ws(websocket: WebSocket, session_id: str):
 def dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     active_session = (
         db.query(BusinessSession)
-        .filter(BusinessSession.user_id == current_user.id)
+        .filter(BusinessSession.user_id == current_user.id, BusinessSession.id.notin_(db.query(StudioRecord.session_id).filter_by(kind="archive")))
         .order_by(desc(BusinessSession.updated_at))
         .first()
     )
@@ -635,6 +641,7 @@ def dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_cu
                 "summary": report.summary,
                 "bullets": report.bullets.splitlines(),
                 "score": report.score,
+            "source": report.source,
                 "created_at": report.created_at,
             }
             for report in reports
@@ -664,6 +671,7 @@ def list_board_meetings(
             "summary": report.summary,
             "bullets": report.bullets.splitlines(),
             "score": report.score,
+            "source": report.source,
             "created_at": report.created_at,
         }
         for report in reports

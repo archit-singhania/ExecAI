@@ -1,4 +1,5 @@
 export type AgentReport = {
+  source?: string;
   id?: string | null;
   agent: string;
   report_type?: string;

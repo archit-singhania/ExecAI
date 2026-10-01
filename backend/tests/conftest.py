@@ -10,9 +10,10 @@ os.environ["JWT_SECRET"] = "isolated-test-secret"
 
 @pytest.fixture(autouse=True)
 def offline_providers(monkeypatch):
-    from app import embeddings, llm_router, store
+    from app import embeddings, llm_router, llm, store
     from app.ratelimit import reset_limits
     reset_limits()
     monkeypatch.setattr(store, "_memory", store.MemoryStore())
     monkeypatch.setattr(embeddings, "_ollama_embedding", lambda *args, **kwargs: None)
     monkeypatch.setattr(llm_router, "_call", lambda *args, **kwargs: None)
+    monkeypatch.setattr(llm, "_client", lambda: (None, None))

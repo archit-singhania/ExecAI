@@ -139,6 +139,7 @@ class AgentReport(Base):
     summary: Mapped[str] = mapped_column(Text)
     bullets: Mapped[str] = mapped_column(Text, default="")
     score: Mapped[int] = mapped_column(Integer, default=70)
+    source: Mapped[str] = mapped_column(String(80), default="legacy-unverified")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     session: Mapped[BusinessSession] = relationship(back_populates="reports")

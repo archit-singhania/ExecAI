@@ -162,18 +162,21 @@ RESPONSE_FORMAT_INSTRUCTIONS = (
 
 def _client():
     settings = get_settings()
-    provider = settings.llm_provider.lower()
+    options = llm_router.RUN_OPTIONS.get()
+    provider = options.get("provider") or settings.llm_provider.lower()
     if provider == "groq":
+        if settings.llm_local_only or options.get("local_only", False):
+            return None, None
         if not settings.groq_api_key:
             return None, None
         return (
-            OpenAI(api_key=settings.groq_api_key, base_url="https://api.groq.com/openai/v1"),
-            settings.groq_model,
+            OpenAI(api_key=settings.groq_api_key, base_url="https://api.groq.com/openai/v1", timeout=45, max_retries=0),
+            settings.groq_model or "llama-3.3-70b-versatile",
         )
     if provider == "ollama":
         return (
-            OpenAI(api_key="ollama", base_url=settings.ollama_base_url),
-            settings.ollama_model,
+            OpenAI(api_key="ollama", base_url=settings.ollama_base_url, timeout=45, max_retries=0),
+            settings.ollama_model or "qwen3:8b",
         )
     return None, None
 
@@ -248,7 +251,7 @@ def _run_tool_calls(client, model, messages: list[dict], tools: list[dict]) -> l
         tools=tools,
         tool_choice="auto",
         temperature=0.2,
-        max_tokens=500,
+        max_tokens=min(500, int(llm_router.RUN_OPTIONS.get().get("max_tokens", 500))),
     )
     message = completion.choices[0].message
     tool_calls = getattr(message, "tool_calls", None)
@@ -365,9 +368,12 @@ def generate_agent_report(
             model=model,
             messages=messages,
             temperature=0.4,
-            max_tokens=500,
+            max_tokens=min(500, int(llm_router.RUN_OPTIONS.get().get("max_tokens", 500))),
         )
         raw = completion.choices[0].message.content or ""
+        options = llm_router.RUN_OPTIONS.get()
+        provider = options.get("provider") or get_settings().llm_provider.lower()
+        llm_router.RUN_SOURCE.set(f"model:{provider}:{model}"[:80])
         return _parse_report(agent_key, raw)
     except Exception:
         return _router_report(agent_key, goal, message, memory_context)

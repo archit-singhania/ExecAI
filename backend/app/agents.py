@@ -402,15 +402,28 @@ def _register_sequence() -> None:
 
 def _run_isolated(agent_fn: Callable[["CEOState"], "CEOState"], base: "CEOState") -> "CEOState":
     local: CEOState = {**base, "reports": []}
-    from app.llm_router import RUN_OPTIONS
+    from app.llm_router import RUN_OPTIONS, RUN_SOURCE
     token = RUN_OPTIONS.set(base.get("options", {}))
+    source_token = RUN_SOURCE.set(None)
     try:
         agent_fn(local)
+        source = RUN_SOURCE.get()
     finally:
         RUN_OPTIONS.reset(token)
+        RUN_SOURCE.reset(source_token)
     for report in local["reports"]:
         report.setdefault("source", "local-template")
+        if report["source"] == "model" and source:
+            report["source"] = source
     return local
+
+def _synthesize_with_controls(state):
+    from app.llm_router import RUN_OPTIONS
+    token = RUN_OPTIONS.set(state.get("options", {}))
+    try:
+        return ceo_synthesis(state)
+    finally:
+        RUN_OPTIONS.reset(token)
 
 
 def _merge(state: "CEOState", name: str, local: "CEOState") -> None:
@@ -518,7 +531,7 @@ def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = N
     if not state["reports"]:
         raise RuntimeError("Every specialist failed to file a report.")
 
-    ceo_synthesis(state)
+    _synthesize_with_controls(state)
 
     if not memory_context and not options:
         cache_set(key, state, ttl_seconds=86400)
@@ -572,5 +585,5 @@ def run_ceo_agents_stream(
         if local:
             state["reports"].extend(local["reports"])
 
-    ceo_synthesis(state)
+    _synthesize_with_controls(state)
     yield "ceo", state

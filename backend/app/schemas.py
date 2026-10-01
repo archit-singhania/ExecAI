@@ -79,6 +79,7 @@ class AgentReportOut(BaseModel):
     summary: str
     bullets: list[str]
     score: int
+    source: str = "legacy-unverified"
     created_at: datetime | None = None
 
 

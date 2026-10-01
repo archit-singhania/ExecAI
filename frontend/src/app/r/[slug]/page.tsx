@@ -6,6 +6,7 @@ import { Logo } from "@/components/logo";
 type SharedReport = {
   title: string;
   agent: string;
+  source?: string;
   report_type: string;
   summary: string;
   bullets: string[];
@@ -33,7 +34,11 @@ function scoreColor(score: number) {
   return "#d45f3a";
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
   const report = await fetchShared(slug);
 
@@ -81,7 +86,9 @@ export default async function SharedReportPage({
         <article className="glass-strong mt-10 rounded-xl p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="sec-eyebrow">{report.agent}</p>
+              <p className="sec-eyebrow">
+                {report.agent} · {report.source || "legacy-unverified"}
+              </p>
               <h1 className="mt-2 text-2xl font-bold leading-tight tracking-[-0.02em] sm:text-3xl">
                 {report.title}
               </h1>
@@ -98,16 +105,23 @@ export default async function SharedReportPage({
             </div>
           </div>
 
-          <p className="mt-5 text-[0.95rem] font-medium leading-8 text-steel">{report.summary}</p>
+          <p className="mt-5 text-[0.95rem] font-medium leading-8 text-steel">
+            {report.summary}
+          </p>
 
           {report.bullets.length ? (
             <ol className="mt-6 space-y-2">
               {report.bullets.map((bullet, index) => (
-                <li key={bullet} className="sec-card sec-card-edge flex gap-3 rounded-lg py-3 pl-4 pr-4">
+                <li
+                  key={bullet}
+                  className="sec-card sec-card-edge flex gap-3 rounded-lg py-3 pl-4 pr-4"
+                >
                   <span className="mt-0.5 shrink-0 text-[0.72rem] font-black tabular-nums text-steel">
                     {String(index + 1).padStart(2, "0")}
                   </span>
-                  <span className="text-[0.85rem] font-semibold leading-6">{bullet}</span>
+                  <span className="text-[0.85rem] font-semibold leading-6">
+                    {bullet}
+                  </span>
                 </li>
               ))}
             </ol>

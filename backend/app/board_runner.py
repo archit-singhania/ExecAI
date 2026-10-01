@@ -73,6 +73,7 @@ def execute_board_run(db: Session, session: BusinessSession, content: str, on_ev
                 summary=item["summary"],
                 bullets="\n".join(item["bullets"]),
                 score=item["score"],
+                source=item.get("source", "legacy-unverified"),
             )
         )
 

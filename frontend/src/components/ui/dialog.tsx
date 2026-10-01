@@ -53,9 +53,9 @@ export function Dialog({
       const panel = panelRef.current;
       if (!panel) return;
 
-      const nodes = Array.from(
-        panel.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ).filter((node) => node.offsetParent !== null);
+      const nodes = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (node) => node.offsetParent !== null,
+      );
 
       if (nodes.length === 0) {
         event.preventDefault();
@@ -89,7 +89,9 @@ export function Dialog({
     const frame = requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel) return;
-      const first = panel.querySelector<HTMLElement>(FOCUSABLE);
+      const first =
+        panel.querySelector<HTMLElement>("[data-autofocus]") ||
+        panel.querySelector<HTMLElement>(FOCUSABLE);
       (first ?? panel).focus();
     });
 

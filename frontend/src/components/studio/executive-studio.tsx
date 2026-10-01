@@ -27,8 +27,14 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { BoardWorkflows, ScenarioComparison, MetricHistory, WorkspaceNotifications } from "@/components/studio/workflows";
+import {
+  BoardWorkflows,
+  ScenarioComparison,
+  MetricHistory,
+  WorkspaceNotifications,
+} from "@/components/studio/workflows";
 import { Dialog } from "@/components/ui/dialog";
+import { usePlan } from "@/lib/use-plan";
 import { Logo } from "@/components/logo";
 import { useTheme } from "@/components/theme-provider";
 import { api, AgentReport, ChatMessage } from "@/lib/api";
@@ -119,6 +125,7 @@ export function ExecutiveStudio() {
   const section = NAV.some((n) => n.id === route) ? route : "overview";
   const title = NAV.find((n) => n.id === section)?.name ?? "Overview";
   const { appearance, setAppearance } = useTheme();
+  const plan = usePlan(isDemoSession());
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState("");
   const [records, setRecords] = useState<StudioRecord[]>([]);
@@ -142,6 +149,8 @@ export function ExecutiveStudio() {
   const [editing, setEditing] = useState<StudioRecord | null>(null);
   const [editingTask, setEditingTask] = useState<StudioTask | null>(null);
   const [reportPreview, setReportPreview] = useState<AgentReport | null>(null);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const closeReport = useCallback(() => setReportPreview(null), []);
   const [online, setOnline] = useState(true);
   const [installPrompt, setInstallPrompt] = useState<
     (Event & { prompt: () => Promise<void> }) | null
@@ -216,8 +225,21 @@ export function ExecutiveStudio() {
         window.removeEventListener("beforeinstallprompt", handleInstall);
       };
     }
+    if (!navigator.onLine) {
+      const cached = window.sessionStorage.getItem("ceoai-workspaces");
+      if (cached) {
+        const items: Workspace[] = JSON.parse(cached);
+        setWorkspaces(items);
+        setSelected(
+          items.find((w) => w.id === window.sessionStorage.getItem("ceoai-workspace"))
+            ?.id || "",
+        );
+        setBooting(false);
+      }
+    }
     studioRequest<Workspace[]>("/api/studio/workspaces")
       .then((items) => {
+        window.sessionStorage.setItem("ceoai-workspaces", JSON.stringify(items));
         setWorkspaces(items);
         const stored = window.sessionStorage.getItem("ceoai-workspace");
         setSelected(
@@ -240,7 +262,11 @@ export function ExecutiveStudio() {
   useEffect(() => {
     if (!selected) return;
     window.sessionStorage.setItem("ceoai-workspace", selected);
-    setRecords([]); setTasks([]); setReports([]); setMessages([]); setMembers([]);
+    setRecords([]);
+    setTasks([]);
+    setReports([]);
+    setMessages([]);
+    setMembers([]);
     setEditing(null);
     setEditingTask(null);
     setJob(null);
@@ -868,7 +894,20 @@ export function ExecutiveStudio() {
                       <Field label="Market, stage, constraints, budget and baseline KPIs">
                         <textarea name="body" defaultValue={editing?.body} rows={4} />
                       </Field>
-                      <div className="st-form-grid">{["industry", "stage", "target_customer", "budget", "constraints", "baseline_kpis"].map(key => <Field key={key} label={key.replaceAll("_", " ")}><input name={key} defaultValue={text(editing?.data[key])}/></Field>)}</div>
+                      <div className="st-form-grid">
+                        {[
+                          "industry",
+                          "stage",
+                          "target_customer",
+                          "budget",
+                          "constraints",
+                          "baseline_kpis",
+                        ].map((key) => (
+                          <Field key={key} label={key.replaceAll("_", " ")}>
+                            <input name={key} defaultValue={text(editing?.data[key])} />
+                          </Field>
+                        ))}
+                      </div>
                       <button className="st-primary" disabled={busy || !writable}>
                         Save context
                       </button>
@@ -876,9 +915,9 @@ export function ExecutiveStudio() {
                   </section>
                 </>
               )}
-              {section === "team" && <WorkspaceNotifications id={selected}/>}
-              {section === "finance" && <ScenarioComparison records={records}/>}
-              {section === "goals" && <MetricHistory records={records}/>}
+              {section === "team" && <WorkspaceNotifications id={selected} />}
+              {section === "finance" && <ScenarioComparison records={records} />}
+              {section === "goals" && <MetricHistory records={records} />}
               {section === "boardroom" && (
                 <>
                   <section className="st-card">
@@ -1015,7 +1054,15 @@ export function ExecutiveStudio() {
                       ))}
                     </div>
                   )}
-                  <BoardWorkflows id={selected} records={records} writable={!!writable} refresh={() => refresh(selected)} action={action} job={job} onJob={setJob}/>
+                  <BoardWorkflows
+                    id={selected}
+                    records={records}
+                    writable={!!writable}
+                    refresh={() => refresh(selected)}
+                    action={action}
+                    job={job}
+                    onJob={setJob}
+                  />
                   <section className="st-card">
                     <h2>Conversation</h2>
                     {messages.length ? (
@@ -1157,7 +1204,27 @@ export function ExecutiveStudio() {
                         </div>
                       )}
                       {section === "goals" && (
-                        <div className="st-form-grid"><Field label="Objective"><input name="objective" defaultValue={text(editing?.data.objective)} placeholder="The larger goal this key result supports"/></Field><Field label="Metric owner"><input name="owner" defaultValue={text(editing?.data.owner)}/></Field><Field label="Review date"><input name="review_date" type="date" defaultValue={text(editing?.data.review_date)}/></Field>
+                        <div className="st-form-grid">
+                          <Field label="Objective">
+                            <input
+                              name="objective"
+                              defaultValue={text(editing?.data.objective)}
+                              placeholder="The larger goal this key result supports"
+                            />
+                          </Field>
+                          <Field label="Metric owner">
+                            <input
+                              name="owner"
+                              defaultValue={text(editing?.data.owner)}
+                            />
+                          </Field>
+                          <Field label="Review date">
+                            <input
+                              name="review_date"
+                              type="date"
+                              defaultValue={text(editing?.data.review_date)}
+                            />
+                          </Field>
                           <Field label="Current value">
                             <input
                               name="value"
@@ -1622,7 +1689,8 @@ export function ExecutiveStudio() {
                     {reports.map((r) => (
                       <article className="st-card" key={r.id}>
                         <span className="st-eyebrow">
-                          {r.agent} · {dated(r.created_at || undefined)}
+                          {r.agent} · {r.source || "legacy-unverified"} ·{" "}
+                          {dated(r.created_at || undefined)}
                         </span>
                         <h2>{r.title}</h2>
                         <p>{r.summary}</p>
@@ -1864,7 +1932,7 @@ export function ExecutiveStudio() {
                             </option>
                           </select>
                         </Field>
-                        <Field label="Maximum tokens per specialist">
+                        <Field label="Maximum tokens per model response">
                           <input
                             name="max_tokens"
                             type="number"
@@ -1885,7 +1953,34 @@ export function ExecutiveStudio() {
                   </section>
                   <section className="st-card">
                     <h2>Provider configuration</h2>
-                    <div className="st-report-grid">{provider ? ((provider.providers || []) as (ProviderStatus & { configured: boolean; local: boolean })[]).map(p => <article key={p.name}><span className="st-eyebrow">{p.local ? "Local" : "Hosted"}</span><h3>{p.name}</h3><p>{p.model || "Default model"}</p><span className="st-chip">{p.configured ? p.cooling_down ? "Cooling down" : "Configured" : "Not configured"}</span><p>{p.served || 0} calls served since server startup</p></article>) : <p>Provider status is unavailable.</p>}</div>
+                    <div className="st-report-grid">
+                      {provider ? (
+                        (
+                          (provider.providers || []) as (ProviderStatus & {
+                            configured: boolean;
+                            local: boolean;
+                          })[]
+                        ).map((p) => (
+                          <article key={p.name}>
+                            <span className="st-eyebrow">
+                              {p.local ? "Local" : "Hosted"}
+                            </span>
+                            <h3>{p.name}</h3>
+                            <p>{p.model || "Default model"}</p>
+                            <span className="st-chip">
+                              {p.configured
+                                ? p.cooling_down
+                                  ? "Cooling down"
+                                  : "Configured"
+                                : "Not configured"}
+                            </span>
+                            <p>{p.served || 0} calls served since server startup</p>
+                          </article>
+                        ))
+                      ) : (
+                        <p>Provider status is unavailable.</p>
+                      )}
+                    </div>
                     <p>
                       Run events preserve each report&apos;s source and progress. Local
                       templates are explicitly labeled and should be treated as planning
@@ -1937,7 +2032,38 @@ export function ExecutiveStudio() {
                     ))}
                   </section>
                   <section className="st-card">
-                    <h2>Your workspace & data</h2>{workspace?.owned && <form onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); void action(async () => { await studioRequest(`/api/studio/workspaces/${selected}`, "PATCH", { title: values.get("title") }); setWorkspaces(await studioRequest("/api/studio/workspaces")); setNotice("Workspace renamed."); }); }}><Field label="Workspace name"><input name="title" required maxLength={180} defaultValue={workspace.title}/></Field><button className="st-secondary" disabled={busy}>Rename workspace</button></form>}
+                    <h2>Your workspace & data</h2>
+                    {workspace?.owned && (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const values = new FormData(event.currentTarget);
+                          void action(async () => {
+                            await studioRequest(
+                              `/api/studio/workspaces/${selected}`,
+                              "PATCH",
+                              { title: values.get("title") },
+                            );
+                            setWorkspaces(
+                              await studioRequest("/api/studio/workspaces"),
+                            );
+                            setNotice("Workspace renamed.");
+                          });
+                        }}
+                      >
+                        <Field label="Workspace name">
+                          <input
+                            name="title"
+                            required
+                            maxLength={180}
+                            defaultValue={workspace.title}
+                          />
+                        </Field>
+                        <button className="st-secondary" disabled={busy}>
+                          Rename workspace
+                        </button>
+                      </form>
+                    )}
                     <div className="st-form-actions">
                       <Link href="/settings" className="st-secondary">
                         Account export & deletion
@@ -1986,58 +2112,91 @@ export function ExecutiveStudio() {
           </footer>
         </main>
       </div>
-      <Dialog open={searchOpen} onClose={() => setSearchOpen(false)} title="Search workspace" className="st-search-modal">
-            <div className="st-section-head">
-              <h2>Find your work</h2>
-              <button
-                className="st-icon"
-                aria-label="Close search"
-                onClick={() => setSearchOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void action(async () =>
-                  setResults(
-                    await studioRequest(
-                      `/api/studio/search/all?q=${encodeURIComponent(query)}`,
-                    ),
-                  ),
-                );
+      <Dialog
+        open={searchOpen}
+        onClose={closeSearch}
+        title="Search workspace"
+        className="st-search-modal"
+      >
+        <div className="st-section-head">
+          <h2>Find your work</h2>
+          <button
+            className="st-icon"
+            aria-label="Close search"
+            onClick={() => setSearchOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void action(async () =>
+              setResults(
+                await studioRequest(
+                  `/api/studio/search/all?q=${encodeURIComponent(query)}`,
+                ),
+              ),
+            );
+          }}
+        >
+          <input
+            autoFocus
+            aria-label="Search query"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            minLength={2}
+            placeholder="Search decisions, reports, knowledge, tasks…"
+          />
+          <button className="st-primary">Search</button>
+        </form>
+        <div className="st-search-results">
+          {results.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => {
+                window.sessionStorage.setItem("ceoai-workspace", r.session_id);
+                setSelected(r.session_id);
+                setSearchOpen(false);
+                const destinations: Record<string, string> = {
+                  task: "execution",
+                  task_details: "execution",
+                  report: "reports",
+                  decision: "decisions",
+                  decision_revision: "decisions",
+                  knowledge: "knowledge",
+                  research: "knowledge",
+                  scenario: "finance",
+                  metric: "goals",
+                  metric_observation: "goals",
+                  profile: "overview",
+                  template: "boardroom",
+                  debate: "boardroom",
+                  comment: "team",
+                  activity: "team",
+                  preferences: "controls",
+                  archive: "security",
+                };
+                const destination = destinations[r.kind] || "overview";
+                window.location.href =
+                  destination === "overview" ? "/studio" : `/studio/${destination}`;
               }}
             >
-              <input
-                autoFocus
-                aria-label="Search query"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                minLength={2}
-                placeholder="Search decisions, reports, knowledge, tasks…"
-              />
-              <button className="st-primary">Search</button>
-            </form>
-            <div className="st-search-results">
-              {results.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => {
-                    window.sessionStorage.setItem("ceoai-workspace", r.session_id);
-                    setSelected(r.session_id);
-                    setSearchOpen(false);
-                    window.location.href = `/studio/${r.kind === "task" ? "execution" : r.kind === "report" ? "reports" : r.kind === "decision" ? "decisions" : "knowledge"}`;
-                  }}
-                >
-                  <span className="st-eyebrow">{r.kind}</span>
-                  <strong>{r.title}</strong>
-                  <small>{r.body?.slice(0, 130)}</small>
-                </button>
-              ))}
-            </div>
+              <span className="st-eyebrow">{r.kind}</span>
+              <strong>{r.title}</strong>
+              <small>{r.body?.slice(0, 130)}</small>
+            </button>
+          ))}
+        </div>
       </Dialog>
-      <Dialog open={!!reportPreview} onClose={() => setReportPreview(null)} title="Report inspector" className="st-search-modal st-reading">{reportPreview && <>
+      <Dialog
+        open={!!reportPreview}
+        onClose={closeReport}
+        title="Report inspector"
+        className="st-search-modal st-reading"
+      >
+        {reportPreview && (
+          <>
             <div className="st-section-head">
               <span className="st-eyebrow">{reportPreview.agent}</span>
               <button
@@ -2061,7 +2220,9 @@ export function ExecutiveStudio() {
             >
               Download PDF
             </button>
-      </>}</Dialog>
+          </>
+        )}
+      </Dialog>
     </div>
   );
 }

@@ -10,6 +10,7 @@ depends_on = None
 
 def upgrade():
     op.add_column("review_schedules", sa.Column("timezone", sa.String(80), nullable=True))
+    op.add_column("agent_reports", sa.Column("source", sa.String(80), nullable=False, server_default="legacy-unverified"))
     op.create_table("studio_records", sa.Column("id", sa.String(36), primary_key=True), sa.Column("session_id", sa.String(36), sa.ForeignKey("business_sessions.id"), nullable=False), sa.Column("author_id", sa.String(36), sa.ForeignKey("users.id"), nullable=False), sa.Column("kind", sa.String(30), nullable=False), sa.Column("title", sa.String(240), nullable=False), sa.Column("body", sa.Text(), nullable=False), sa.Column("data", sa.Text(), nullable=False), sa.Column("version", sa.Integer(), nullable=False), sa.Column("created_at", sa.DateTime(), nullable=False), sa.Column("updated_at", sa.DateTime(), nullable=False))
     for name in ["session_id", "author_id", "kind"]:
         op.create_index(f"ix_studio_records_{name}", "studio_records", [name])
@@ -31,5 +32,6 @@ def upgrade():
 
 def downgrade():
     op.drop_column("review_schedules", "timezone")
+    op.drop_column("agent_reports", "source")
     for name in ["knowledge_chunks", "run_events", "auth_sessions", "workspace_members", "studio_records"]:
         op.drop_table(name)

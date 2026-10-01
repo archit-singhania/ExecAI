@@ -84,6 +84,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             raise
 
         duration = (time.perf_counter() - started) * 1000
+        user_id_var.set(getattr(request.state, "user_id", "-"))
         response.headers["X-Request-ID"] = request_id
 
         if request.url.path not in QUIET_PATHS:
