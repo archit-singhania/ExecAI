@@ -33,6 +33,8 @@ npm run dev
 
 Open `http://localhost:8000/health`: expect `{"status":"ok"}`. Open `http://localhost:3000`: expect the premium landing page. If a port is occupied, stop only the server you own or change both matching URL/origin settings. For a production-build preview, run `npm run build`, followed by `npm run start --workspace frontend`; keep the API running. Do not run dev and production frontend servers on the same port.
 
+When running all four repositories together, use CEO.ai's reserved API/frontend ports **8012/3012**. In Terminal A, set `$env:CORS_ORIGINS='http://localhost:3012'` and `$env:APP_BASE_URL='http://localhost:3012'`, then start Uvicorn with `--port 8012`. In Terminal B, set `$env:NEXT_PUBLIC_API_URL='http://localhost:8012'`, then run `npm run dev --workspace frontend -- --port 3012`. Open `http://localhost:3012/studio`; the API health URL is `http://localhost:8012/health`. Keep the same chosen database in Terminal A. These session variables override the example files without editing other projects.
+
 ## Isolated complete acceptance accounts
 
 A normal signup starts on Free: one active workspace, twenty monthly runs, no paid report exports or scheduled reviews. Verify those limits with a real signed-up account. To test all local features without purchasing or changing existing users, stop Terminal A and select a separate acceptance database in that terminal:
