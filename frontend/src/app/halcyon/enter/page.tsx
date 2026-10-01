@@ -272,6 +272,7 @@ export default function HalcyonEnterPage() {
         ) : (
           <section className="flex flex-1 flex-col py-8">
             <div className="hal-stream">
+              {process.env.NEXT_PUBLIC_PIXEL_STREAM_URL ? <>
               <iframe
                 ref={frameRef}
                 src={pixelStreamUrl()}
@@ -280,9 +281,10 @@ export default function HalcyonEnterPage() {
                 onLoad={() => setLinked(handOverSession(frameRef.current, session.id, quality))}
                 className="h-full w-full border-0"
               />
+              </> : <div className="hal-browser-world" style={{ background: worldGradient(WORLD_BASELINES.find(w => w.id === world) || WORLD_BASELINES[0]), filter: `brightness(${environment?.brightness ?? .8})` }} aria-label="Browser ambient world"><div className="hal-browser-sun"/><div className="hal-browser-mountain"/><div className="hal-browser-water"/><div className={`hal-breath ${environment?.breathing_guide ? "is-breathing" : ""}`}><span>{environment?.breathing_guide ? "Breathe slowly" : "A moment of calm"}</span></div></div>}
               <div className="hal-stream-hint">
                 <span className="hal-status-dot" />
-                {linked ? "Linked to this session" : "Waiting for the world"}
+                {process.env.NEXT_PUBLIC_PIXEL_STREAM_URL ? linked ? "Linked to this session" : "Waiting for the world" : "Browser ambience · Unreal stream not configured"}
               </div>
             </div>
 

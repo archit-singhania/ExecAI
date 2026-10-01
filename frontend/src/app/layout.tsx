@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LocaleProvider } from "@/lib/i18n";
 import "./globals.css";
@@ -8,23 +7,12 @@ import "./globals.css";
 import "@/styles/tokens.css";
 import "@/styles/primitives.css";
 import "@/styles/premium.css";
-
-const sans = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const display = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-display",
-  display: "swap",
-});
+import "@/styles/material.css";
 
 export const metadata: Metadata = {
-  title: "CEO.ai",
+  title: "CEO.ai — Executive Studio",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/brand/compass.svg", apple: "/brand/compass.svg" },
   description: "Hire an AI CEO to plan, challenge, and operate your startup.",
 };
 
@@ -33,7 +21,7 @@ const noFlashScript = `
   try {
     var storedMode = window.localStorage.getItem("ceoai-theme-mode");
     var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var mode = storedMode || (prefersDark ? "dark" : "light");
+    var mode = !storedMode || storedMode === "system" ? (prefersDark ? "dark" : "light") : storedMode;
     if (mode === "dark") document.documentElement.classList.add("dark");
 
     var storedAccent = window.localStorage.getItem("ceoai-theme-accent");
@@ -57,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable}`} suppressHydrationWarning>
+    <html lang="en" className="ceo-material" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
       </head>

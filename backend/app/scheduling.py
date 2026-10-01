@@ -5,7 +5,8 @@ This module owns the next-run math and the shared board-report builder so
 both the manual endpoint and the cron runner produce identical output.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as utc_timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ def compute_next_run(
     tz_offset_minutes: int,
     last_run_at: datetime | None = None,
     now: datetime | None = None,
+    timezone: str | None = None,
 ) -> datetime | None:
     """Next run in UTC, or None when the cadence is off.
 
@@ -36,7 +38,8 @@ def compute_next_run(
 
     now = now or datetime.utcnow()
     offset = timedelta(minutes=tz_offset_minutes)
-    local_now = now + offset
+    zone = ZoneInfo(timezone) if timezone else None
+    local_now = now.replace(tzinfo=utc_timezone.utc).astimezone(zone).replace(tzinfo=None) if zone else now + offset
 
     candidate = local_now.replace(hour=hour, minute=0, second=0, microsecond=0)
     candidate += timedelta(days=(weekday - candidate.weekday()) % 7)
@@ -45,11 +48,12 @@ def compute_next_run(
 
     interval = CADENCE_DAYS.get(cadence, 7)
     if last_run_at is not None and interval > 7:
-        earliest_local = last_run_at + offset + timedelta(days=interval)
+        last_local = last_run_at.replace(tzinfo=utc_timezone.utc).astimezone(zone).replace(tzinfo=None) if zone else last_run_at + offset
+        earliest_local = last_local + timedelta(days=interval)
         while candidate < earliest_local:
             candidate += timedelta(days=7)
 
-    return candidate - offset
+    return candidate.replace(tzinfo=zone).astimezone(utc_timezone.utc).replace(tzinfo=None) if zone else candidate - offset
 
 
 def build_board_meeting(db: Session, session: BusinessSession, trigger: str = "manual") -> AgentReport:
@@ -125,7 +129,7 @@ def get_or_create_schedule(db: Session, user_id: str) -> ReviewSchedule:
     if schedule:
         return schedule
 
-    schedule = ReviewSchedule(user_id=user_id)
+    schedule = ReviewSchedule(user_id=user_id, cadence="weekly", weekday=0, hour=9, tz_offset_minutes=0, email_enabled=True)
     schedule.next_run_at = compute_next_run(
         schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes
     )
@@ -214,7 +218,7 @@ def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) 
         if session is None:
             # Nothing to review yet; roll the schedule forward so we don't spin.
             schedule.next_run_at = compute_next_run(
-                schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now
+                schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now, timezone=schedule.timezone
             )
             results.append({"user_id": schedule.user_id, "status": "skipped_no_session"})
             continue
@@ -222,7 +226,7 @@ def run_due_reviews(db: Session, now: datetime | None = None, limit: int = 200) 
         report = build_board_meeting(db, session, trigger="scheduled")
         schedule.last_run_at = now
         schedule.next_run_at = compute_next_run(
-            schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now
+            schedule.cadence, schedule.weekday, schedule.hour, schedule.tz_offset_minutes, now, now, timezone=schedule.timezone
         )
 
         delivered = False

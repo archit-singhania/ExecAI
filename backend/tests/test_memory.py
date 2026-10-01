@@ -1,6 +1,8 @@
 import json
 import subprocess
 import sys
+import os
+from pathlib import Path
 from datetime import datetime, timedelta
 
 from app.embeddings import _hashing_embedding, _stable_hash, cosine_similarity, embed_text
@@ -26,12 +28,13 @@ def test_hash_is_stable_across_processes():
     invalidated every stored embedding on restart. This is the regression
     test for that."""
     code = "from app.embeddings import _stable_hash; print(_stable_hash('runway'))"
-    first = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
+    first = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
     second = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
-        env={"PYTHONHASHSEED": "1", "PATH": "/usr/bin:/bin"},
+        env={**env, "PYTHONHASHSEED": "1"},
     )
 
     assert first.stdout.strip()

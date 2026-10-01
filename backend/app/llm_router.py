@@ -20,6 +20,8 @@ LLM_LOCAL_ONLY=true.
 """
 
 import json
+from contextvars import ContextVar
+RUN_OPTIONS = ContextVar("ceo_run_options", default={})
 import random
 import time
 from dataclasses import dataclass, field
@@ -174,7 +176,11 @@ def complete(
     """
     settings = get_settings()
 
+    options = RUN_OPTIONS.get()
     order = TIERS.get(tier, TIERS["fast"])
+    if options.get("provider"):
+        order = [options["provider"]]
+    max_tokens = min(max_tokens, int(options.get("max_tokens", max_tokens)))
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
     for attempt in range(max(1, passes)):
@@ -183,7 +189,7 @@ def complete(
             if not provider:
                 continue
 
-            if settings.llm_local_only and not provider.local:
+            if (settings.llm_local_only or options.get("local_only", False)) and not provider.local:
                 continue
 
             if not provider.available(settings):

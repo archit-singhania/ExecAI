@@ -188,6 +188,7 @@ class ReviewSchedule(Base):
     weekday: Mapped[int] = mapped_column(Integer, default=0)  
     hour: Mapped[int] = mapped_column(Integer, default=9) 
     tz_offset_minutes: Mapped[int] = mapped_column(Integer, default=0) 
+    timezone: Mapped[str | None] = mapped_column(String(80), nullable=True)
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

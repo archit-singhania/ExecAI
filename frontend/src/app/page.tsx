@@ -1,143 +1,153 @@
 "use client";
-
 import Link from "next/link";
-import { ArrowRight, Feather, Moon, Radio, ShieldCheck, Sparkles, Volume2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { StatusPill } from "@/components/ui/status-pill";
+import {
+  ArrowRight,
+  Check,
+  Compass,
+  FileText,
+  Layers3,
+  Moon,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Wallet,
+} from "lucide-react";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
-import { AgentPreviewCard } from "@/components/marketing/agent-preview-card";
-import { LandingPillars } from "@/components/marketing/landing-pillars";
-import { MeshDivider, ScrollProgress } from "@/components/ui/scroll-chrome";
-import { AnimatedBackground } from "@/components/ui/animated-background";
-import { SceneStack } from "@/components/ui/scene-stack";
-import { agentMeta } from "@/lib/dashboard-data";
-import { useLocale } from "@/lib/i18n";
-
-const FEATURED_AGENTS: Array<{ name: keyof typeof agentMeta; pitch: string }> = [
-  {
-    name: "Market Research",
-    pitch: "Pressure-tests demand before you spend a cent building.",
-  },
-  {
-    name: "CFO",
-    pitch: "Caps validation spend and tracks runway against every decision.",
-  },
-  {
-    name: "CTO",
-    pitch: "Scopes the narrowest build that still proves repeat value.",
-  },
-  {
-    name: "Sales",
-    pitch: "Builds the pilot list and chases willingness to pay.",
-  },
-];
+import { Logo } from "@/components/logo";
+import { startDemoSession } from "@/lib/auth";
 
 export default function LandingPage() {
-  const { t } = useLocale();
-
   return (
-    <main className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-radial-ui text-ink">
-      <ScrollProgress />
-      <div className="scanline pointer-events-none absolute inset-0" />
-      <div className="landing-aurora pointer-events-none absolute inset-0">
-        <SceneStack
-          id="landing"
-          reactive
-          layers={["aurora", "volumetric", "liquid", "ribbons", "vortex", "constellation", "caustics", "grid"]}
-        />
-      </div>
-      <AnimatedBackground webgl={true} />
-      <div className="landing-veil pointer-events-none absolute inset-0" />
-
-      <div className="relative flex min-h-full flex-col">
-        <MarketingNav />
-
-        <section className="mx-auto grid w-full max-w-[1400px] grid-cols-1 items-center gap-6 px-4 pb-6 pt-4 sm:px-6 lg:min-h-[calc(100dvh-8rem)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:px-8">
-          <div className="animate-rise flex flex-col gap-5">
-            <div className="inline-flex w-fit items-center gap-2 rounded-md border border-ink/10 bg-white/70 px-3 py-1.5 text-[0.7rem] font-black shadow-line dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark sm:text-xs">
-              {t("hero.badge")}
-            </div>
-
-            <h1 className="max-w-xl text-[2.15rem] font-black leading-[1.02] sm:text-5xl lg:text-[3.1rem] bg-clip-text text-transparent bg-gradient-to-r from-ink to-steel dark:from-white dark:to-fog">
-              {t("hero.title")}
-            </h1>
-
-            <p className="max-w-lg text-sm leading-6 text-steel sm:text-base sm:leading-7">{t("hero.subtitle")}</p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href="/signup">
-                <Button className="h-12 px-6">
-                  {t("hero.ctaPrimary")} <ArrowRight size={17} />
-                </Button>
-              </Link>
-              <Link href="/login">
-                <Button variant="ghost" className="h-12 px-6">
-                  {t("hero.ctaSecondary")}
-                </Button>
-              </Link>
-              <Link href="/trial">
-                <Button variant="quiet" className="h-12 px-6 hover:bg-white/10 transition-colors">
-                  <Sparkles size={16} />
-                  {t("hero.ctaTertiary")}
-                </Button>
-              </Link>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <StatusPill icon={Radio} label="Live system" pulse />
-              <StatusPill icon={ShieldCheck} label="Human approval mode" />
-              <StatusPill icon={Volume2} label="Board review" />
-            </div>
+    <main id="main" className="material-marketing">
+      <MarketingNav />
+      <section className="material-hero">
+        <div>
+          <span className="material-label">Your executive decision studio</span>
+          <h1>
+            Lead with clarity.
+            <br />
+            Build with <em>conviction.</em>
+          </h1>
+          <p>
+            A board of specialist perspectives, a living evidence library, and a
+            thoughtful workspace for turning ambitious plans into accountable action.
+          </p>
+          <div className="material-links">
+            <Link href="/signup" className="material-cta">
+              Create your workspace <ArrowRight size={17} />
+            </Link>
+            <Link
+              href="/dashboard"
+              onClick={startDemoSession}
+              className="material-link"
+            >
+              Explore the demo <Sparkles size={16} />
+            </Link>
           </div>
-
-          <div className="animate-rise flex flex-col gap-3" style={{ animationDelay: "80ms" }}>
-            <p className="text-[0.7rem] font-black uppercase tracking-wide text-steel sm:text-xs">
-              {t("hero.specialists")}
-            </p>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {FEATURED_AGENTS.map((agent) => {
-                const meta = agentMeta[agent.name];
-                return (
-                  <div key={agent.name} className="transition-transform duration-300 hover:scale-105 hover:-translate-y-1">
-                    <AgentPreviewCard
-                      icon={meta.icon}
-                      name={agent.name}
-                      orbit={meta.orbit}
-                      tone={meta.tone}
-                      pitch={agent.pitch}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-[0.7rem] text-steel sm:text-xs">{t("hero.specialistsNote")}</p>
+          <small className="material-footnote">
+            Nine perspectives. Your judgment at the center.
+          </small>
+        </div>
+        <div className="material-preview" aria-label="Illustrative boardroom preview">
+          <div className="material-preview-top">
+            <Logo size={29} />
+            <span>Executive boardroom</span>
+            <small>Illustrative preview</small>
           </div>
-        </section>
-
-        <MeshDivider />
-
-        <LandingPillars />
-
-        <footer className="relative flex shrink-0 items-center justify-center gap-3 px-4 pb-4 text-center text-[0.65rem] text-steel sm:px-6 sm:text-xs">
-          <span>{t("hero.footerNote")}</span>
-          <Link
-            href="/about-author"
-            title="About the author"
-            aria-label="About the author"
-            className="group inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-white/60 text-steel shadow-line backdrop-blur transition hover:border-accent/50 hover:text-accent dark:border-fog/10 dark:bg-white/5 dark:shadow-line-dark"
-          >
-            <Feather size={12} className="transition group-hover:scale-110" />
-          </Link>
-          <Link
-            href="/halcyon"
-            title="Halcyon — a quieter place"
-            aria-label="Halcyon"
-            className="hal-quiet-link group"
-          >
-            <Moon size={12} className="transition group-hover:scale-110" />
-          </Link>
-        </footer>
-      </div>
+          <div className="material-preview-question">
+            What is the strongest next move
+            <br />
+            for our company?
+          </div>
+          {[
+            {
+              name: "Market Research",
+              note: "Challenge demand assumptions",
+              icon: Compass,
+            },
+            { name: "CFO", note: "Test runway and unit economics", icon: Wallet },
+            {
+              name: "Product & Technology",
+              note: "Find the smallest useful experiment",
+              icon: Layers3,
+            },
+            {
+              name: "Legal & Operations",
+              note: "Make risk and responsibilities visible",
+              icon: ShieldCheck,
+            },
+          ].map(({ name, note, icon: Icon }) => (
+            <div className="material-agent-row" key={name}>
+              <span>
+                <Icon size={15} />
+              </span>
+              <div>
+                <strong>{name}</strong>
+                <small>{note}</small>
+              </div>
+              <Check size={13} />
+            </div>
+          ))}
+          <div className="material-preview-note">
+            <strong>A decision worth examining.</strong>See the reasoning. Inspect the
+            evidence. Track what happens next.
+          </div>
+        </div>
+      </section>
+      <section className="material-section">
+        <span className="material-label">A considered operating system</span>
+        <h2>Everything behind a confident decision.</h2>
+        <div className="material-features">
+          {[
+            {
+              title: "A board with perspective",
+              detail:
+                "Watch specialists report, compare their conviction, and challenge a recommendation before accepting it.",
+              icon: Compass,
+            },
+            {
+              title: "Evidence you can inspect",
+              detail:
+                "Bring company documents and verified research into the workspace. Retrieve passages and preserve the sources behind your choices.",
+              icon: FileText,
+            },
+            {
+              title: "Execution that closes the loop",
+              detail:
+                "Save decisions, model financial scenarios, assign tasks, review forecasts and return to your goals with an accountable record.",
+              icon: Target,
+            },
+          ].map(({ title, detail, icon: Icon }) => (
+            <article className="material-feature" key={title}>
+              <Icon size={25} />
+              <h3>{title}</h3>
+              <p>{detail}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="material-band">
+        <span className="material-label">From ambition to action</span>
+        <h2>Your next chapter deserves a clear plan.</h2>
+        <p>
+          Start with the company context. Ask a meaningful question. Build your decision
+          trail.
+        </p>
+        <Link href="/signup" className="material-cta">
+          Meet your executive studio <ArrowRight size={17} />
+        </Link>
+      </section>
+      <footer className="material-footer">
+        <span>CEO.ai · Evidence informs. People decide.</span>
+        <Link href="/pricing">Plans</Link>
+        <Link href="/about-author">About the maker</Link>
+        <Link href="/halcyon">
+          <Moon size={12} /> Halcyon
+        </Link>
+        <Link href="/login">
+          Sign in <ArrowRight size={12} />
+        </Link>
+      </footer>
     </main>
   );
 }

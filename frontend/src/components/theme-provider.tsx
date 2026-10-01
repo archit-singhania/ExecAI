@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 type Mode = "light" | "dark";
+type Appearance = Mode | "system";
 
 export type AccentOption = {
   name: string;
@@ -54,6 +55,8 @@ const SURFACE_LIGHT_STORAGE_KEY = "ceoai-theme-surface-light";
 const SURFACE_DARK_STORAGE_KEY = "ceoai-theme-surface-dark";
 
 type ThemeContextValue = {
+  appearance: Appearance;
+  setAppearance: (appearance: Appearance) => void;
   mode: Mode;
   setMode: (mode: Mode) => void;
   toggleMode: () => void;
@@ -66,6 +69,7 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [appearance, setAppearanceState] = useState<Appearance>("system");
   const [mode, setModeState] = useState<Mode>("light");
   const [accent, setAccentState] = useState<string>(ACCENT_OPTIONS[0].value);
   const [surfaceLight, setSurfaceLight] = useState<string>(SURFACE_OPTIONS.light[0].value);
@@ -73,13 +77,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const storedMode = window.localStorage.getItem(MODE_STORAGE_KEY) as Mode | null;
+    const storedMode = window.localStorage.getItem(MODE_STORAGE_KEY) as Appearance | null;
     const storedAccent = window.localStorage.getItem(ACCENT_STORAGE_KEY);
     const storedSurfaceLight = window.localStorage.getItem(SURFACE_LIGHT_STORAGE_KEY);
     const storedSurfaceDark = window.localStorage.getItem(SURFACE_DARK_STORAGE_KEY);
     const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
 
-    const initialMode = storedMode ?? (prefersDark ? "dark" : "light");
+    const preference = storedMode === "light" || storedMode === "dark" ? storedMode : "system";
+    setAppearanceState(preference);
+    const initialMode = preference === "system" ? (prefersDark ? "dark" : "light") : preference;
     setModeState(initialMode);
     if (storedAccent) setAccentState(storedAccent);
     if (storedSurfaceLight) setSurfaceLight(storedSurfaceLight);
@@ -90,8 +96,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return;
     document.documentElement.classList.toggle("dark", mode === "dark");
-    window.localStorage.setItem(MODE_STORAGE_KEY, mode);
-  }, [mode, mounted]);
+    window.localStorage.setItem(MODE_STORAGE_KEY, appearance);
+  }, [mode, appearance, mounted]);
+
+  useEffect(() => {
+    if (appearance !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setModeState(media.matches ? "dark" : "light");
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [appearance]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -106,8 +121,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(SURFACE_DARK_STORAGE_KEY, surfaceDark);
   }, [mode, surfaceLight, surfaceDark, mounted]);
 
-  const setMode = useCallback((next: Mode) => setModeState(next), []);
-  const toggleMode = useCallback(() => setModeState((current) => (current === "dark" ? "light" : "dark")), []);
+  const setAppearance = useCallback((next: Appearance) => {
+    setAppearanceState(next);
+    setModeState(next === "system" ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" : next);
+  }, []);
+  const setMode = useCallback((next: Mode) => { setAppearanceState(next); setModeState(next); }, []);
+  const toggleMode = useCallback(() => { setAppearanceState(mode === "dark" ? "light" : "dark"); setModeState(mode === "dark" ? "light" : "dark"); }, [mode]);
   const setAccent = useCallback((value: string) => setAccentState(value), []);
   const setSurface = useCallback(
     (value: string) => {
@@ -119,6 +138,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
+      appearance,
+      setAppearance,
       mode,
       setMode,
       toggleMode,
@@ -127,7 +148,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       surface: mode === "dark" ? surfaceDark : surfaceLight,
       setSurface,
     }),
-    [mode, setMode, toggleMode, accent, setAccent, surfaceDark, surfaceLight, setSurface],
+    [appearance, setAppearance, mode, setMode, toggleMode, accent, setAccent, surfaceDark, surfaceLight, setSurface],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

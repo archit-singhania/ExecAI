@@ -68,7 +68,9 @@ def enforce_run_quota(
 
 def enforce_session_quota(db: Session, user: User) -> None:
     plan = get_plan(user.tier)
-    count = db.query(BusinessSession).filter(BusinessSession.user_id == user.id).count()
+    from app.studio_models import StudioRecord
+    archived = db.query(StudioRecord.session_id).filter_by(kind="archive")
+    count = db.query(BusinessSession).filter(BusinessSession.user_id == user.id, BusinessSession.id.notin_(archived)).count()
 
     if count >= plan.session_limit:
         raise HTTPException(

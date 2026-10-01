@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.auth import decode_access_token, get_current_user
+from app.auth import decode_access_token, get_current_user, validate_session
 from app.database import SessionLocal, get_db
 from app.halcyon.affect import detect_crisis, estimate_affect
 from app.halcyon.arc import ArcReading, apply_arc, compute_arc
@@ -327,20 +327,19 @@ def delete_all_sessions(
 
 
 @router.websocket("/ws/{session_id}")
-async def world_socket(websocket: WebSocket, session_id: str, token: str = Query(...)):
+async def world_socket(websocket: WebSocket, session_id: str, token: str | None = Query(None)):
     """Unreal connects here.
 
     The token rides in the query string rather than a header — Unreal's
     WebSocket module makes custom headers awkward, and the connection is
     localhost-only during prototyping.
     """
-    user_id = decode_access_token(token)
-    if not user_id:
-        await websocket.close(code=4401)
-        return
-
     db = SessionLocal()
     try:
+        user_id = validate_session(token or websocket.cookies.get("ceoai_session", ""), db)
+        if not user_id:
+            await websocket.close(code=4401)
+            return
         session = db.get(HalcyonSession, session_id)
         if not session or session.user_id != user_id:
             await websocket.close(code=4404)

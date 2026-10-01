@@ -14,3 +14,8 @@ npm-debug.log*
 # Local tooling
 .DS_Store
 Thumbs.db
+.qa/
+*-verify.db
+playwright-report/
+test-results/
+*.tsbuildinfo

@@ -43,6 +43,7 @@ export function CommandPalette({
   reports = [],
   tasks = [],
   onOpenReport,
+  sessionId,
 }: {
   onSelectTab: (tab: DashboardTab) => void;
   onStartNewSession: () => void;

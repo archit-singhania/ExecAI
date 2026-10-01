@@ -3,13 +3,13 @@ import hashlib
 import json
 import secrets
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from app.agents import run_ceo_agents, run_ceo_agents_stream
-from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.auth import create_access_token, get_current_user, hash_password, verify_password, set_session_cookie, revoke_user_sessions
 from app.email import send_password_changed, send_password_reset, send_welcome
 from app.llm import transcribe_audio
 from app.config import get_settings
@@ -28,6 +28,9 @@ from app.speech_routes import router as speech_router
 from app.entitlements import enforce_run_quota, enforce_session_quota, require_feature
 from app.logging_setup import RequestContextMiddleware, configure_logging, log_event
 from app.store import store_backend
+from app.studio_models import AuthSession, RunEvent, StudioRecord, WorkspaceMember, KnowledgeChunk
+from app.access import workspace_access
+from app.studio import router as studio_router
 from app.scheduling import (
     build_board_meeting,
     compute_next_run,
@@ -80,6 +83,13 @@ if settings.sentry_dsn:
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CEO.ai API", version="0.1.0")
+
+@app.middleware("http")
+async def verify_cookie_origin(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.cookies.get("ceoai_session") and origin and origin not in settings.cors_origin_list:
+        return JSONResponse(status_code=403, content={"detail": "This origin cannot modify the workspace."})
+    return await call_next(request)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -104,7 +114,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     if origin and (origin in settings.cors_origin_list or "*" in settings.cors_origin_list):
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
-    return JSONResponse(status_code=500, content={"detail": str(exc)}, headers=headers)
+    return JSONResponse(status_code=500, content={"detail": "An unexpected server error occurred. Please retry."}, headers=headers)
 
 
 @app.get("/health")
@@ -127,10 +137,16 @@ app.include_router(jobs_router)
 app.include_router(predictions_router)
 app.include_router(analytics_router)
 app.include_router(speech_router)
+app.include_router(studio_router)
 
 configure_logging(as_json=settings.app_env != "development")
 app.add_middleware(RequestContextMiddleware)
 log_event("startup", env=settings.app_env, store=store_backend())
+
+@app.on_event("startup")
+def recover_queued_runs():
+    from app.jobs import recover_runs
+    recover_runs()
 
 agent_run_limit = limit_by_user("agent_run", limit=10, window_seconds=60)
 board_limit = limit_by_user("board_meeting", limit=6, window_seconds=300)
@@ -145,7 +161,9 @@ async def transcribe_voice(file: UploadFile = File(...), current_user: User = De
     """STT fallback for browsers without native SpeechRecognition (Firefox, some
     Safari builds). VoiceStage's mic button records via MediaRecorder and posts
     the clip here when window.SpeechRecognition is unavailable."""
-    audio_bytes = await file.read()
+    audio_bytes = await file.read(10 * 1024 * 1024 + 1)
+    if len(audio_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(413, "Audio upload exceeds 10 MB.")
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Empty audio upload.")
     text = transcribe_audio(audio_bytes, file.filename or "audio.webm")
@@ -158,7 +176,7 @@ async def transcribe_voice(file: UploadFile = File(...), current_user: User = De
 
 
 @app.post("/api/auth/signup", response_model=TokenOut)
-def signup(payload: UserCreate, db: Session = Depends(get_db)):
+def signup(payload: UserCreate, response: Response, db: Session = Depends(get_db), _: None = Depends(limit_by_ip("signup", 10, 900))):
     existing = db.query(User).filter(User.email == payload.email.lower()).first()
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -172,19 +190,21 @@ def signup(payload: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, db)
+    set_session_cookie(response, token)
     send_welcome(to=user.email, name=user.name, app_url=settings.app_base_url)
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
 @app.post("/api/auth/login", response_model=TokenOut)
-def login(payload: UserLogin, db: Session = Depends(get_db)):
+def login(payload: UserLogin, response: Response, db: Session = Depends(get_db), _: None = Depends(limit_by_ip("login", 20, 900))):
     invalid = HTTPException(status_code=401, detail="Incorrect email or password.")
     user = db.query(User).filter(User.email == payload.email.lower()).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise invalid
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, db)
+    set_session_cookie(response, token)
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
@@ -242,6 +262,7 @@ def forgot_password(
 @app.post("/api/auth/reset-password", response_model=TokenOut)
 def reset_password(
     payload: PasswordResetConfirm,
+    response: Response,
     db: Session = Depends(get_db),
     _: None = Depends(reset_limit),
 ):
@@ -266,6 +287,7 @@ def reset_password(
         raise invalid
 
     user.hashed_password = hash_password(payload.password)
+    revoke_user_sessions(db, user.id)
     record.used_at = datetime.utcnow()
 
     db.query(PasswordResetToken).filter(
@@ -278,7 +300,8 @@ def reset_password(
 
     send_password_changed(to=user.email, name=user.name)
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, db)
+    set_session_cookie(response, token)
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
@@ -322,10 +345,7 @@ def get_session(session_id: str, db: Session = Depends(get_db), current_user: Us
 
 
 def _owned_session(session_id: str, db: Session, current_user: User) -> BusinessSession:
-    session = db.get(BusinessSession, session_id)
-    if not session or session.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
+    return workspace_access(db, session_id, current_user)
 
 
 def _recent_history(db: Session, session_id: str, limit: int = 6) -> list[str]:
@@ -494,216 +514,73 @@ def search_memories(
 
 
 @app.post("/api/sessions/{session_id}/messages", response_model=MessageOut)
-def send_message(
-    session_id: str,
-    payload: MessageCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(enforce_run_quota),
-):
-    session = _owned_session(session_id, db, current_user)
+def send_message(session_id: str, payload: MessageCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    import time
+    from app.jobs import queue_board_run, ensure_worker, serialize_job
+    from app.models import Job
+    job = queue_board_run(db, current_user, session_id, payload.content, request)
+    ensure_worker(job.id)
+    deadline = time.monotonic() + 360
+    while time.monotonic() < deadline:
+        db.expire_all()
+        job = db.get(Job, job.id)
+        if job.status == "done":
+            result = serialize_job(db, job)
+            response = db.get(Message, job.message_id)
+            return MessageOut(id=response.id, role=response.role, content=response.content, created_at=response.created_at, reports=result["reports"])
+        if job.status in {"failed", "cancelled"}:
+            raise HTTPException(503, job.error or "Board run cancelled.")
+        time.sleep(0.1)
+    raise HTTPException(504, "The board run is still processing. Reconnect using the run history.")
 
-    user_message = Message(session_id=session.id, role="user", content=payload.content)
-    db.add(user_message)
-
-    try:
-        memory_context = _recent_history(db, session.id) + retrieve_relevant_memories(db, session.id, payload.content)
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        memory_context = _recent_history(db, session.id)
-
-    result = run_ceo_agents(session.business_goal, payload.content, memory_context)
-    session.health_score = result["health_score"]
-    session.runway_months = result["runway_months"]
-
-    response = Message(session_id=session.id, role="assistant", content=result["final"])
-    db.add(response)
-    db.flush()
-
-    reports = []
-    for item in result["reports"]:
-        report = AgentReport(
-            session_id=session.id,
-            agent=item["agent"],
-            report_type="agent",
-            title=item["title"],
-            summary=item["summary"],
-            bullets="\n".join(item["bullets"]),
-            score=item["score"],
-        )
-        db.add(report)
-        reports.append(report)
-
-    for item in result["tasks"]:
-        exists = (
-            db.query(Task)
-            .filter(Task.session_id == session.id, Task.title == item["title"])
-            .first()
-        )
-        if not exists:
-            db.add(
-                Task(
-                    session_id=session.id,
-                    title=item["title"],
-                    description=item.get("description", ""),
-                    priority=item["priority"],
-                    status=item["status"],
-                    created_by_agent=item["created_by_agent"],
-                )
-            )
-
-    db.commit()
-    db.refresh(response)
-
-    try:
-        store_memory(db, session.id, "user_question", f"User asked: {payload.content}", importance=0.65)
-        store_memory(db, session.id, "ceo_decision", result["final"], importance=0.9)
-        db.commit()
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        db.rollback()
-
-    return MessageOut(
-        id=response.id,
-        role=response.role,
-        content=response.content,
-        created_at=response.created_at,
-        reports=[
-            {
-                "agent": report.agent,
-                "id": report.id,
-                "report_type": report.report_type,
-                "title": report.title,
-                "summary": report.summary,
-                "bullets": report.bullets.splitlines(),
-                "score": report.score,
-                "created_at": report.created_at,
-            }
-            for report in reports
-        ],
-    )
 
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 @app.websocket("/api/sessions/{session_id}/messages/ws")
-async def send_message_ws(websocket: WebSocket, session_id: str, db: Session = Depends(get_db)):
+async def send_message_ws(websocket: WebSocket, session_id: str):
+    """Compatibility transport: durable jobs are authoritative, events can be replayed."""
+    import asyncio
+    from app.jobs import queue_board_run, ensure_worker, serialize_job
+    from app.auth import get_current_user_ws
     await websocket.accept()
+    db = SessionLocal()
     try:
-        raw_data = await websocket.receive_text()
-        data = json.loads(raw_data)
-        content = data.get("content", "")
-        token = data.get("token")
-        
-        # Super simple auth for WS
-        if not token:
-            await websocket.send_json({"type": "error", "message": "Unauthorized"})
-            await websocket.close()
-            return
-            
-        from app.auth import get_current_user_ws
-        try:
-            current_user = get_current_user_ws(token, db)
-        except Exception:
-            await websocket.send_json({"type": "error", "message": "Unauthorized"})
-            await websocket.close()
-            return
-
-        session = _owned_session(session_id, db, current_user)
-        business_goal = session.business_goal
-        session_id_value = session.id
-
-        user_message = Message(session_id=session_id_value, role="user", content=content)
-        db.add(user_message)
-        db.commit()
-
-        try:
-            memory_context = _recent_history(db, session_id_value) + retrieve_relevant_memories(
-                db, session_id_value, content
-            )
-        except Exception:
-            import traceback
-            traceback.print_exc()
-            memory_context = _recent_history(db, session_id_value)
-
-        seen = 0
-        final_state = None
-        for node_name, state in run_ceo_agents_stream(business_goal, content, memory_context):
-            if node_name != "ceo":
-                for report in state["reports"][seen:]:
-                    await websocket.send_json({'type': 'agent_report', 'node': node_name, 'report': report})
-                seen = len(state["reports"])
-            final_state = state
-
-        if not final_state:
-             await websocket.send_json({"type": "error", "message": "No response generated"})
-             return
-
-        session.health_score = final_state["health_score"]
-        session.runway_months = final_state["runway_months"]
-
-        response = Message(session_id=session_id_value, role="assistant", content=final_state["final"])
-        db.add(response)
-        db.flush()
-
-        for item in final_state["reports"]:
-            db.add(
-                AgentReport(
-                    session_id=session_id_value,
-                    agent=item["agent"],
-                    report_type="agent",
-                    title=item["title"],
-                    summary=item["summary"],
-                    bullets="\n".join(item["bullets"]),
-                    score=item["score"],
-                )
-            )
-
-        for item in final_state["tasks"]:
-            exists = (
-                db.query(Task)
-                .filter(Task.session_id == session_id_value, Task.title == item["title"])
-                .first()
-            )
-            if not exists:
-                db.add(
-                    Task(
-                        session_id=session_id_value,
-                        title=item["title"],
-                        description=item.get("description", ""),
-                        priority=item["priority"],
-                        status=item["status"],
-                        created_by_agent=item["created_by_agent"],
-                    )
-                )
-
-        db.commit()
-        db.refresh(response)
-
-        try:
-            store_memory(db, session_id_value, "user_question", f"User asked: {content}", importance=0.65)
-            store_memory(db, session_id_value, "ceo_decision", final_state["final"], importance=0.9)
-            db.commit()
-        except Exception:
-            db.rollback()
-
-        await websocket.send_json({
-            'type': 'done', 
-            'message_id': response.id, 
-            'final': final_state['final'], 
-            'health_score': final_state['health_score'], 
-            'runway_months': final_state['runway_months']
-        })
-
+        origin = websocket.headers.get("origin")
+        if origin and origin not in settings.cors_origin_list:
+            raise HTTPException(403, "Origin is not allowed.")
+        data = await asyncio.wait_for(websocket.receive_json(), timeout=15)
+        token = data.get("token") or websocket.cookies.get("ceoai_session")
+        user = get_current_user_ws(token or "", db)
+        payload = MessageCreate(content=data.get("content", ""))
+        job = queue_board_run(db, user, session_id, payload.content, websocket)
+        job_id = job.id
+        ensure_worker(job_id)
+        cursor = 0
+        while True:
+            db.expire_all()
+            rows = db.query(RunEvent).filter(RunEvent.job_id == job_id, RunEvent.id > cursor).order_by(RunEvent.id).all()
+            for row in rows:
+                cursor = row.id
+                await websocket.send_json(json.loads(row.event))
+            state = db.get(__import__('app.models', fromlist=['Job']).Job, job_id)
+            if state.status in {"done", "failed", "cancelled"}:
+                if state.status != "done":
+                    await websocket.send_json({"type": "error", "message": state.error or "Run cancelled."})
+                break
+            await asyncio.sleep(0.25)
     except WebSocketDisconnect:
-        pass
+        pass  # the durable run continues; /api/jobs supports reconnect
     except Exception as exc:
         try:
-            await websocket.send_json({'type': 'error', 'message': str(exc)})
-        except:
+            await websocket.send_json({"type": "error", "message": getattr(exc, "detail", "Unable to start this board run.")})
+        except Exception:
+            pass
+    finally:
+        db.close()
+        try:
+            await websocket.close()
+        except Exception:
             pass
 
 
@@ -730,14 +607,14 @@ def dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_cu
         db.query(Task)
         .filter(Task.session_id == active_session.id)
         .order_by(desc(Task.created_at))
-        .limit(6)
+        .limit(100)
         .all()
     )
     reports = (
         db.query(AgentReport)
         .filter(AgentReport.session_id == active_session.id)
         .order_by(desc(AgentReport.created_at))
-        .limit(5)
+        .limit(9)
         .all()
     )
     recommendations = [
@@ -809,29 +686,11 @@ def _background_board_meeting(session_id: str):
         db.close()
 
 @app.post("/api/sessions/{session_id}/board-meeting", response_model=AgentReportOut)
-def generate_board_meeting(
-    session_id: str,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(board_limit),
-):
-    session = _owned_session(session_id, db, current_user)
-    
-    # Create placeholder report
-    report = AgentReport(
-        session_id=session.id,
-        agent="CEO Board",
-        report_type="board",
-        title="Board Meeting in Progress...",
-        summary="The board is convening in the background. Check back in a few moments.",
-        bullets="",
-        score=0,
-    )
-    db.add(report)
+def generate_board_meeting(session_id: str, db: Session = Depends(get_db), current_user: User = Depends(board_limit)):
+    session = workspace_access(db, session_id, current_user, write=True)
+    report = build_board_meeting(db, session, trigger="manual")
     db.commit()
     db.refresh(report)
-
-    background_tasks.add_task(_background_board_meeting, session.id)
     return serialize_report(report)
 
 
@@ -855,12 +714,20 @@ def update_review_schedule(
     schedule.hour = payload.hour
     schedule.tz_offset_minutes = payload.tz_offset_minutes
     schedule.email_enabled = payload.email_enabled
+    if payload.timezone:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try:
+            ZoneInfo(payload.timezone)
+        except ZoneInfoNotFoundError:
+            raise HTTPException(422, "Choose a valid IANA timezone.")
+    schedule.timezone = payload.timezone
     schedule.next_run_at = compute_next_run(
         payload.cadence,
         payload.weekday,
         payload.hour,
         payload.tz_offset_minutes,
         schedule.last_run_at,
+        timezone=payload.timezone,
     )
     db.commit()
     db.refresh(schedule)

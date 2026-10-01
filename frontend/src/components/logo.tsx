@@ -1,35 +1,14 @@
 "use client";
 
-import Image from "next/image";
-import { useTheme } from "@/components/theme-provider";
-import { cn } from "@/lib/utils";
 
 export function Logo({ size = 44 }: { size?: number }) {
-  const { mode } = useTheme();
-
   return (
-    <div
-      className="relative shrink-0 overflow-hidden rounded-lg shadow-glow ring-1 ring-ink/5 dark:ring-fog/10"
-      style={{ height: size, width: size }}
-    >
-      {}
-      <Image
-        src="/LightModeLogo.png"
-        alt="CEO.ai"
-        fill
-        sizes={`${size}px`}
-        className={cn("object-cover transition-opacity duration-150", mode === "dark" ? "opacity-0" : "opacity-100")}
-        priority
-      />
-      <Image
-        src="/DarkModeLogo.png"
-        alt=""
-        aria-hidden
-        fill
-        sizes={`${size}px`}
-        className={cn("object-cover transition-opacity duration-150", mode === "dark" ? "opacity-100" : "opacity-0")}
-        priority
-      />
-    </div>
+    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="CEO.ai compass" className="shrink-0 text-accent">
+      <rect x="2" y="2" width="60" height="60" rx="19" fill="currentColor" />
+      <circle cx="32" cy="32" r="20" stroke="white" strokeOpacity=".38" strokeWidth="1.5" fill="none" />
+      <path d="m40 18-4 18-18 10 10-18Z" fill="white" />
+      <path d="m40 18 6 28-10-10Z" fill="white" fillOpacity=".48" />
+      <circle cx="32" cy="32" r="3" fill="currentColor" />
+    </svg>
   );
 }

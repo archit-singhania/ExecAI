@@ -23,6 +23,7 @@ async function authRequest<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -40,7 +41,7 @@ async function authRequest<T>(path: string, body: unknown): Promise<T> {
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  return window.sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function getStoredUser(): AuthUser | null {
@@ -55,11 +56,15 @@ export function getStoredUser(): AuthUser | null {
 }
 
 export function storeSession(auth: AuthResponse) {
-  window.localStorage.setItem(TOKEN_KEY, auth.access_token);
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.setItem(TOKEN_KEY, auth.access_token);
   window.localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
 }
 
 export function clearSession() {
+  const token = getToken();
+  void fetch(`${API_URL}/api/studio/security/logout`, { method: "POST", credentials: "include", keepalive: true, headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => undefined);
+  window.sessionStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
   window.localStorage.removeItem(DEMO_KEY);

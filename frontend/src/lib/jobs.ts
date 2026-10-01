@@ -1,10 +1,11 @@
 import { AgentReport } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
-export type JobStatus = "queued" | "running" | "done" | "failed";
+export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
 
 export type JobState = {
   id: string;
+  session_id?: string;
   status: JobStatus;
   progress_current: number;
   progress_total: number;
@@ -22,6 +23,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
 
   const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -69,7 +71,7 @@ export async function pollJob(
     onUpdate(state);
 
     if (state.status === "done") return state;
-    if (state.status === "failed") {
+    if (state.status === "failed" || state.status === "cancelled") {
       throw new Error(state.error || "The board run failed.");
     }
 

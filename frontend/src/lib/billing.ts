@@ -40,6 +40,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
 
   const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",

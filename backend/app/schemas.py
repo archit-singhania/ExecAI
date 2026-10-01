@@ -142,6 +142,7 @@ class ReviewScheduleIn(BaseModel):
     hour: int = Field(default=9, ge=0, le=23)
     tz_offset_minutes: int = Field(default=0, ge=-840, le=840)
     email_enabled: bool = True
+    timezone: str | None = Field(default=None, max_length=80)
 
 
 class ReviewScheduleOut(BaseModel):
@@ -150,6 +151,7 @@ class ReviewScheduleOut(BaseModel):
     hour: int
     tz_offset_minutes: int
     email_enabled: bool
+    timezone: str | None = None
     last_run_at: datetime | None = None
     next_run_at: datetime | None = None
 

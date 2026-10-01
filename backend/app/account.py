@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, hash_password, verify_password
+from app.auth import get_current_user, hash_password, verify_password, revoke_user_sessions
 from app.database import get_db
 from app.email import send_password_changed
 from app.halcyon.models import HalcyonSession, HalcyonTurn
@@ -16,7 +16,9 @@ from app.models import (
     ReviewSchedule,
     Task,
     User,
+    Job, Prediction, SharedReport,
 )
+from app.studio_models import AuthSession, KnowledgeChunk, RunEvent, StudioRecord, WorkspaceMember
 from app.plans import get_plan
 from app.ratelimit import limit_by_user
 from app.schemas import AccountDelete, PasswordChange, ProfileUpdate, UserOut
@@ -53,6 +55,7 @@ def change_password(
         raise HTTPException(status_code=400, detail="The new password matches the old one.")
 
     current_user.hashed_password = hash_password(payload.new_password)
+    revoke_user_sessions(db, current_user.id)
 
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == current_user.id,
@@ -127,6 +130,8 @@ def export_everything(
             if schedule
             else None
         ),
+        "studio_records": [ {"id": r.id, "session_id": r.session_id, "kind": r.kind, "title": r.title, "body": r.body, "data": __import__("json").loads(r.data), "version": r.version} for r in db.query(StudioRecord).filter(StudioRecord.session_id.in_(session_ids)) ],
+        "memberships": [{"session_id": m.session_id, "role": m.role} for m in db.query(WorkspaceMember).filter_by(user_id=current_user.id)],
         "sessions": [
             {
                 "id": session.id,
@@ -226,6 +231,22 @@ def delete_account(
 
     sessions = db.query(BusinessSession).filter(BusinessSession.user_id == current_user.id).all()
     session_ids = [session.id for session in sessions]
+
+    active_jobs = db.query(Job).filter(Job.user_id == current_user.id, Job.status.in_(["queued", "running"])).count()
+    if active_jobs:
+        raise HTTPException(409, "Cancel active board runs before deleting your account.")
+    records = db.query(StudioRecord).filter((StudioRecord.session_id.in_(session_ids)) | (StudioRecord.author_id == current_user.id)).all()
+    record_ids = [r.id for r in records]
+    db.query(KnowledgeChunk).filter(KnowledgeChunk.record_id.in_(record_ids)).delete(synchronize_session=False)
+    db.query(StudioRecord).filter(StudioRecord.id.in_(record_ids)).delete(synchronize_session=False)
+    db.query(WorkspaceMember).filter((WorkspaceMember.session_id.in_(session_ids)) | (WorkspaceMember.user_id == current_user.id)).delete(synchronize_session=False)
+    job_ids = [j.id for j in db.query(Job).filter((Job.session_id.in_(session_ids)) | (Job.user_id == current_user.id))]
+    db.query(RunEvent).filter(RunEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
+    db.query(Job).filter(Job.id.in_(job_ids)).delete(synchronize_session=False)
+    report_ids = [r.id for r in db.query(AgentReport).filter(AgentReport.session_id.in_(session_ids))]
+    db.query(SharedReport).filter((SharedReport.report_id.in_(report_ids)) | (SharedReport.user_id == current_user.id)).delete(synchronize_session=False)
+    db.query(Prediction).filter(Prediction.session_id.in_(session_ids)).delete(synchronize_session=False)
+    db.query(AuthSession).filter_by(user_id=current_user.id).delete(synchronize_session=False)
 
     if session_ids:
         db.query(Message).filter(Message.session_id.in_(session_ids)).delete(

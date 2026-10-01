@@ -8,13 +8,10 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     llm_provider: str = "ollama"
-    groq_api_key: str | None = None
-    groq_model: str = "llama-3.1-8b-instant"
     groq_whisper_model: str = "whisper-large-v3-turbo"
     ollama_base_url: str = "http://localhost:11434/v1"
-    ollama_model: str = "llama3.1"
     ollama_embed_model: str = "nomic-embed-text"
-    cors_origins: str = "http://localhost:3003"
+    cors_origins: str = "http://localhost:3000"
     jwt_secret: str = "dev-only-change-me-in-prod"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 7
@@ -22,7 +19,7 @@ class Settings(BaseSettings):
 
     resend_api_key: str | None = None
     email_from: str = "CEO.ai <onboarding@resend.dev>"
-    app_base_url: str = "http://localhost:3003"
+    app_base_url: str = "http://localhost:3000"
     password_reset_minutes: int = 60
 
     sentry_dsn: str | None = None
@@ -44,6 +41,7 @@ class Settings(BaseSettings):
     azure_speech_region: str = "westeurope"
 
     llm_local_only: bool = True
+    research_api_key: str | None = None
     groq_api_key: str | None = None
     gemini_api_key: str | None = None
     cerebras_api_key: str | None = None

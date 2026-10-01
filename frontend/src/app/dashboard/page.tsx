@@ -182,14 +182,14 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, []);
+  }, [isDemo]);
 
   const latestReports = useMemo(() => {
     const fromMessages = messages.flatMap((message) => message.reports ?? []);
     return fromMessages.length ? fromMessages.slice(-9) : dashboard?.reports ?? [];
   }, [messages, dashboard]);
 
-  const activeTasks = isDemo ? demoTasks : dashboard?.tasks ?? fallbackTasks;
+  const activeTasks = isDemo ? demoTasks : dashboard?.tasks ?? [];
   const filteredTasks = activeTasks.filter((task: Task) => {
     if (taskFilter === "Done") return task.status.toLowerCase() === "done";
     if (taskFilter === "Open") return task.status.toLowerCase() !== "done";
@@ -197,11 +197,11 @@ export default function DashboardPage() {
     return true;
   });
   const doneTasks = activeTasks.filter((task: Task) => task.status.toLowerCase() === "done").length;
-  const healthScore = session?.health_score ?? 82;
-  const runway = session?.runway_months ?? 6;
+  const healthScore = session?.health_score ?? (isDemo ? 82 : 0);
+  const runway = session?.runway_months ?? (isDemo ? 6 : 0);
   const opportunityScore = latestReports.length
     ? Math.round(latestReports.reduce((total, report) => total + report.score, 0) / latestReports.length)
-    : 84;
+    : isDemo ? 84 : 0;
 
   useEffect(() => {
     setAmbient({ health: healthScore });
@@ -558,7 +558,7 @@ export default function DashboardPage() {
 
             {activeTab === "agents" ? (
               <AgentBriefing
-                reports={latestReports.length ? latestReports : fallbackReports}
+                reports={latestReports.length ? latestReports : isDemo ? fallbackReports : []}
                 selectedReport={selectedReport}
                 reportExport={reportExport}
                 openReport={openReport}
@@ -585,7 +585,7 @@ export default function DashboardPage() {
               <BoardTheater
                 boardReport={boardReport}
                 boardHistory={boardHistory}
-                memories={memories.length ? memories.slice(0, 4) : fallbackMemories}
+                memories={memories.length ? memories.slice(0, 4) : isDemo ? fallbackMemories : []}
                 memoryQuery={memoryQuery}
                 memoryResults={memoryResults}
                 setMemoryQuery={setMemoryQuery}
@@ -600,7 +600,7 @@ export default function DashboardPage() {
 
             {activeTab === "operations" ? (
               <Operations
-                reports={latestReports.length ? latestReports : fallbackReports}
+                reports={latestReports.length ? latestReports : isDemo ? fallbackReports : []}
                 opportunityScore={opportunityScore}
                 healthScore={healthScore}
                 runway={runway}
@@ -620,7 +620,7 @@ export default function DashboardPage() {
         onBoardReview={generateBoardMeeting}
         onLogout={logout}
         onReplayTour={() => setShowOnboarding(true)}
-        reports={latestReports.length ? latestReports : fallbackReports}
+        reports={latestReports.length ? latestReports : isDemo ? fallbackReports : []}
         tasks={activeTasks}
         onOpenReport={openReport}
         sessionId={session?.id}

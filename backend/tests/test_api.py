@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_ceo_ai.db"
-Path("test_ceo_ai.db").unlink(missing_ok=True)
+from tempfile import TemporaryDirectory
+_test_directory = TemporaryDirectory(prefix="ceoai-test-", ignore_cleanup_errors=True)
+os.environ["DATABASE_URL"] = f"sqlite:///{Path(_test_directory.name) / 'test.db'}"
 
 import uuid
 

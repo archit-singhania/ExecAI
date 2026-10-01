@@ -27,6 +27,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
         weekday: 0,
         hour: 9,
         tz_offset_minutes: -new Date().getTimezoneOffset(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         email_enabled: true,
         last_run_at: null,
         next_run_at: null,
@@ -53,6 +54,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
         cadence: next.cadence,
         weekday: next.weekday,
         hour: next.hour,
+        timezone: next.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
         tz_offset_minutes: -new Date().getTimezoneOffset(),
         email_enabled: next.email_enabled,
       });
@@ -136,7 +138,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
                 </option>
               ))}
             </select>
-            <span className="text-[0.72rem] font-semibold text-steel">your local time</span>
+            <span className="text-[0.72rem] font-semibold text-steel">{schedule.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} · daylight saving aware</span>
           </div>
 
           <button

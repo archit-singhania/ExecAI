@@ -89,7 +89,7 @@ export function useDashboardData(
     setBoardHistory(history);
   }, []);
 
-  const tasks = isDemo ? demoTasks : dashboard?.tasks ?? fallbackTasks;
+  const tasks = useMemo(() => isDemo ? demoTasks : dashboard?.tasks ?? [], [isDemo, demoTasks, dashboard]);
 
   const filteredTasks = useMemo(
     () =>
@@ -110,11 +110,11 @@ export function useDashboardData(
   const reports = useMemo(() => {
     if (liveReports.length) return liveReports;
     if (dashboard?.reports?.length) return dashboard.reports;
-    return fallbackReports;
-  }, [liveReports, dashboard]);
+    return isDemo ? fallbackReports : [];
+  }, [liveReports, dashboard, isDemo]);
 
-  const healthScore = session?.health_score ?? 82;
-  const runway = session?.runway_months ?? 6;
+  const healthScore = session?.health_score ?? (isDemo ? 82 : 0);
+  const runway = session?.runway_months ?? (isDemo ? 6 : 0);
 
   const opportunityScore = useMemo(
     () =>
@@ -130,7 +130,7 @@ export function useDashboardData(
     error,
     session,
     dashboard,
-    memories: memories.length ? memories : fallbackMemories,
+    memories: memories.length ? memories : isDemo ? fallbackMemories : [],
     boardHistory,
     tasks,
     filteredTasks,

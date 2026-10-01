@@ -22,19 +22,6 @@ import { MetroTile } from "@/components/dashboard/metro-tile";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { cn } from "@/lib/utils";
 
-function shapeFrom(seed: number, length = 7): number[] {
-  const points: number[] = [];
-  let value = Math.max(8, seed * 0.55);
-
-  for (let index = 0; index < length; index += 1) {
-    const wave = Math.sin((seed + index * 1.7) * 0.9) * (seed * 0.08 + 2);
-    value = value + wave + (seed - value) * 0.22;
-    points.push(Math.max(1, value));
-  }
-
-  points[points.length - 1] = Math.max(1, seed);
-  return points;
-}
 
 export function MetroHome({
   user,
@@ -86,6 +73,7 @@ export function MetroHome({
         </div>
 
         <div className="flex items-center gap-2">
+          <Link href="/studio" className="mh-btn">Executive studio</Link>
           {plan ? (
             <Link
               href="/pricing"
@@ -165,7 +153,6 @@ export function MetroHome({
             stat={reportCount ? `${reportCount}` : "—"}
             delta={reportCount ? "filed" : undefined}
             status={reportCount ? "Reporting" : "Idle"}
-            trend={reportCount ? shapeFrom(reportCount) : undefined}
             icon={Users2}
             tone="ink"
             onClick={(rect) => onSelectTab("agents", rect)}
@@ -199,7 +186,6 @@ export function MetroHome({
             eyebrow="Operating rhythm"
             stat={opportunityScore ? `${opportunityScore}` : "—"}
             delta={opportunityScore ? "consensus" : undefined}
-            trend={opportunityScore ? shapeFrom(opportunityScore) : undefined}
             status="Signal"
             icon={Activity}
             tone="slate"
@@ -211,7 +197,6 @@ export function MetroHome({
             eyebrow="Company signal"
             stat={`${healthScore}%`}
             progress={healthScore}
-            trend={shapeFrom(healthScore)}
             status="Tracking"
             icon={Gauge}
             tone="plum"
@@ -223,7 +208,6 @@ export function MetroHome({
             eyebrow="Capital outlook"
             stat={`${runway}`}
             delta="months"
-            trend={shapeFrom(runway * 4)}
             status={runway < 6 ? "Tight" : "Stable"}
             icon={CircleDollarSign}
             tone="ink"
@@ -233,8 +217,8 @@ export function MetroHome({
           <MetroTile
             label="Analytics"
             eyebrow="Business intelligence"
-            stat="12 views"
-            status="Live data"
+            stat="Explore"
+            status="Analytics"
             icon={BarChart3}
             tone="cobalt"
             onClick={(rect) => onSelectTab("analytics", rect)}

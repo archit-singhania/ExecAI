@@ -70,6 +70,7 @@ export type ReviewSchedule = {
   weekday: number;
   hour: number;
   tz_offset_minutes: number;
+  timezone?: string | null;
   email_enabled: boolean;
   last_run_at: string | null;
   next_run_at: string | null;
@@ -91,13 +92,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function authHeader(): Record<string, string> {
   if (typeof window === "undefined") return {};
-  const token = window.localStorage.getItem("ceoai-auth-token");
+  const token = window.sessionStorage.getItem("ceoai-auth-token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const isMutation = !!options?.method && options.method !== "GET";
   const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -109,7 +111,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (response.status === 401) {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem("ceoai-auth-token");
+      window.sessionStorage.removeItem("ceoai-auth-token");
       window.localStorage.removeItem("ceoai-auth-user");
       window.location.href = "/login";
     }
@@ -202,6 +204,7 @@ export async function transcribeAudio(blob: Blob): Promise<string> {
   const formData = new FormData();
   formData.append("file", blob, "voice.webm");
   const response = await fetch(`${API_URL}/api/voice/transcribe`, {
+    credentials: "include",
     method: "POST",
     headers: { ...authHeader() },
     body: formData,
@@ -228,9 +231,12 @@ export async function streamMessage(
   
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`${wsUrl}/api/sessions/${sessionId}/messages/ws`);
+    let settled = false;
+    const timeout = window.setTimeout(() => { if (!settled) { settled = true; ws.close(); reject(new Error("The board is taking longer than expected. Reopen the executive studio to reconnect to your durable run.")); } }, 6 * 60 * 1000);
+    ws.onclose = () => { window.clearTimeout(timeout); if (!settled) { settled = true; reject(new Error("Connection interrupted. Your board run continues; open the executive studio to reconnect.")); } };
     
     ws.onopen = () => {
-      ws.send(JSON.stringify({ content, token: window.localStorage.getItem("ceoai-auth-token") }));
+      ws.send(JSON.stringify({ content, token: window.sessionStorage.getItem("ceoai-auth-token") }));
     };
 
     ws.onmessage = (event) => {
@@ -238,6 +244,7 @@ export async function streamMessage(
         const data = JSON.parse(event.data);
         onEvent(data as StreamEvent);
         if (data.type === "done" || data.type === "error") {
+          settled = true; window.clearTimeout(timeout);
           ws.close();
           resolve();
         }
@@ -248,6 +255,7 @@ export async function streamMessage(
 
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
+      settled = true; window.clearTimeout(timeout);
       reject(new Error("WebSocket connection failed"));
     };
   });

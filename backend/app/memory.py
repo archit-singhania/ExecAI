@@ -33,7 +33,10 @@ def _rank(memory: BusinessMemory, query_vector: list[float], now: datetime) -> f
         return -1.0
 
     try:
-        similarity = cosine_similarity(query_vector, json.loads(memory.embedding))
+        stored = json.loads(memory.embedding)
+        if len(stored) != len(query_vector):
+            return -1.0
+        similarity = cosine_similarity(query_vector, stored)
     except (json.JSONDecodeError, TypeError):
         return -1.0
 
@@ -78,8 +81,10 @@ def retrieve_relevant_memories(db: Session, session_id: str, query: str, top_k: 
         .limit(200)
         .all()
     )
+    from app.studio import knowledge_search
+    documents = [f"[Document {item["document_id"]}, chunk {item["position"]}] {item["content"]}" for item in knowledge_search(db, session_id, query, top_k)]
     if not memories:
-        return []
+        return documents
 
     query_vector = embed_text(query)
     now = datetime.utcnow()
@@ -100,7 +105,7 @@ def retrieve_relevant_memories(db: Session, session_id: str, query: str, top_k: 
     if len(top) < top_k:
         top.extend(memory.content for memory in unembedded[: top_k - len(top)])
 
-    return top
+    return documents + top
 
 
 def search_memory_rows(db: Session, session_id: str, query: str, limit: int = 10) -> list[BusinessMemory]:

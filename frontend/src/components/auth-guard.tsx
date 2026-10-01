@@ -10,12 +10,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
+    if (isDemoSession()) { setChecked(true); return; }
     const token = getToken();
-    if (!token && !isDemoSession()) {
-      router.replace("/login");
-      return;
-    }
-    setChecked(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/auth/me`, { credentials: "include", headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" })
+      .then((r) => { if (!r.ok) throw new Error("Sign in required"); return r.json(); })
+      .then(() => setChecked(true))
+      .catch(() => router.replace("/login"));
   }, [router]);
 
   if (!checked) {

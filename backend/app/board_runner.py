@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.agents import run_ceo_agents
+from app.agents import run_ceo_agents, run_ceo_agents_stream
 from app.memory import retrieve_relevant_memories, store_memory
 from app.models import AgentReport, BusinessSession, Job, Message, Task
 from app.predictions import create_predictions
@@ -19,9 +19,10 @@ def recent_history(db: Session, session_id: str, limit: int = 8) -> list[str]:
     return [f"{row.role}: {row.content}" for row in reversed(rows)]
 
 
-def execute_board_run(db: Session, session: BusinessSession, content: str) -> Message:
+def execute_board_run(db: Session, session: BusinessSession, content: str, on_event=None, cancelled=None) -> Message:
     user_message = Message(session_id=session.id, role="user", content=content)
     db.add(user_message)
+    db.commit()
 
     try:
         memory_context = recent_history(db, session.id) + retrieve_relevant_memories(
@@ -30,7 +31,27 @@ def execute_board_run(db: Session, session: BusinessSession, content: str) -> Me
     except Exception:
         memory_context = recent_history(db, session.id)
 
-    result = run_ceo_agents(session.business_goal, content, memory_context)
+    from app.studio_models import StudioRecord
+    import json
+    company_records = db.query(StudioRecord).filter(StudioRecord.session_id == session.id, StudioRecord.kind.in_(["profile", "decision", "research", "scenario", "metric"])).order_by(StudioRecord.updated_at.desc()).limit(12).all()
+    memory_context.extend([f"Workspace {r.kind}: {r.title}\n{r.body[:1600]}\n{r.data[:1600]}" for r in company_records])
+    preference = db.query(StudioRecord).filter_by(session_id=session.id, kind="preferences", title="Agent controls").first()
+    options = json.loads(preference.data) if preference else {}
+    if on_event:
+        result = None
+        for node, state in run_ceo_agents_stream(session.business_goal, content, memory_context, options=options):
+            if cancelled and cancelled():
+                raise InterruptedError("Run cancelled by user.")
+            if node != "ceo":
+                for report in state["reports"]:
+                    on_event({"type": "agent_report", "node": node, "report": report})
+            result = state
+        if result is None:
+            raise RuntimeError("No board result was produced.")
+    else:
+        result = run_ceo_agents(session.business_goal, content, memory_context, options=options)
+    if cancelled and cancelled():
+        raise InterruptedError("Run cancelled by user.")
 
     session.health_score = result["health_score"]
     session.runway_months = result["runway_months"]
@@ -87,7 +108,7 @@ def execute_board_run(db: Session, session: BusinessSession, content: str) -> Me
         store_memory(db, session.id, "ceo_decision", result["final"], importance=0.9)
         db.commit()
     except Exception:
-        pass
+        db.rollback()
 
     return response
 

@@ -87,6 +87,7 @@ def market_agent(state: CEOState) -> CEOState:
     goal = state["message"] or state["goal"]
     llm_report = generate_agent_report("market", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     score = _score(goal, 78)
@@ -108,6 +109,7 @@ def market_agent(state: CEOState) -> CEOState:
 def cfo_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("cfo", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["runway_months"] = 7 if llm_report["score"] >= 75 else 4
         state["reports"].append(llm_report)
         return state
@@ -131,6 +133,7 @@ def cfo_agent(state: CEOState) -> CEOState:
 def cto_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("cto", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -151,6 +154,7 @@ def cto_agent(state: CEOState) -> CEOState:
 def product_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("product", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -171,6 +175,7 @@ def product_agent(state: CEOState) -> CEOState:
 def marketing_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("marketing", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -191,6 +196,7 @@ def marketing_agent(state: CEOState) -> CEOState:
 def legal_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("legal", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -211,6 +217,7 @@ def legal_agent(state: CEOState) -> CEOState:
 def sales_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("sales", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -231,6 +238,7 @@ def sales_agent(state: CEOState) -> CEOState:
 def designer_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("designer", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -251,6 +259,7 @@ def designer_agent(state: CEOState) -> CEOState:
 def assistant_agent(state: CEOState) -> CEOState:
     llm_report = generate_agent_report("assistant", state["goal"], state["message"], state.get("memory_context"))
     if llm_report:
+        llm_report["source"] = "model"
         state["reports"].append(llm_report)
         return state
     report: AgentBrief = {
@@ -393,7 +402,14 @@ def _register_sequence() -> None:
 
 def _run_isolated(agent_fn: Callable[["CEOState"], "CEOState"], base: "CEOState") -> "CEOState":
     local: CEOState = {**base, "reports": []}
-    agent_fn(local)
+    from app.llm_router import RUN_OPTIONS
+    token = RUN_OPTIONS.set(base.get("options", {}))
+    try:
+        agent_fn(local)
+    finally:
+        RUN_OPTIONS.reset(token)
+    for report in local["reports"]:
+        report.setdefault("source", "local-template")
     return local
 
 
@@ -454,7 +470,7 @@ def _cache_key(goal: str, message: str) -> str:
     return f"agents:v1:{digest[:32]}"
 
 
-def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = None) -> CEOState:
+def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = None, options: dict | None = None) -> CEOState:
     """Run all nine specialists concurrently, then synthesise.
 
     They were sequential, which meant nine round trips end to end. Each agent
@@ -472,12 +488,13 @@ def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = N
         _register_sequence()
 
     key = _cache_key(goal, message)
-    if not memory_context:
+    if not memory_context and not options:
         cached = cache_get(key)
         if cached:
             return cached
 
     state = _initial_state(goal, message, memory_context)
+    state["options"] = options or {}
     collected: dict[str, CEOState] = {}
 
     with ThreadPoolExecutor(max_workers=len(AGENT_SEQUENCE)) as pool:
@@ -503,14 +520,14 @@ def run_ceo_agents(goal: str, message: str, memory_context: list[str] | None = N
 
     ceo_synthesis(state)
 
-    if not memory_context:
+    if not memory_context and not options:
         cache_set(key, state, ttl_seconds=86400)
 
     return state
 
 
 def run_ceo_agents_stream(
-    goal: str, message: str, memory_context: list[str] | None = None
+    goal: str, message: str, memory_context: list[str] | None = None, options: dict | None = None
 ) -> Iterator[tuple[str, CEOState]]:
     """Yield (node_name, state_so_far) as each specialist finishes.
 
@@ -522,6 +539,7 @@ def run_ceo_agents_stream(
         _register_sequence()
 
     state = _initial_state(goal, message, memory_context)
+    state["options"] = options or {}
     collected: dict[str, CEOState] = {}
 
     with ThreadPoolExecutor(max_workers=len(AGENT_SEQUENCE)) as pool:

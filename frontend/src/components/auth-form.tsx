@@ -18,7 +18,6 @@ import {
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
-import { SceneStack } from "@/components/ui/scene-stack";
 import { ThemeModeToggle, ThemeConfigurator } from "@/components/ui/theme-controls";
 import { LanguagePicker } from "@/components/ui/language-picker";
 import { authApi, startDemoSession, storeSession } from "@/lib/auth";
@@ -74,7 +73,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         ? await authApi.signup(name, email, password)
         : await authApi.login(email, password);
       storeSession(auth);
-      router.push("/dashboard");
+      router.push("/studio");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -89,7 +88,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       className="relative flex h-[100dvh] min-h-[640px] flex-col overflow-y-auto bg-radial-ui text-ink"
     >
       <div className="pointer-events-none absolute inset-0 opacity-50 mix-blend-screen dark:opacity-40">
-        <SceneStack id="auth" layers={["vortex", "volumetric", "aurora"]} />
+        <div className="material-atmosphere" aria-hidden="true"/>
       </div>
 
       <div className="relative flex items-center justify-end gap-2 px-4 pt-4 sm:px-6">
@@ -104,7 +103,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <div className="mb-7 flex items-center gap-2.5">
               <Logo size={38} />
               <span className="text-sm font-bold tracking-tight">CEO.ai</span>
-              <span className="nav-live-dot" aria-hidden title="Live system" />
+              
             </div>
 
             <h1 className="text-[1.7rem] font-bold leading-[1.08] tracking-[-0.02em] sm:text-3xl">

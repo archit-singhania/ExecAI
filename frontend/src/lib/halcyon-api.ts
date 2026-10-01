@@ -76,12 +76,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function authHeader(): Record<string, string> {
   if (typeof window === "undefined") return {};
-  const token = window.localStorage.getItem("ceoai-auth-token");
+  const token = window.sessionStorage.getItem("ceoai-auth-token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -168,7 +169,7 @@ export function pixelStreamUrl(): string {
 
 export function authToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("ceoai-auth-token");
+  return window.sessionStorage.getItem("ceoai-auth-token");
 }
 
 export function handOverSession(

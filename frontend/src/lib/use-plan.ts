@@ -31,7 +31,7 @@ export function usePlan(isDemo = false): PlanFeatures {
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
-    if (isDemo || !getToken()) {
+    if (isDemo) {
       setLoading(false);
       return;
     }
