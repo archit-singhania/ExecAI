@@ -10,7 +10,7 @@ Verified on Windows on 1 October 2026 with Python 3.12, Node.js, Chrome and isol
 | ESLint | Passed |
 | Next.js production build | Passed; 16 routes built with Next.js 15.5.27, including the Vercel environment guard |
 | Clean dependency installation | `npm ci --ignore-scripts` passed |
-| npm security audit | Zero reported vulnerabilities |
+| npm security audit | 1 October: zero reported vulnerabilities. Refreshed 3 October: full audit has 11 high development-tool entries from one `braces` advisory; production-only audit has zero. See current dependency gate below. |
 | Chrome browser acceptance | Two tests passed, including the recorded studio journey and reduced-motion marketing |
 | Patch whitespace | `git diff --check` passed |
 | CI workflow syntax | Parsed successfully; backend, frontend and PostgreSQL migration jobs configured |
@@ -30,5 +30,14 @@ Artifacts:
 - [Approximately one-minute browser demonstration](demo/ceoai-workflow.webm) — 64.52 seconds, 1280 × 720, WebM.
 - [Full browser recording](demo/ceoai-workflow-full.webm).
 - [Light studio](screenshots/studio-light.png), [dark studio](screenshots/studio-dark.png), [mobile execution](screenshots/studio-mobile.png).
+- [Recording provenance and original fixture inputs](demo/README.md).
+
+## Dependency audit refresh — 3 October 2026
+
+The original build/browser evidence above remains dated 1 October. A new registry check ran `npm audit --json --registry=https://registry.npmjs.org` against the unchanged root workspace lock: **11 high, zero critical** entries. All propagate from `braces` 3.0.3 through development dependencies including `micromatch`, `fast-glob`, Tailwind's watcher and ESLint/stylelint tooling. These are eleven affected dependency-tree entries, not eleven independent defects. `npm audit --omit=dev --json --registry=https://registry.npmjs.org` separately returned **zero vulnerabilities**.
+
+[GHSA-vfj7-8cjw-p6xm / CVE-2026-93687](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), reviewed/updated on 2 October, affects `braces` through 3.0.3 and lists no patched version. The registry's latest `braces` is still 3.0.3. Compatible parent updates do not resolve it: latest `micromatch` 4.0.8 still requires `braces ^3.0.3`, and latest `fast-glob` 3.3.3 requires that micromatch line. npm's proposed forced Tailwind major upgrade and ESLint/stylelint downgrades do not constitute a validated compatible fix, so the manifest and lock were preserved.
+
+The installed lock marks `braces` as development-only. Reviewed first-party frontend source has no direct runtime import of these glob libraries. Current callers use maintainer-controlled source/build/lint patterns in `frontend/tailwind.config.ts`, `frontend/eslint.config.mjs` and package scripts. Company text, search terms and uploaded documents are not passed to those build/lint pattern APIs. This limits the observed exposure; it does not remove the advisory or justify calling the full audit clean. Running tooling on unreviewed repository/configuration changes remains an exposure. A compatible upstream patch or a separately validated toolchain migration is an outstanding development dependency release gate; repeat the full registry audit before publishing.
 
 PostgreSQL/pgvector integration was configured in CI but was not run locally. Hosted models, Tavily search, payments, email, actual microphone permissions, unattended cron and native Unreal streaming require acceptance against configured services before release claims. The local worker design supports one application deployment; distributed workers and cold offline startup are outside this release. No deployment, publication or benchmark claims are included in this evidence.

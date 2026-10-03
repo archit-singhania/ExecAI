@@ -26,3 +26,5 @@ All rows describe connected product flows, not mock analytics. “Configured ser
 | 20 | Routing/budgets/traces | Server/privacy controls, preferred provider, token cap, persisted source trace, actual plan usage | Provider “configured” is not a health check; served counters reset on server restart; no invented dollar costs |
 
 Additional verification covers account export/deletion, password revocation, untrusted mutation origins, task ownership and populated-schema migration preservation. Design acceptance includes light/dark/system appearance, responsive navigation, keyboard modal trapping/restoration and reduced motion. PostgreSQL CI smoke and live integration gates are documented in `RELEASE.md`.
+
+Dependency verification is a separate foundation: the 3 October refresh has zero production audit findings, while the full audit retains 11 high entries from one unresolved development-tool advisory. See [the dated validation record](VALIDATION.md) and [release gate](RELEASE.md); this does not change the twenty product capability scopes above.
