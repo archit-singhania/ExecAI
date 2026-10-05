@@ -140,24 +140,24 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page
       .getByLabel("Dependencies (select multiple)")
       .selectOption(prerequisite.id);
-    await page.getByLabel("Status", { exact: true }).selectOption("Done");
+    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Done");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await expect(page.getByRole("alert").first()).toContainText(/dependenc/i);
-    await page.getByLabel("Status", { exact: true }).selectOption("Ready");
+    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Ready");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await page
       .locator("article.st-task")
       .filter({ hasText: "Complete buyer interviews" })
       .getByRole("button", { name: "Edit task" })
       .click();
-    await page.getByLabel("Status", { exact: true }).selectOption("Done");
+    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Done");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await page
       .locator("article.st-task")
       .filter({ hasText: "Design the pilot" })
       .getByRole("button", { name: "Edit task" })
       .click();
-    await page.getByLabel("Status", { exact: true }).selectOption("Done");
+    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Done");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await expect(
       page
@@ -186,9 +186,10 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     ).toBeVisible();
     await page.goto("/studio/controls");
     await page.getByLabel("Preferred provider").selectOption("ollama");
-    await page.getByLabel("Privacy", { exact: true }).selectOption("true");
+    await page.getByRole("combobox", { name: "Privacy", exact: true }).selectOption("true");
     await page.getByLabel("Maximum tokens per model response").fill("700");
     await page.getByRole("button", { name: "Save agent controls" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Controls saved" })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue(
       "700",
@@ -227,6 +228,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     const publicView = await page.context().newPage();
     await publicView.goto(shared.url);
     await expect(publicView.getByRole("heading", { level: 1 })).toBeVisible();
+    await publicView.screenshot({ path: "test-results/public-report.png", fullPage: true });
     expect(
       (await publicView.request.get(`${api}/api/share/${shared.slug}`)).status(),
     ).toBe(200);
@@ -242,6 +244,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await expect(
       page.getByRole("button", { name: "Weekly", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Weekly", exact: true })).toBeEnabled();
     await page.reload();
     await expect(
       page.getByRole("button", { name: "Weekly", exact: true }),
@@ -255,7 +258,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
       ["editor.fixture@example.com", "editor"],
     ]) {
       await page.getByLabel("Colleague email").fill(email);
-      await page.getByLabel("Access", { exact: true }).selectOption(role);
+      await page.getByRole("combobox", { name: "Access", exact: true }).selectOption(role);
       await page.getByRole("button", { name: "Add member", exact: true }).click();
       await expect(
         page.locator(".st-compact-row").filter({ hasText: email }),
@@ -300,6 +303,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
       .getByLabel("Business goal & context")
       .fill("A separate company with no board runs.");
     await page.getByRole("button", { name: "Create workspace", exact: true }).click();
+    await expect(page.getByLabel("Choose workspace")).not.toHaveValue(workspace);
     const second = await page.getByLabel("Choose workspace").inputValue();
     expect(second).not.toBe(workspace);
     await page.goto("/studio/forecasts");
@@ -345,6 +349,7 @@ test("glass, comfort preferences, mobile drawer and service error recovery", asy
   await dialog.getByRole("checkbox", { name: /Reduce transparency/ }).check();
   await dialog.getByRole("checkbox", { name: /Reduce motion/ }).check();
   await dialog.getByRole("checkbox", { name: /Increase contrast/ }).check();
+  await page.screenshot({ path: "test-results/visual-comfort.png", fullPage: true });
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Visual comfort", exact: true }),
@@ -365,6 +370,7 @@ test("glass, comfort preferences, mobile drawer and service error recovery", asy
   await page.getByRole("button", { name: "Open navigation" }).click();
   const navigation = page.getByRole("dialog", { name: "Studio navigation" });
   await expect(navigation).toBeVisible();
+  await page.screenshot({ path: "test-results/mobile-navigation.png", fullPage: true });
   expect(
     await page.locator(".st-main").evaluate((el) => (el as HTMLElement).inert),
   ).toBe(true);
