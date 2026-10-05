@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Minus, Target, X } from "lucide-react";
-import {
-  Calibration,
-  Prediction,
-  predictionsApi,
-} from "@/lib/predictions";
+import { Calibration, Prediction, predictionsApi } from "@/lib/predictions";
 import {
   EmptyState,
   MetricRow,
@@ -22,7 +18,8 @@ const DEMO_PREDICTIONS: Prediction[] = [
   {
     id: "demo-1",
     agent: "CFO",
-    statement: "Cost to acquire a customer will exceed first-month revenue per customer.",
+    statement:
+      "Cost to acquire a customer will exceed first-month revenue per customer.",
     confidence: 71,
     due_at: new Date(Date.now() - 86400000 * 2).toISOString(),
     status: "pending",
@@ -46,7 +43,8 @@ const DEMO_PREDICTIONS: Prediction[] = [
   {
     id: "demo-3",
     agent: "Marketing",
-    statement: "Organic channels will produce more signups than paid in the first month.",
+    statement:
+      "Organic channels will produce more signups than paid in the first month.",
     confidence: 58,
     due_at: new Date(Date.now() + 86400000 * 19).toISOString(),
     status: "pending",
@@ -63,7 +61,14 @@ const DEMO_CALIBRATION: Calibration = {
   agents: [
     { agent: "CTO", hit: 5, missed: 1, pending: 1, resolved: 6, accuracy: 83 },
     { agent: "CFO", hit: 4, missed: 2, pending: 1, resolved: 6, accuracy: 67 },
-    { agent: "Product Manager", hit: 3, missed: 2, pending: 0, resolved: 5, accuracy: 60 },
+    {
+      agent: "Product Manager",
+      hit: 3,
+      missed: 2,
+      pending: 0,
+      resolved: 5,
+      accuracy: 60,
+    },
     { agent: "Marketing", hit: 2, missed: 3, pending: 1, resolved: 5, accuracy: 40 },
   ],
 };
@@ -76,12 +81,23 @@ function accuracyColor(accuracy: number | null) {
   return "#d45f3a";
 }
 
-export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
+export function TrackRecord({
+  isDemo,
+  sessionId,
+  writable = true,
+}: {
+  isDemo?: boolean;
+  sessionId?: string;
+  writable?: boolean;
+}) {
   const [pending, setPending] = useState<Prediction[]>([]);
   const [calibration, setCalibration] = useState<Calibration | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
     if (isDemo) {
       setPending(DEMO_PREDICTIONS);
       setCalibration(DEMO_CALIBRATION);
@@ -91,17 +107,21 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
 
     try {
       const [list, stats] = await Promise.all([
-        predictionsApi.list("pending"),
-        predictionsApi.calibration(),
+        predictionsApi.list("pending", sessionId),
+        predictionsApi.calibration(sessionId),
       ]);
       setPending(list.predictions);
       setCalibration(stats);
-    } catch {
+    } catch (failure) {
       setCalibration(null);
+      setPending([]);
+      setError(
+        failure instanceof Error ? failure.message : "Unable to load forecasts.",
+      );
     } finally {
       setLoading(false);
     }
-  }, [isDemo]);
+  }, [isDemo, sessionId]);
 
   useEffect(() => {
     load();
@@ -118,13 +138,20 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
 
     try {
       await predictionsApi.resolve(id, status);
-      const stats = await predictionsApi.calibration();
+      const stats = await predictionsApi.calibration(sessionId);
       setCalibration(stats);
       toast.success(
-        status === "hit" ? "Marked correct" : status === "missed" ? "Marked wrong" : "Voided",
+        status === "hit"
+          ? "Marked correct"
+          : status === "missed"
+            ? "Marked wrong"
+            : "Voided",
       );
     } catch (error) {
       setPending(previous);
+      setError(
+        error instanceof Error ? error.message : "Unable to record this outcome.",
+      );
       toastFromError(error, "Couldn't record that");
     }
   }
@@ -135,6 +162,19 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
     .filter((agent) => agent.accuracy !== null)
     .pop();
 
+  if (error)
+    return (
+      <SectionPanel tone="plum">
+        <SectionHeader eyebrow="Accountability" title="Track record" icon={Target} />
+        <p role="alert" className="st-alert">
+          {error}
+        </p>
+        <button type="button" className="st-secondary" onClick={() => void load()}>
+          Retry forecasts
+        </button>
+      </SectionPanel>
+    );
+
   return (
     <SectionPanel tone="plum">
       <SectionHeader
@@ -143,7 +183,9 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
         icon={Target}
         meta={
           calibration?.overall !== null && calibration?.overall !== undefined ? (
-            <span className="sec-eyebrow tabular-nums">{calibration.overall}% overall</span>
+            <span className="sec-eyebrow tabular-nums">
+              {calibration.overall}% overall
+            </span>
           ) : null
         }
       />
@@ -156,7 +198,11 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
           emphasis
         />
         <MetricStat label="Open calls" value={pending.length} hint="awaiting outcome" />
-        <MetricStat label="Ready to judge" value={overdue.length} hint="past their date" />
+        <MetricStat
+          label="Ready to judge"
+          value={overdue.length}
+          hint="past their date"
+        />
         <MetricStat
           label="Most reliable"
           value={best?.accuracy ?? "—"}
@@ -165,8 +211,9 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
       </MetricRow>
 
       <p className="sec-note">
-        Every session commits each desk to something dated and checkable. Mark them right or
-        wrong and their accuracy builds &mdash; which is how you learn whose 90 to believe.
+        Every session commits each desk to something dated and checkable. Mark them
+        right or wrong and their accuracy builds &mdash; which is how you learn whose 90
+        to believe.
       </p>
 
       {loading ? (
@@ -208,8 +255,8 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
 
               {worst && worst.accuracy !== null && worst.accuracy < 50 ? (
                 <p className="mt-4 text-[0.78rem] font-medium leading-6 text-steel">
-                  Your {worst.agent} desk has been wrong more often than right. Weight its
-                  conviction accordingly.
+                  Your {worst.agent} desk has been wrong more often than right. Weight
+                  its conviction accordingly.
                 </p>
               ) : null}
             </div>
@@ -221,7 +268,10 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
                 <div
                   key={item.id}
                   style={{ animationDelay: `${index * 45}ms` }}
-                  className={cn("sec-card sec-card-edge rounded-lg p-4 pl-5", item.overdue && "sec-card-due")}
+                  className={cn(
+                    "sec-card sec-card-edge rounded-lg p-4 pl-5",
+                    item.overdue && "sec-card-due",
+                  )}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="sec-eyebrow">{item.agent}</p>
@@ -232,18 +282,35 @@ export function TrackRecord({ isDemo }: { isDemo?: boolean }) {
                     </span>
                   </div>
 
-                  <p className="mt-2 text-[0.88rem] font-semibold leading-7">{item.statement}</p>
+                  <p className="mt-2 text-[0.88rem] font-semibold leading-7">
+                    {item.statement}
+                  </p>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button type="button" onClick={() => resolve(item.id, "hit")} className="tr-btn tr-btn-hit">
+                    <button
+                      type="button"
+                      disabled={!writable}
+                      onClick={() => resolve(item.id, "hit")}
+                      className="tr-btn tr-btn-hit"
+                    >
                       <Check size={13} />
                       Right
                     </button>
-                    <button type="button" onClick={() => resolve(item.id, "missed")} className="tr-btn tr-btn-miss">
+                    <button
+                      type="button"
+                      disabled={!writable}
+                      onClick={() => resolve(item.id, "missed")}
+                      className="tr-btn tr-btn-miss"
+                    >
                       <X size={13} />
                       Wrong
                     </button>
-                    <button type="button" onClick={() => resolve(item.id, "void")} className="tr-btn">
+                    <button
+                      type="button"
+                      disabled={!writable}
+                      onClick={() => resolve(item.id, "void")}
+                      className="tr-btn"
+                    >
                       <Minus size={13} />
                       Can&apos;t tell
                     </button>

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.access import workspace_access
 from app.database import get_db
 from app.models import AgentReport, BusinessSession, Message, Prediction, Task, User
 
@@ -20,13 +21,15 @@ def _day_key(value: datetime) -> str:
 @router.get("/overview")
 def overview(
     days: int = 30,
+    session_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     window = max(7, min(180, days))
     since = datetime.utcnow() - timedelta(days=window)
 
-    sessions = db.query(BusinessSession).filter(BusinessSession.user_id == current_user.id).all()
+    sessions = ([workspace_access(db, session_id, current_user)] if session_id else
+                db.query(BusinessSession).filter(BusinessSession.user_id == current_user.id).all())
     session_ids = [item.id for item in sessions]
 
     if not session_ids:

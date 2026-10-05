@@ -1,9 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { mkdirSync } from "node:fs";
 
 const api = "http://127.0.0.1:8012";
 const web = "http://localhost:3012";
+const testDirectory = join(tmpdir(), `ceoai-e2e-${Date.now()}`);
+mkdirSync(testDirectory, { recursive: true });
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 180000,
@@ -12,6 +15,8 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
+    actionTimeout: 30000,
+    navigationTimeout: 60000,
     baseURL: web,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
@@ -23,21 +28,24 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: `${process.env.CEOAI_PYTHON || "python"} -m uvicorn app.main:app --app-dir ../backend --host 127.0.0.1 --port 8012`,
+          command: `"${process.env.CEOAI_PYTHON || "python"}" ../backend/scripts/e2e_server.py`,
           url: `${api}/health`,
           timeout: 90000,
           reuseExistingServer: false,
           env: {
-            DATABASE_URL: `sqlite:///${join(tmpdir(), `ceoai-e2e-${Date.now()}.db`).replaceAll("\\", "/")}`,
+            DATABASE_URL: `sqlite:///${join(testDirectory, "manual_acceptance.db").replaceAll("\\", "/")}`,
             JWT_SECRET: "isolated-e2e-secret",
             APP_ENV: "test",
             CORS_ORIGINS: web,
+            APP_BASE_URL: web,
+            RESEARCH_API_KEY: "",
+            RESEND_API_KEY: "",
             OLLAMA_BASE_URL: "http://127.0.0.1:9/v1",
             LLM_LOCAL_ONLY: "true",
           },
         },
         {
-          command: "npm run dev -- --port 3012",
+          command: `"${process.execPath}" "${require.resolve("next/dist/bin/next")}" ${process.env.CEOAI_E2E_PRODUCTION ? "start" : "dev"} --port 3012`,
           url: web,
           timeout: 90000,
           reuseExistingServer: false,

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import BusinessSession, Prediction, User
+from app.access import workspace_access
 
 router = APIRouter(prefix="/api/predictions", tags=["predictions"])
 
@@ -19,7 +20,10 @@ class PredictionResolve(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
-def _user_session_ids(db: Session, user: User) -> list[str]:
+def _user_session_ids(db: Session, user: User, session_id: str | None = None) -> list[str]:
+    if session_id:
+        workspace_access(db, session_id, user)
+        return [session_id]
     return [
         row.id
         for row in db.query(BusinessSession.id).filter(BusinessSession.user_id == user.id).all()
@@ -45,10 +49,11 @@ def _serialize(prediction: Prediction) -> dict:
 @router.get("")
 def list_predictions(
     status: str | None = None,
+    session_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session_ids = _user_session_ids(db, current_user)
+    session_ids = _user_session_ids(db, current_user, session_id)
     if not session_ids:
         return {"predictions": []}
 
@@ -72,9 +77,7 @@ def resolve_prediction(
     if not prediction:
         raise HTTPException(status_code=404, detail="Prediction not found.")
 
-    session = db.get(BusinessSession, prediction.session_id)
-    if not session or session.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Prediction not found.")
+    workspace_access(db, prediction.session_id, current_user, write=True)
 
     prediction.status = payload.status
     prediction.note = payload.note
@@ -87,10 +90,11 @@ def resolve_prediction(
 
 @router.get("/calibration")
 def calibration(
+    session_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session_ids = _user_session_ids(db, current_user)
+    session_ids = _user_session_ids(db, current_user, session_id)
     if not session_ids:
         return {"agents": [], "overall": None, "resolved_total": 0}
 

@@ -6,6 +6,7 @@ import { ACCENT_OPTIONS, SURFACE_OPTIONS, useTheme } from "@/components/theme-pr
 import { useLocale } from "@/lib/i18n";
 import { useRipple } from "@/lib/use-ripple";
 import { cn } from "@/lib/utils";
+import { VisualPreferences } from "@/components/ui/visual-preferences";
 
 export function ThemeModeToggle() {
   const { mode, toggleMode } = useTheme();
@@ -39,7 +40,12 @@ export function ThemeModeToggle() {
         <span
           key={ripple.id}
           className="ripple-span"
-          style={{ left: ripple.x, top: ripple.y, width: ripple.size, height: ripple.size }}
+          style={{
+            left: ripple.x,
+            top: ripple.y,
+            width: ripple.size,
+            height: ripple.size,
+          }}
           aria-hidden
         />
       ))}
@@ -76,7 +82,12 @@ function Swatch({
         <span
           key={ripple.id}
           className="ripple-span"
-          style={{ left: ripple.x, top: ripple.y, width: ripple.size, height: ripple.size }}
+          style={{
+            left: ripple.x,
+            top: ripple.y,
+            width: ripple.size,
+            height: ripple.size,
+          }}
           aria-hidden
         />
       ))}
@@ -122,7 +133,12 @@ export function ThemeConfigurator() {
           <span
             key={ripple.id}
             className="ripple-span"
-            style={{ left: ripple.x, top: ripple.y, width: ripple.size, height: ripple.size }}
+            style={{
+              left: ripple.x,
+              top: ripple.y,
+              width: ripple.size,
+              height: ripple.size,
+            }}
             aria-hidden
           />
         ))}
@@ -130,7 +146,9 @@ export function ThemeConfigurator() {
 
       {open ? (
         <div className="animate-pop-in absolute end-0 top-12 z-40 w-64 rounded-lg border border-ink/10 bg-white/95 p-3 text-ink shadow-soft backdrop-blur-xl dark:bg-[#171b20]/95">
-          <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.18em] text-steel">Primary</p>
+          <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.18em] text-steel">
+            Primary
+          </p>
           <div className="grid grid-cols-8 gap-1.5">
             {ACCENT_OPTIONS.map((option) => (
               <Swatch
@@ -143,7 +161,9 @@ export function ThemeConfigurator() {
             ))}
           </div>
 
-          <p className="mb-2 mt-4 px-1 text-[11px] font-black uppercase tracking-[0.18em] text-steel">Surface</p>
+          <p className="mb-2 mt-4 px-1 text-[11px] font-black uppercase tracking-[0.18em] text-steel">
+            Surface
+          </p>
           <div className="grid grid-cols-8 gap-1.5">
             {surfaceOptions.map((option) => (
               <Swatch
@@ -175,6 +195,9 @@ export function ThemeConfigurator() {
                 )}
               />
             </button>
+          </div>
+          <div className="mt-3 border-t border-ink/10 pt-3">
+            <VisualPreferences expanded />
           </div>
         </div>
       ) : null}

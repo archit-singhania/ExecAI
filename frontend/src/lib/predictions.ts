@@ -61,12 +61,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const predictionsApi = {
-  list: (status?: PredictionStatus) =>
+  list: (status?: PredictionStatus, sessionId?: string) =>
     request<{ predictions: Prediction[] }>(
-      `/api/predictions${status ? `?status=${status}` : ""}`,
+      `/api/predictions?${new URLSearchParams({ ...(status ? { status } : {}), ...(sessionId ? { session_id: sessionId } : {}) })}`,
     ),
 
-  calibration: () => request<Calibration>("/api/predictions/calibration"),
+  calibration: (sessionId?: string) =>
+    request<Calibration>(
+      `/api/predictions/calibration${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
+    ),
 
   resolve: (id: string, status: "hit" | "missed" | "void", note?: string) =>
     request<Prediction>(`/api/predictions/${id}`, {

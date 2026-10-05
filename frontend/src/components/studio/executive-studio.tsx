@@ -34,6 +34,8 @@ import {
   WorkspaceNotifications,
 } from "@/components/studio/workflows";
 import { Dialog } from "@/components/ui/dialog";
+import { VisualPreferences } from "@/components/ui/visual-preferences";
+import { Toaster } from "@/components/ui/toaster";
 import { usePlan } from "@/lib/use-plan";
 import { Logo } from "@/components/logo";
 import { useTheme } from "@/components/theme-provider";
@@ -149,13 +151,16 @@ export function ExecutiveStudio() {
   const [editing, setEditing] = useState<StudioRecord | null>(null);
   const [editingTask, setEditingTask] = useState<StudioTask | null>(null);
   const [reportPreview, setReportPreview] = useState<AgentReport | null>(null);
+  const [sharePreview, setSharePreview] = useState<{ url: string; title: string } | null>(null);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
   const closeReport = useCallback(() => setReportPreview(null), []);
+  const closeShare = useCallback(() => setSharePreview(null), []);
   const [online, setOnline] = useState(true);
   const [installPrompt, setInstallPrompt] = useState<
     (Event & { prompt: () => Promise<void> }) | null
   >(null);
   const mounted = useRef(true);
+  const navigation = useRef<HTMLElement>(null);
   const selection = useRef(selected);
   selection.current = selected;
   const user = getStoredUser();
@@ -163,6 +168,45 @@ export function ExecutiveStudio() {
   const role = members.find((m) => m.id === user?.id)?.role;
   const writable = workspace?.owned || role === "editor";
   const scoped = (path: string) => `/api/studio/${selected}${path}`;
+
+  useEffect(() => {
+    if (!menu) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const links = () =>
+      Array.from(
+        navigation.current?.querySelectorAll<HTMLElement>(
+          "a[href], button:not(:disabled), select:not(:disabled)",
+        ) || [],
+      ).filter((node) => node.offsetParent !== null);
+    const frame = requestAnimationFrame(() => links()[0]?.focus());
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = links();
+      if (!items.length) {
+        event.preventDefault();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === items[0]) {
+        event.preventDefault();
+        items[items.length - 1].focus();
+      } else if (
+        !event.shiftKey &&
+        document.activeElement === items[items.length - 1]
+      ) {
+        event.preventDefault();
+        items[0].focus();
+      }
+    };
+    document.addEventListener("keydown", trap);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", trap);
+      previous?.focus();
+    };
+  }, [menu]);
 
   const refresh = useCallback(async (id: string) => {
     const [nextRecords, nextTasks, nextReports, nextMessages, nextMembers] =
@@ -508,7 +552,15 @@ export function ExecutiveStudio() {
     );
   return (
     <div className="st-app">
-      <aside className={`st-sidebar ${menu ? "is-open" : ""}`}>
+      <Toaster />
+      <aside
+        ref={navigation}
+        id="studio-navigation"
+        role={menu ? "dialog" : undefined}
+        aria-modal={menu || undefined}
+        aria-label={menu ? "Studio navigation" : undefined}
+        className={`st-sidebar ${menu ? "is-open" : ""}`}
+      >
         <Link href="/" className="st-brand">
           <Logo size={40} />
           <span>
@@ -592,12 +644,14 @@ export function ExecutiveStudio() {
           onClick={() => setMenu(false)}
         />
       )}
-      <div className="st-main">
+      <div className="st-main" inert={menu}>
         <header className="st-topbar">
           <div>
             <button
               className="st-icon st-menu"
               aria-label="Open navigation"
+              aria-controls="studio-navigation"
+              aria-expanded={menu}
               onClick={() => setMenu(true)}
             >
               <Menu size={20} />
@@ -607,7 +661,11 @@ export function ExecutiveStudio() {
             </span>
           </div>
           <div className="st-top-actions">
-            <button className="st-search-button" onClick={() => setSearchOpen(true)}>
+            <button
+              className="st-search-button"
+              aria-label="Search everything"
+              onClick={() => setSearchOpen(true)}
+            >
               <Search size={16} />
               <span>Search everything</span>
               <kbd>⌘ K</kbd>
@@ -623,6 +681,7 @@ export function ExecutiveStudio() {
               <option value="light">Light</option>
               <option value="dark">Dark</option>
             </select>
+            <VisualPreferences />
             {installPrompt && (
               <button
                 className="st-secondary"
@@ -1660,8 +1719,17 @@ export function ExecutiveStudio() {
                   </div>
                 </>
               )}
-              {section === "forecasts" && <TrackRecord isDemo={false} />}
-              {section === "analytics" && <Analytics isDemo={false} />}
+              {section === "forecasts" && (
+                <TrackRecord
+                  key={selected}
+                  isDemo={false}
+                  sessionId={selected}
+                  writable={!!writable}
+                />
+              )}
+              {section === "analytics" && (
+                <Analytics key={selected} isDemo={false} sessionId={selected} />
+              )}
               {section === "reports" && (
                 <>
                   <section className="st-card">
@@ -1715,13 +1783,17 @@ export function ExecutiveStudio() {
                           </button>
                           <button
                             className="st-secondary"
+                            disabled={!workspace?.owned}
                             onClick={() =>
                               void action(async () => {
                                 const shared = await api.createShareLink(r.id!);
-                                await navigator.clipboard.writeText(shared.url);
-                                setNotice(
-                                  "Share link copied. Anyone with this link can read this report.",
-                                );
+                                setSharePreview({ url: shared.url, title: r.title });
+                                try {
+                                  await navigator.clipboard.writeText(shared.url);
+                                  setNotice("Share link copied. Anyone with this link can read this report.");
+                                } catch {
+                                  setNotice("Share link created. Copy it from the sharing dialog; clipboard access is unavailable.");
+                                }
                               })
                             }
                           >
@@ -1729,6 +1801,7 @@ export function ExecutiveStudio() {
                           </button>
                           <button
                             className="st-text-danger"
+                            disabled={!workspace?.owned}
                             onClick={() =>
                               void action(async () => {
                                 await api.revokeShareLink(r.id!);
@@ -2188,6 +2261,16 @@ export function ExecutiveStudio() {
             </button>
           ))}
         </div>
+      </Dialog>
+      <Dialog open={!!sharePreview} onClose={closeShare} title="Share report" className="st-search-modal st-reading">
+        {sharePreview && <>
+          <h3>{sharePreview.title}</h3>
+          <p>Anyone with this link can read this report. Revoke it from Reports &amp; reviews to remove public access.</p>
+          <label className="st-share-field">Public report link
+            <input aria-label="Public report link" readOnly value={sharePreview.url} onFocus={(event) => event.currentTarget.select()} />
+          </label>
+          <a className="st-secondary" href={sharePreview.url} target="_blank" rel="noreferrer">Open public report <ArrowRight size={14} /></a>
+        </>}
       </Dialog>
       <Dialog
         open={!!reportPreview}

@@ -8,6 +8,7 @@ import "@/styles/tokens.css";
 import "@/styles/primitives.css";
 import "@/styles/premium.css";
 import "@/styles/material.css";
+import "@/styles/liquid-glass.css";
 
 export const metadata: Metadata = {
   title: "CEO.ai — Executive Studio",
@@ -30,6 +31,11 @@ const noFlashScript = `
     var storedSurfaceKey = mode === "dark" ? "ceoai-theme-surface-dark" : "ceoai-theme-surface-light";
     var storedSurface = window.localStorage.getItem(storedSurfaceKey);
     if (storedSurface) document.documentElement.style.setProperty("--color-surface", storedSurface);
+
+    var comfort = JSON.parse(window.localStorage.getItem("ceoai-visual-comfort") || "{}");
+    if (comfort.reducedMotion === true) document.documentElement.classList.add("reduce-motion");
+    if (comfort.reducedTransparency === true) document.documentElement.classList.add("reduce-transparency");
+    if (comfort.highContrast === true) document.documentElement.classList.add("increase-contrast");
 
     var storedLocale = window.localStorage.getItem("ceoai-locale") || "en";
     var storedRtl = window.localStorage.getItem("ceoai-rtl-override");

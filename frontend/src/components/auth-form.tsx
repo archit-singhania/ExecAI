@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -55,6 +55,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [passwordChanged, setPasswordChanged] = useState(false);
+
+  useEffect(() => {
+    setPasswordChanged(
+      mode === "login" &&
+        new URLSearchParams(window.location.search).get("password") === "changed",
+    );
+  }, [mode]);
 
   const isSignup = mode === "signup";
   const strength = useMemo(() => passwordStrength(password), [password]);
@@ -111,6 +119,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <p className="mt-2.5 text-sm leading-7 text-steel">
               {isSignup ? t("auth.signupSubtitle") : t("auth.loginSubtitle")}
             </p>
+
+            {passwordChanged && (
+              <p
+                role="status"
+                className="mt-4 rounded-xl border border-positive/20 bg-positive/5 p-3 text-sm text-ink"
+              >
+                Your password changed. Sign in again with your new password; previous
+                sessions have been revoked.
+              </p>
+            )}
 
             <form onSubmit={onSubmit} className="mt-7 space-y-3.5">
               {isSignup ? (

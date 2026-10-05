@@ -2,6 +2,8 @@
 
 This guide tests actual local product behavior. Use hypothetical company data and the isolated accounts below. Keep a pass/fail note for each numbered capability, together with the screen, expected result and provider configuration used. A missing external service is an unavailable-state result, not a successful integration test.
 
+The [5 October audit](FULL-AUDIT-2026-10-05.md) includes refreshed screenshots and the current build/browser results. Visually expect a floating pearl/navy navigation rail, frosted toolbar, soft cobalt atmosphere, glossy control rims and clear reading surfaces. Use **Visual comfort** in the toolbar or Account settings: reduced transparency must remove blur, reduced motion must stop decorative transitions, and increased contrast must strengthen secondary text and outlines. Preferences survive reload. On a narrow screen, opening navigation must contain keyboard focus; Escape closes it and restores the menu button.
+
 ## Start the existing checkout
 
 From the repository root in PowerShell, install dependencies if needed:
@@ -32,6 +34,8 @@ npm run dev
 ```
 
 Open `http://localhost:8000/health`: expect `{"status":"ok"}`. Open `http://localhost:3000`: expect the premium landing page. If a port is occupied, stop only the server you own or change both matching URL/origin settings. For a production-build preview, run `npm run build`, followed by `npm run start --workspace frontend`; keep the API running. Do not run dev and production frontend servers on the same port.
+
+When changing the API port for a production preview, set `NEXT_PUBLIC_API_URL` **before** building as well as before starting. Next.js includes this public origin in the compiled client.
 
 When running all four repositories together, use CEO.ai's reserved API/frontend ports **8012/3012**. In Terminal A, set `$env:CORS_ORIGINS='http://localhost:3012'` and `$env:APP_BASE_URL='http://localhost:3012'`, then start Uvicorn with `--port 8012`. In Terminal B, set `$env:NEXT_PUBLIC_API_URL='http://localhost:8012'`, then run `npm run dev --workspace frontend -- --port 3012`. Open `http://localhost:3012/studio`; the API health URL is `http://localhost:8012/health`. Keep the same chosen database in Terminal A. These session variables override the example files without editing other projects.
 

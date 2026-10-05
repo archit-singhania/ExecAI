@@ -52,33 +52,24 @@ def _run_board_job(job_id):
         def cancelled():
             with SessionLocal() as check:
                 current = check.get(Job, job_id)
-                return not current or current.status == "cancelled"
+                return not current or current.status != "running"
         def event(payload):
             with SessionLocal() as events:
                 current = events.get(Job, job_id)
-                if current.status == "cancelled":
+                if not current or current.status != "running":
                     raise InterruptedError("Run cancelled.")
                 current.progress_current += 1
                 current.progress_label = payload["report"]["agent"] + " reported"
                 current.updated_at = datetime.utcnow()
                 events.add(RunEvent(job_id=job_id, event=json.dumps(payload)))
                 events.commit()
-        response = execute_board_run(db, session, job.prompt, on_event=event, cancelled=cancelled)
-        db.refresh(job)
-        job.status = "done"
-        job.message_id = response.id
-        job.progress_current = job.progress_total
-        job.progress_label = "Verdict delivered"
-        job.updated_at = datetime.utcnow()
-        db.add(RunEvent(job_id=job_id, event=json.dumps({"type": "done", "message_id": response.id, "final": response.content, "health_score": session.health_score, "runway_months": session.runway_months})))
-        db.add(StudioRecord(session_id=session.id, author_id=job.user_id, kind="activity", title="Board run completed", body=job.prompt, data=json.dumps({"job_id": job_id, "message_id": response.id})))
-        db.commit()
+        execute_board_run(db, session, job.prompt, on_event=event, cancelled=cancelled, job_id=job_id)
     except Exception as exc:
         import logging
         logging.getLogger("ceoai").exception("Board job failed: %s", job_id)
         db.rollback()
         job = db.get(Job, job_id)
-        if job and job.status != "cancelled":
+        if job and job.status in {"queued", "running"}:
             job.status = "failed"
             job.error = "Run interrupted; retry to continue." if isinstance(exc, InterruptedError) else "Board execution failed. Retry or check provider configuration."
             job.updated_at = datetime.utcnow()
@@ -128,10 +119,10 @@ def get_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get
 @router.post("/{job_id}/cancel")
 def cancel_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     job = owned_job(db, job_id, user)
-    if job.status in {"queued", "running"}:
-        job.status = "cancelled"
-        job.updated_at = datetime.utcnow()
-        db.commit()
+    db.query(Job).filter(Job.id == job_id, Job.status.in_(["queued", "running"])).update(
+        {"status": "cancelled", "updated_at": datetime.utcnow()}, synchronize_session=False)
+    db.commit()
+    db.refresh(job)
     return serialize_job(db, job)
 
 @router.post("/{job_id}/retry")

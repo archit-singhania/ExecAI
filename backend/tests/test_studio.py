@@ -178,6 +178,9 @@ def test_board_review_is_completed_and_export_is_a_real_pdf():
     pdf = client.get(f"/api/studio/{sid}/reports/{review.json()['id']}/pdf", headers=owner)
     assert pdf.status_code == 200, pdf.text
     assert pdf.content.startswith(b"%PDF-")
+    from pypdf import PdfReader
+    exported = PdfReader(io.BytesIO(pdf.content))
+    assert review.json()["title"] in " ".join(page.extract_text() for page in exported.pages)
 
 def test_account_deletion_cleans_new_studio_data():
     owner, _, _ = account(); sid = workspace(owner)
@@ -185,3 +188,97 @@ def test_account_deletion_cleans_new_studio_data():
     result = client.request("DELETE", "/api/account", headers=owner, json={"password": "correct-horse-battery", "confirmation": "DELETE"})
     assert result.status_code == 200, result.text
     assert client.get("/api/auth/me", headers=owner).status_code == 401
+
+
+def test_workspace_forecasts_and_analytics_are_scoped_and_respect_shared_roles():
+    from datetime import datetime, timedelta
+    from app.models import Prediction
+    owner, _, _ = account(); editor, _, editor_email = account(); viewer, _, viewer_email = account(); stranger, _, _ = account()
+    first = workspace(owner); second = workspace(owner)
+    with SessionLocal() as db:
+        alpha = Prediction(session_id=first, agent="CFO", statement="Alpha company only", confidence=65, due_at=datetime.utcnow() + timedelta(days=30))
+        beta = Prediction(session_id=second, agent="CTO", statement="Beta company only", confidence=80, due_at=datetime.utcnow() + timedelta(days=30))
+        db.add_all([alpha, beta]); db.commit(); alpha_id = alpha.id
+    client.post(f"/api/studio/{first}/members", headers=owner, json={"email": editor_email, "role": "editor"})
+    client.post(f"/api/studio/{first}/members", headers=owner, json={"email": viewer_email, "role": "viewer"})
+    for actor in (owner, editor, viewer):
+        forecasts = client.get(f"/api/predictions?session_id={first}", headers=actor)
+        assert forecasts.status_code == 200 and [p["statement"] for p in forecasts.json()["predictions"]] == ["Alpha company only"]
+        assert client.get(f"/api/analytics/overview?session_id={first}", headers=actor).json()["totals"]["predictions"] == 1
+    for route in (f"/api/predictions?session_id={first}", f"/api/predictions/calibration?session_id={first}", f"/api/analytics/overview?session_id={first}"):
+        assert client.get(route, headers=stranger).status_code == 404
+    assert client.patch(f"/api/predictions/{alpha_id}", headers=viewer, json={"status": "hit"}).status_code == 403
+    assert client.patch(f"/api/predictions/{alpha_id}", headers=editor, json={"status": "hit"}).status_code == 200
+    assert client.get(f"/api/predictions/calibration?session_id={first}", headers=owner).json()["resolved_total"] == 1
+    assert client.get(f"/api/predictions/calibration?session_id={second}", headers=owner).json()["resolved_total"] == 0
+
+
+def test_cancelled_run_cannot_finalize_from_stale_cancellation_observation():
+    import pytest
+    from app.board_runner import execute_board_run
+    from app.models import BusinessSession, Message, AgentReport, Prediction
+    owner, user, _ = account(); sid = workspace(owner)
+    with SessionLocal() as db:
+        run = Job(user_id=user["id"], session_id=sid, prompt="Inspect launch evidence", status="running", progress_total=9)
+        db.add(run); db.commit(); job_id = run.id
+    checks = 0
+    def stale_check():
+        nonlocal checks
+        checks += 1
+        # Nine specialist chunks plus CEO synthesis precede the final check.
+        if checks == 11:
+            with SessionLocal() as cancel:
+                cancel.query(Job).filter_by(id=job_id).update({"status": "cancelled"})
+                cancel.commit()
+        return False
+    with SessionLocal() as db:
+        with pytest.raises(InterruptedError):
+            execute_board_run(db, db.get(BusinessSession, sid), "Inspect launch evidence", on_event=lambda event: None, cancelled=stale_check, job_id=job_id)
+    with SessionLocal() as db:
+        assert db.get(Job, job_id).status == "cancelled"
+        assert db.query(Message).filter_by(session_id=sid, role="assistant").count() == 0
+        assert db.query(AgentReport).filter_by(session_id=sid).count() == 0
+        assert db.query(Prediction).filter_by(session_id=sid).count() == 0
+
+
+def test_durable_cancellation_retry_and_recovery_preserve_one_canonical_result(monkeypatch):
+    from threading import Event
+    from app import jobs
+    from app.models import Message
+    owner, user, _ = account(); stranger, _, _ = account(); sid = workspace(owner)
+    entered, release, left = Event(), Event(), Event()
+    original = jobs.execute_board_run
+    def delayed(*args, **kwargs):
+        entered.set()
+        try:
+            if not release.wait(10):
+                raise RuntimeError("Isolated worker did not receive its test release.")
+            return original(*args, **kwargs)
+        finally:
+            left.set()
+    monkeypatch.setattr(jobs, "execute_board_run", delayed)
+    initial = client.post(f"/api/jobs/board-run/{sid}", headers=owner, json={"content": "Test durable cancellation."}).json()["job_id"]
+    try:
+        assert entered.wait(5)
+        assert client.post(f"/api/jobs/{initial}/cancel", headers=stranger).status_code == 404
+        assert client.post(f"/api/jobs/{initial}/cancel", headers=owner).json()["status"] == "cancelled"
+    finally:
+        release.set()
+    assert left.wait(10)
+    monkeypatch.setattr(jobs, "execute_board_run", original)
+    retry = client.post(f"/api/jobs/{initial}/retry", headers=owner)
+    assert retry.status_code == 200 and retry.json()["job_id"] != initial
+    retried_id = retry.json()["job_id"]
+    deadline = time.monotonic() + 15
+    state = {}
+    while time.monotonic() < deadline:
+        state = client.get(f"/api/jobs/{retried_id}", headers=owner).json()
+        if state.get("status") in {"done", "failed"}:
+            break
+        time.sleep(.05)
+    assert state["status"] == "done" and len(state["reports"]) == 9
+    assert client.post(f"/api/jobs/{retried_id}/retry", headers=owner).status_code == 409
+    assert client.post(f"/api/jobs/{retried_id}/cancel", headers=owner).json()["status"] == "done"
+    with SessionLocal() as db:
+        assert db.query(Message).filter_by(session_id=sid, role="assistant").count() == 1
+        assert db.query(RunEvent).filter_by(job_id=retried_id).count() == 10

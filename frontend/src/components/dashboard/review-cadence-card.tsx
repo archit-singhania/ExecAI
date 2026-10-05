@@ -79,7 +79,12 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
     );
   }
 
-  if (!schedule) return null;
+  if (!schedule)
+    return (
+      <p role="alert" className="st-alert">
+        {error || "Review cadence is unavailable. Reload to retry."}
+      </p>
+    );
 
   const active = schedule.cadence !== "off";
 
@@ -88,7 +93,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <CalendarClock size={14} className="text-steel" />
-          <p className="sec-eyebrow">Review cadence</p>
+          <p className="sec-eyebrow">Account review cadence</p>
         </div>
         {saving ? <Loader2 size={13} className="animate-spin text-steel" /> : null}
       </div>
@@ -98,6 +103,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
           <button
             key={option.value}
             type="button"
+            disabled={saving}
             onClick={() => persist({ ...schedule, cadence: option.value })}
             aria-pressed={schedule.cadence === option.value}
             className={cn(
@@ -117,6 +123,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
               <button
                 key={day}
                 type="button"
+                disabled={saving}
                 onClick={() => persist({ ...schedule, weekday: index })}
                 aria-pressed={schedule.weekday === index}
                 className={cn(
@@ -138,6 +145,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
             </label>
             <select
               id="review-hour"
+              disabled={saving}
               value={schedule.hour}
               onChange={(event) =>
                 persist({ ...schedule, hour: Number(event.target.value) })
@@ -158,6 +166,7 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
 
           <button
             type="button"
+            disabled={saving}
             onClick={() =>
               persist({ ...schedule, email_enabled: !schedule.email_enabled })
             }
@@ -181,18 +190,20 @@ export function ReviewCadenceCard({ isDemo }: { isDemo?: boolean }) {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}.`
-              : "The board convenes on this schedule whether or not you open the app."}
+              : "Your schedule is saved. Unattended reviews require the server scheduler to be configured."}
           </p>
         </>
       ) : (
         <p className="text-[0.75rem] font-medium leading-6 text-steel">
-          Reviews are manual. Turn on a cadence and the board scores your progress on
-          its own.
+          Reviews are manual. A saved cadence covers your account&apos;s companies;
+          unattended delivery requires a configured server scheduler and email service.
         </p>
       )}
 
       {error ? (
-        <p className="mt-2 text-[0.75rem] font-bold text-ember">{error}</p>
+        <p role="alert" className="mt-2 text-[0.75rem] font-bold text-ember">
+          {error}
+        </p>
       ) : null}
       {isDemo ? (
         <p className="mt-2 text-[0.72rem] font-semibold text-steel">

@@ -202,6 +202,7 @@ export const VoiceStage = forwardRef<VoiceStageHandle, VoiceStageProps>(function
       <form onSubmit={submitText} className="mx-auto w-full max-w-xl">
         <div className="voice-composer flex items-center gap-2 rounded-xl p-1.5">
           <input
+            aria-label="Voice boardroom message"
             value={textInput}
             onChange={(event) => setTextInput(event.target.value)}
             placeholder={busy ? "The board is working…" : "Or type your message…"}

@@ -24,6 +24,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VisualPreferences } from "@/components/ui/visual-preferences";
 
 function SectionHead({
   icon: Icon,
@@ -74,7 +75,10 @@ export default function SettingsPage() {
     setUser(stored);
     setName(stored?.name ?? "");
 
-    billingApi.me().then(setSubscription).catch(() => undefined);
+    billingApi
+      .me()
+      .then(setSubscription)
+      .catch(() => undefined);
   }, [router]);
 
   async function saveName(event: FormEvent) {
@@ -103,7 +107,8 @@ export default function SettingsPage() {
       await accountApi.changePassword(currentPassword, newPassword);
       setCurrentPassword("");
       setNewPassword("");
-      toast.success("Password changed", "We've emailed you a confirmation.");
+      clearSession();
+      router.replace("/login?password=changed");
     } catch (error) {
       toastFromError(error, "Couldn't change your password");
     } finally {
@@ -192,6 +197,13 @@ export default function SettingsPage() {
         </header>
 
         <div className="mt-8 space-y-4" data-stagger>
+          <Card>
+            <h2 className="mb-2 text-sm font-bold">Appearance & accessibility</h2>
+            <p className="ui-card-desc mb-4">
+              Choose solid surfaces, calmer motion, or stronger contrast on this device.
+            </p>
+            <VisualPreferences expanded />
+          </Card>
           {/* ---------------------------------------------------------- */}
           <Card style={{ "--i": 0 } as React.CSSProperties}>
             <SectionHead icon={User} title="Profile" />
@@ -258,13 +270,9 @@ export default function SettingsPage() {
               <Button
                 type="submit"
                 variant="ghost"
-                disabled={
-                  savingPassword || newPassword.length < 8 || !currentPassword
-                }
+                disabled={savingPassword || newPassword.length < 8 || !currentPassword}
               >
-                {savingPassword ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : null}
+                {savingPassword ? <Loader2 size={14} className="animate-spin" /> : null}
                 Change password
               </Button>
             </form>
@@ -332,8 +340,8 @@ export default function SettingsPage() {
             <SectionHead icon={Download} title="Your data" />
 
             <p className="ui-card-desc">
-              Download everything tied to this account as JSON: sessions,
-              messages, reports, tasks, memories, and review settings.
+              Download everything tied to this account as JSON: sessions, messages,
+              reports, tasks, memories, and review settings.
             </p>
 
             <div className="mt-4">
@@ -353,9 +361,9 @@ export default function SettingsPage() {
             <SectionHead icon={Trash2} title="Delete account" tone="critical" />
 
             <p className="ui-card-desc">
-              This removes your account and every session, report, task, and
-              memory attached to it. It cannot be undone. Export your data first
-              if you want a copy.
+              This removes your account and every session, report, task, and memory
+              attached to it. It cannot be undone. Export your data first if you want a
+              copy.
             </p>
 
             <div className="mt-4">
@@ -403,11 +411,7 @@ export default function SettingsPage() {
           </Field>
 
           <div className="ui-dialog-foot">
-            <Button
-              type="button"
-              variant="quiet"
-              onClick={() => setConfirmOpen(false)}
-            >
+            <Button type="button" variant="quiet" onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
             <Button

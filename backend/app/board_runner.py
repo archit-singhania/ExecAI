@@ -19,7 +19,7 @@ def recent_history(db: Session, session_id: str, limit: int = 8) -> list[str]:
     return [f"{row.role}: {row.content}" for row in reversed(rows)]
 
 
-def execute_board_run(db: Session, session: BusinessSession, content: str, on_event=None, cancelled=None) -> Message:
+def execute_board_run(db: Session, session: BusinessSession, content: str, on_event=None, cancelled=None, job_id: str | None = None) -> Message:
     user_message = Message(session_id=session.id, role="user", content=content)
     db.add(user_message)
     db.commit()
@@ -52,6 +52,15 @@ def execute_board_run(db: Session, session: BusinessSession, content: str, on_ev
         result = run_ceo_agents(session.business_goal, content, memory_context, options=options)
     if cancelled and cancelled():
         raise InterruptedError("Run cancelled by user.")
+
+    if job_id:
+        # Claim finalization inside the same transaction as the canonical result.
+        # A cancellation that wins first prevents every final-result write.
+        claimed = db.query(Job).filter(Job.id == job_id, Job.status == "running").update(
+            {"status": "done", "updated_at": datetime.utcnow()}, synchronize_session=False)
+        if not claimed:
+            db.rollback()
+            raise InterruptedError("Run stopped before its final result was saved.")
 
     session.health_score = result["health_score"]
     session.runway_months = result["runway_months"]
@@ -95,14 +104,18 @@ def execute_board_run(db: Session, session: BusinessSession, content: str, on_ev
                 )
             )
 
+    create_predictions(db, session.id, result.get("predictions", []))
+    if job_id:
+        from app.studio_models import RunEvent
+        job = db.get(Job, job_id)
+        db.refresh(job)
+        job.message_id = response.id
+        job.progress_current = job.progress_total
+        job.progress_label = "Verdict delivered"
+        db.add(RunEvent(job_id=job_id, event=json.dumps({"type": "done", "message_id": response.id, "final": response.content, "health_score": session.health_score, "runway_months": session.runway_months})))
+        db.add(StudioRecord(session_id=session.id, author_id=job.user_id, kind="activity", title="Board run completed", body=content, data=json.dumps({"job_id": job_id, "message_id": response.id})))
     db.commit()
     db.refresh(response)
-
-    try:
-        create_predictions(db, session.id, result.get("predictions", []))
-        db.commit()
-    except Exception:
-        db.rollback()
 
     try:
         store_memory(db, session.id, "user_question", f"User asked: {content}", importance=0.65)
