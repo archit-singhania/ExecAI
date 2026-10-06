@@ -84,7 +84,7 @@ time,
    ========================================================================== */
 
 :focus-visible {
-  outline: 2px solid rgb(var(--color-accent));
+  outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
@@ -139,16 +139,16 @@ time,
 }
 
 .dark * {
-  scrollbar-color: rgb(var(--color-fog) / 0.18) transparent;
+  scrollbar-color: rgb(var(--color-ink) / 0.24) transparent;
 }
 
 .dark *::-webkit-scrollbar-thumb {
-  background: rgb(var(--color-fog) / 0.14);
+  background: rgb(var(--color-ink) / 0.2);
   background-clip: content-box;
 }
 
 .dark *::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--color-fog) / 0.28);
+  background: rgb(var(--color-ink) / 0.35);
   background-clip: content-box;
 }
 

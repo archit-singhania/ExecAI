@@ -109,25 +109,63 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page.getByLabel("Objective", { exact: true }).fill("Validate demand");
     await page.getByLabel("Current value").fill("2");
     await page.getByLabel("Target", { exact: true }).fill("5");
+    const recordsPath = `/api/studio/${workspace}/records`;
+    const createResponse = page.waitForResponse(
+      (response) =>
+        response.url() === api + recordsPath &&
+        response.request().method() === "POST",
+    );
     await page.getByRole("button", { name: "Save metric", exact: true }).click();
-    const metric = page
-      .locator("article.st-card")
-      .filter({
-        has: page.getByRole("heading", { name: "Buyer interviews", exact: true }),
-      });
+    const created = await createResponse;
+    expect(created.status()).toBe(201);
+    const savedMetric = await created.json();
+    expect(savedMetric).toMatchObject({
+      kind: "metric",
+      data: { value: 2, target: 5 },
+    });
+    const metric = page.locator("article.st-card").filter({
+      has: page.getByRole("heading", { name: "Buyer interviews", exact: true }),
+    });
     await metric.getByRole("button", { name: "Edit", exact: true }).click();
     await page.getByLabel("Current value").fill("5");
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${api}${recordsPath}/${savedMetric.id}` &&
+        response.request().method() === "PUT",
+    );
     await page.getByRole("button", { name: "Save metric", exact: true }).click();
+    const updated = await updateResponse;
+    expect(updated.status()).toBe(200);
+    expect(await updated.json()).toMatchObject({
+      id: savedMetric.id,
+      kind: "metric",
+      version: savedMetric.version + 1,
+      data: { value: 5, target: 5 },
+    });
+    await expect(metric).toContainText(`Version ${savedMetric.version + 1}`);
     await expect(
       page.getByRole("heading", { name: "Historical scorecard" }),
     ).toBeVisible();
-    const records = await call(page, `/api/studio/${workspace}/records`);
-    expect(
-      records.value.some(
-        (r: { kind: string; data: { value: number } }) =>
-          r.kind === "metric_observation" && r.data.value === 2,
-      ),
-    ).toBe(true);
+    const records = await call(page, recordsPath);
+    expect(records.status).toBe(200);
+    expect(records.value).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: savedMetric.id,
+          kind: "metric",
+          version: savedMetric.version + 1,
+          data: expect.objectContaining({ value: 5, target: 5 }),
+        }),
+        expect.objectContaining({
+          kind: "metric_observation",
+          data: expect.objectContaining({
+            metric_id: savedMetric.id,
+            value: 2,
+            target: 5,
+          }),
+        }),
+      ]),
+    );
 
     await page.goto("/studio/execution");
     await page.getByLabel("Task title").fill("Complete buyer interviews");
@@ -140,24 +178,32 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page
       .getByLabel("Dependencies (select multiple)")
       .selectOption(prerequisite.id);
-    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Done");
+    await page
+      .getByRole("combobox", { name: "Status", exact: true })
+      .selectOption("Done");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await expect(page.getByRole("alert").first()).toContainText(/dependenc/i);
-    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Ready");
+    await page
+      .getByRole("combobox", { name: "Status", exact: true })
+      .selectOption("Ready");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await page
       .locator("article.st-task")
       .filter({ hasText: "Complete buyer interviews" })
       .getByRole("button", { name: "Edit task" })
       .click();
-    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Done");
+    await page
+      .getByRole("combobox", { name: "Status", exact: true })
+      .selectOption("Done");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await page
       .locator("article.st-task")
       .filter({ hasText: "Design the pilot" })
       .getByRole("button", { name: "Edit task" })
       .click();
-    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("Done");
+    await page
+      .getByRole("combobox", { name: "Status", exact: true })
+      .selectOption("Done");
     await page.getByRole("button", { name: "Save task", exact: true }).click();
     await expect(
       page
@@ -186,17 +232,26 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     ).toBeVisible();
     await page.goto("/studio/controls");
     await page.getByLabel("Preferred provider").selectOption("ollama");
-    await page.getByRole("combobox", { name: "Privacy", exact: true }).selectOption("true");
+    await page
+      .getByRole("combobox", { name: "Privacy", exact: true })
+      .selectOption("true");
     await page.getByLabel("Maximum tokens per model response").fill("700");
     await page.getByRole("button", { name: "Save agent controls" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Controls saved" })).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Controls saved" }),
+    ).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue(
       "700",
     );
     await expect(page.getByLabel("Preferred provider")).toHaveValue("ollama");
-    await expect(page.getByRole("combobox", { name: "Privacy", exact: true })).toHaveValue("true");
-    await page.screenshot({ path: "test-results/agent-controls-2026-10-06.png", fullPage: true });
+    await expect(
+      page.getByRole("combobox", { name: "Privacy", exact: true }),
+    ).toHaveValue("true");
+    await page.screenshot({
+      path: "test-results/agent-controls-2026-10-06.png",
+      fullPage: true,
+    });
   });
 
   await test.step("exports decode, public sharing revokes, account schedule persists", async () => {
@@ -231,7 +286,10 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     const publicView = await page.context().newPage();
     await publicView.goto(shared.url);
     await expect(publicView.getByRole("heading", { level: 1 })).toBeVisible();
-    await publicView.screenshot({ path: "test-results/public-report.png", fullPage: true });
+    await publicView.screenshot({
+      path: "test-results/public-report.png",
+      fullPage: true,
+    });
     expect(
       (await publicView.request.get(`${api}/api/share/${shared.slug}`)).status(),
     ).toBe(200);
@@ -247,7 +305,9 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await expect(
       page.getByRole("button", { name: "Weekly", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("button", { name: "Weekly", exact: true })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "Weekly", exact: true }),
+    ).toBeEnabled();
     await page.reload();
     await expect(
       page.getByRole("button", { name: "Weekly", exact: true }),
@@ -261,12 +321,16 @@ test("extended real studio operations, exports, roles and workspace isolation", 
       ["editor.fixture@example.com", "editor"],
     ]) {
       await page.getByLabel("Colleague email").fill(email);
-      await page.getByRole("combobox", { name: "Access", exact: true }).selectOption(role);
+      await page
+        .getByRole("combobox", { name: "Access", exact: true })
+        .selectOption(role);
       await page.getByRole("button", { name: "Add member", exact: true }).click();
       await expect(
         page
           .locator("section.st-card")
-          .filter({ has: page.getByRole("heading", { name: "Workspace members", exact: true }) })
+          .filter({
+            has: page.getByRole("heading", { name: "Workspace members", exact: true }),
+          })
           .locator(".st-compact-row")
           .filter({ hasText: email }),
       ).toBeVisible();
@@ -319,10 +383,14 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     const analytics = await call(page, `/api/analytics/overview?session_id=${second}`);
     expect(analytics.value.totals.reports).toBe(0);
     await page.goto("/studio/controls");
-    await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue("900");
+    await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue(
+      "900",
+    );
     await expect(page.getByLabel("Preferred provider")).toHaveValue("");
     await page.getByLabel("Choose workspace").selectOption(workspace);
-    await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue("700");
+    await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue(
+      "700",
+    );
     await expect(page.getByLabel("Preferred provider")).toHaveValue("ollama");
     await page.goto("/studio/forecasts");
     await expect(
@@ -330,7 +398,10 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     ).toBeEnabled();
     await page.getByRole("button", { name: "Right", exact: true }).first().click();
     await expect(page.getByText("100% overall", { exact: true })).toBeVisible();
-    await page.screenshot({ path: "test-results/forecasts-2026-10-06.png", fullPage: true });
+    await page.screenshot({
+      path: "test-results/forecasts-2026-10-06.png",
+      fullPage: true,
+    });
   });
   expect(errors).toEqual([]);
 });
@@ -352,6 +423,12 @@ test("glass, comfort preferences, mobile drawer and service error recovery", asy
     .fill("A visual and keyboard acceptance fixture.");
   await page.getByRole("button", { name: "Create workspace", exact: true }).click();
   await expect(page.locator(".st-hero")).toBeVisible();
+  const loadedFonts = await page.evaluate(async () => {
+    const sans = await document.fonts.load('500 16px "Manrope"');
+    const display = await document.fonts.load('500 32px "Newsreader"');
+    return [sans.length, display.length];
+  });
+  expect(loadedFonts.every((count) => count > 0)).toBe(true);
   await expect
     .poll(() =>
       page.locator(".st-topbar").evaluate((el) => getComputedStyle(el).backdropFilter),

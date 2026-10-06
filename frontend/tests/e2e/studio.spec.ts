@@ -13,7 +13,9 @@ test("real company workflows persist, with dark/mobile and keyboard access", asy
     .fill("Correct-Horse-Board-2026!");
   await page.getByRole("button", { name: "Create free account", exact: true }).click();
   await expect(page).toHaveURL(/\/studio$/);
-  await page.getByLabel("Company name", { exact: true }).fill("Northstar Labs · Illustrative workspace");
+  await page
+    .getByLabel("Company name", { exact: true })
+    .fill("Northstar Labs · Illustrative workspace");
   await page
     .getByLabel("Business goal & context")
     .fill(
@@ -98,6 +100,34 @@ test("real company workflows persist, with dark/mobile and keyboard access", asy
   });
   await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
   await expect(page.locator("html")).toHaveClass(/dark/);
+  const actionContrast = await page
+    .getByRole("button", { name: "Save context", exact: true })
+    .evaluate((button) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext("2d")!;
+      const luminance = (color: string) => {
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const channels = [...context.getImageData(0, 0, 1, 1).data]
+          .slice(0, 3)
+          .map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      };
+      const style = getComputedStyle(button);
+      const foreground = luminance(style.color);
+      const background = luminance(style.backgroundColor);
+      return (
+        (Math.max(foreground, background) + 0.05) /
+        (Math.min(foreground, background) + 0.05)
+      );
+    });
+  expect(actionContrast).toBeGreaterThanOrEqual(4.5);
   await page.screenshot({
     path: "test-results/studio-dark.png",
     fullPage: true,
@@ -143,4 +173,35 @@ test("marketing remains readable with reduced motion", async ({ page }) => {
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBe(true);
+  await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  const contrast = await page
+    .locator(".material-label")
+    .first()
+    .evaluate((label) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext("2d")!;
+      const luminance = (color: string) => {
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const channels = [...context.getImageData(0, 0, 1, 1).data]
+          .slice(0, 3)
+          .map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      };
+      const foreground = luminance(getComputedStyle(label).color);
+      const background = luminance(getComputedStyle(document.body).backgroundColor);
+      return (
+        (Math.max(foreground, background) + 0.05) /
+        (Math.min(foreground, background) + 0.05)
+      );
+    });
+  expect(contrast).toBeGreaterThanOrEqual(4.5);
+  await page.screenshot({ path: "test-results/premium-marketing-dark.png" });
 });

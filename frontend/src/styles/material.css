@@ -1,25 +1,62 @@
 /* Material language shared by marketing, account, classic dashboard and Halcyon. */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/Manrope-Variable.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("/fonts/Newsreader-Variable.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: Georgia, serif;
-  --color-ink: 23 35 59;
-  --color-fog: 245 247 252;
-  --color-steel: 89 105 128;
-  --color-accent: 65 105 225;
+  --font-sans:
+    "Manrope", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --color-ink: 29 38 58;
+  --color-fog: 243 242 238;
+  --color-steel: 90 102 122;
+  --color-surface: 253 252 249;
+  --color-accent: 62 88 176;
+  --color-accent-ink: rgb(var(--color-accent));
+  --color-positive: 30 111 90;
+  --color-caution: 139 99 39;
+  --color-critical: 167 65 65;
+  --color-info: 62 88 176;
   --r-sm: 9px;
   --r-md: 13px;
   --r-lg: 20px;
   --r-xl: 28px;
-  --elev-2: 0 5px 25px rgb(37 60 109 / 0.06), 0 0 0 1px rgb(23 35 59 / 0.06);
+  --elev-2:
+    0 8px 28px rgb(38 43 67 / 0.055), 0 1px 3px rgb(38 43 67 / 0.035),
+    0 0 0 1px rgb(29 38 58 / 0.06);
 }
 .dark {
-  --color-ink: 237 242 252;
-  --color-fog: 13 20 33;
-  --color-steel: 163 176 197;
-  --color-surface: 23 33 50;
+  --color-ink: 236 239 246;
+  --color-fog: 15 20 31;
+  --color-steel: 170 182 201;
+  --color-surface: 23 31 46;
+  --color-accent-ink: color-mix(
+    in srgb,
+    rgb(var(--color-accent)) 55%,
+    rgb(var(--color-ink))
+  );
+  --color-positive: 135 207 180;
+  --color-caution: 224 190 133;
+  --color-critical: 239 157 157;
+  --surface-sunken: 18 24 37;
+  --surface-base: 23 31 46;
+  --surface-raised: 31 40 57;
+  --surface-overlay: 39 49 68;
   --line-faint: rgb(var(--color-ink) / 0.06);
   --line: rgb(var(--color-ink) / 0.1);
   --line-strong: rgb(var(--color-ink) / 0.16);
+  --elev-2: 0 8px 30px rgb(0 0 0 / 0.22), inset 0 1px 0 rgb(236 239 246 / 0.05);
 }
 .ceo-material body {
   font-family: var(--font-sans);
@@ -58,14 +95,20 @@
 .material-marketing {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 75% 0%, #dae5ff8c, transparent 46%),
+    radial-gradient(
+      ellipse at 80% 0%,
+      rgb(var(--color-accent) / 0.12),
+      transparent 46%
+    ),
+    radial-gradient(ellipse at 8% 40%, rgb(191 164 119 / 0.12), transparent 40%),
     rgb(var(--color-fog));
   color: rgb(var(--color-ink));
   overflow: hidden;
 }
 .dark .material-marketing {
   background:
-    radial-gradient(ellipse at 75% 0%, #283f694f, transparent 46%),
+    radial-gradient(ellipse at 75% 0%, rgb(var(--color-accent) / 0.2), transparent 46%),
+    radial-gradient(ellipse at 8% 40%, rgb(161 129 87 / 0.07), transparent 40%),
     rgb(var(--color-fog));
 }
 .material-marketing > header {
@@ -93,7 +136,7 @@
   letter-spacing: 0.15em;
   text-transform: uppercase;
   font-weight: 700;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 .material-hero h1 {
   font-size: clamp(42px, 5.4vw, 72px);
@@ -105,7 +148,7 @@
 .material-hero h1 em {
   font-family: var(--font-display);
   font-weight: 400;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 .material-hero p {
   max-width: 450px;
@@ -201,7 +244,7 @@
   height: 31px;
   border-radius: 10px;
   background: rgb(var(--color-accent) / 0.08);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 .material-agent-row strong {
   display: block;
@@ -256,7 +299,7 @@
   box-shadow: var(--elev-2);
 }
 .material-feature > svg {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   margin-bottom: 24px;
 }
 .material-feature h3 {

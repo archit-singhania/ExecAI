@@ -430,7 +430,7 @@
 
 .ui-badge[data-tone="accent"] {
   background: rgb(var(--color-accent) / 0.14);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .ui-badge[data-tone="positive"] {

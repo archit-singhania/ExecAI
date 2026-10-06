@@ -169,7 +169,7 @@ input {
 }
 
 .text-accent {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .bg-accent {
@@ -189,7 +189,7 @@ input {
 }
 
 .title-accent {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   text-shadow: 0 0 26px rgb(var(--color-accent) / 0.35);
 }
 
@@ -1553,7 +1553,7 @@ textarea:focus-visible {
 }
 
 .sec-check:hover {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   box-shadow: inset 0 0 0 1.5px rgb(var(--color-accent));
 }
 
@@ -1641,7 +1641,7 @@ textarea:focus-visible {
 
 .sec-phase-building {
   background: rgb(var(--color-accent) / 0.16);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   box-shadow: inset 0 0 0 1.5px rgb(var(--color-accent) / 0.5);
 }
 
@@ -3382,7 +3382,7 @@ a.hal-support-link:hover {
 }
 
 .bc-desk-filed .bc-desk-node {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   box-shadow: inset 0 0 0 1.5px rgb(var(--color-accent) / 0.55);
   transform: scale(1.12);
   animation: bc-arrive 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -3410,7 +3410,7 @@ a.hal-support-link:hover {
 .bc-desk-score {
   font-size: 0.68rem;
   font-weight: 800;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .bc-verdict {
@@ -3885,7 +3885,7 @@ a.hal-support-link:hover {
 .pr-check {
   flex-shrink: 0;
   margin-top: 0.18rem;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .toaster {
@@ -3940,7 +3940,7 @@ a.hal-support-link:hover {
 
 .toast-info .toast-icon {
   background: rgb(var(--color-accent) / 0.12);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .toast-success .toast-icon {
@@ -3984,7 +3984,7 @@ a.hal-support-link:hover {
   margin-top: 0.5rem;
   font-size: 0.74rem;
   font-weight: 700;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .toast-action:hover {
@@ -4139,7 +4139,7 @@ a.hal-support-link:hover {
 }
 
 .cmdk-item-active .cmdk-item-icon {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .cmdk-item-label {
@@ -4414,7 +4414,7 @@ a.hal-support-link:hover {
   width: 2.4rem;
   border-radius: 0.6rem;
   background: rgb(var(--color-accent) / 0.12);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .onb-title {
@@ -6175,7 +6175,7 @@ select {
   padding: 0.3rem 0.8rem;
   font-size: 0.68rem;
   font-weight: 700;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   background: rgb(var(--color-accent) / 0.1);
   box-shadow: inset 0 0 0 1px rgb(var(--color-accent) / 0.22);
 }
@@ -6331,7 +6331,7 @@ select {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .fr-example-goal {
@@ -6411,7 +6411,7 @@ select {
   width: 2.4rem;
   border-radius: 0.6rem;
   background: rgb(var(--color-accent) / 0.12);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .lp-card-eyebrow {
@@ -6465,7 +6465,7 @@ select {
   font-size: 0.78rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .lp-demo-caption {
@@ -6515,7 +6515,7 @@ select {
 }
 
 .lp-cta-quiet:hover {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .rv {
@@ -7016,7 +7016,7 @@ select {
 }
 
 .mtb-item-on {
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
   background: rgb(var(--color-accent) / 0.1);
 }
 
@@ -7085,7 +7085,7 @@ select {
   width: 2rem;
   border-radius: 0.55rem;
   background: rgb(var(--color-accent) / 0.12);
-  color: rgb(var(--color-accent));
+  color: var(--color-accent-ink);
 }
 
 .mqg-label {

@@ -23,19 +23,19 @@ export type SurfaceOption = {
 };
 
 export const ACCENT_OPTIONS: AccentOption[] = [
-  { name: "Cobalt", value: "91 122 214" },
-  { name: "Teal", value: "41 158 157" },
-  { name: "Violet", value: "124 92 214" },
-  { name: "Slate Blue", value: "90 110 158" },
-  { name: "Orchid", value: "170 96 196" },
-  { name: "Jade", value: "38 150 122" },
-  { name: "Sky", value: "42 130 214" },
-  { name: "Indigo", value: "80 92 184" },
+  { name: "Sapphire", value: "62 88 176" },
+  { name: "Petrol", value: "26 113 112" },
+  { name: "Amethyst", value: "111 74 165" },
+  { name: "Steel Blue", value: "71 96 133" },
+  { name: "Mulberry", value: "139 70 115" },
+  { name: "Jade", value: "26 112 83" },
+  { name: "Atlantic", value: "36 108 152" },
+  { name: "Indigo", value: "76 75 151" },
 ];
 
 export const SURFACE_OPTIONS: { light: SurfaceOption[]; dark: SurfaceOption[] } = {
   light: [
-    { name: "Paper", value: "255 255 255" },
+    { name: "Porcelain", value: "253 252 249" },
     { name: "Linen", value: "250 247 240" },
     { name: "Mist", value: "244 247 246" },
     { name: "Blush", value: "250 244 246" },
@@ -45,7 +45,7 @@ export const SURFACE_OPTIONS: { light: SurfaceOption[]; dark: SurfaceOption[] } 
     { name: "Pearl", value: "248 247 250" },
   ],
   dark: [
-    { name: "Slate", value: "23 27 32" },
+    { name: "Blue Graphite", value: "23 31 46" },
     { name: "Onyx", value: "18 20 24" },
     { name: "Charcoal", value: "27 27 30" },
     { name: "Midnight", value: "16 20 28" },
