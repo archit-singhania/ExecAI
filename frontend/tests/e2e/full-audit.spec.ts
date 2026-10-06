@@ -112,8 +112,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     const recordsPath = `/api/studio/${workspace}/records`;
     const createResponse = page.waitForResponse(
       (response) =>
-        response.url() === api + recordsPath &&
-        response.request().method() === "POST",
+        response.url() === api + recordsPath && response.request().method() === "POST",
     );
     await page.getByRole("button", { name: "Save metric", exact: true }).click();
     const created = await createResponse;
@@ -168,8 +167,21 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     );
 
     await page.goto("/studio/execution");
+    const saveTask = async (successful = true) => {
+      const save = page.getByRole("button", { name: "Save task", exact: true });
+      const [response] = await Promise.all([
+        page.waitForResponse(
+          (item) =>
+            new URL(item.url()).pathname.startsWith(`/api/studio/${workspace}/tasks`) &&
+            ["POST", "PUT"].includes(item.request().method()),
+        ),
+        save.click(),
+      ]);
+      expect(response.ok()).toBe(successful);
+      await expect(save).toBeEnabled();
+    };
     await page.getByLabel("Task title").fill("Complete buyer interviews");
-    await page.getByRole("button", { name: "Save task", exact: true }).click();
+    await saveTask();
     const tasks = await call(page, `/api/studio/${workspace}/tasks`);
     const prerequisite = tasks.value.find(
       (task: { title: string }) => task.title === "Complete buyer interviews",
@@ -181,12 +193,12 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page
       .getByRole("combobox", { name: "Status", exact: true })
       .selectOption("Done");
-    await page.getByRole("button", { name: "Save task", exact: true }).click();
+    await saveTask(false);
     await expect(page.getByRole("alert").first()).toContainText(/dependenc/i);
     await page
       .getByRole("combobox", { name: "Status", exact: true })
       .selectOption("Ready");
-    await page.getByRole("button", { name: "Save task", exact: true }).click();
+    await saveTask();
     await page
       .locator("article.st-task")
       .filter({ hasText: "Complete buyer interviews" })
@@ -195,7 +207,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page
       .getByRole("combobox", { name: "Status", exact: true })
       .selectOption("Done");
-    await page.getByRole("button", { name: "Save task", exact: true }).click();
+    await saveTask();
     await page
       .locator("article.st-task")
       .filter({ hasText: "Design the pilot" })
@@ -204,7 +216,7 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page
       .getByRole("combobox", { name: "Status", exact: true })
       .selectOption("Done");
-    await page.getByRole("button", { name: "Save task", exact: true }).click();
+    await saveTask();
     await expect(
       page
         .locator(".st-kanban-column")
@@ -436,9 +448,49 @@ test("glass, comfort preferences, mobile drawer and service error recovery", asy
     .toContain("blur");
   await page.getByRole("button", { name: "Visual comfort", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Visual comfort", exact: true });
+  const dialogCenter = await dialog.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    return {
+      x: Math.abs(rect.left + rect.width / 2 - innerWidth / 2),
+      y: Math.abs(rect.top + rect.height / 2 - innerHeight / 2),
+    };
+  });
+  expect(dialogCenter.x).toBeLessThan(2);
+  expect(dialogCenter.y).toBeLessThan(12);
+  await dialog.getByRole("radio", { name: /Petrol & Mineral/ }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-collection", "petrol");
+  const mineralInk = await page
+    .locator(".st-app")
+    .evaluate((el) => getComputedStyle(el).color);
+  expect(mineralInk).toBe("rgb(27, 44, 43)");
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-collection", "petrol");
+  await page.getByRole("button", { name: "Visual comfort", exact: true }).click();
+  await expect(dialog.getByRole("radio", { name: /Petrol & Mineral/ })).toBeChecked();
+  await dialog.getByRole("radio", { name: /Sapphire & Porcelain/ }).check();
   await dialog.getByRole("checkbox", { name: /Reduce transparency/ }).check();
   await dialog.getByRole("checkbox", { name: /Reduce motion/ }).check();
   await dialog.getByRole("checkbox", { name: /Increase contrast/ }).check();
+  await dialog.getByRole("radio", { name: /Petrol & Mineral/ }).check();
+  await expect
+    .poll(() =>
+      dialog
+        .locator(".design-collection small")
+        .first()
+        .evaluate((el) => getComputedStyle(el).color),
+    )
+    .toBe("rgb(43, 57, 81)");
+  await dialog.getByRole("radio", { name: /Mulberry & Linen/ }).check();
+  await expect
+    .poll(() =>
+      dialog
+        .locator(".design-collection small")
+        .first()
+        .evaluate((el) => getComputedStyle(el).color),
+    )
+    .toBe("rgb(43, 57, 81)");
+  await dialog.getByRole("radio", { name: /Sapphire & Porcelain/ }).check();
   await page.screenshot({ path: "test-results/visual-comfort.png", fullPage: true });
   await page.keyboard.press("Escape");
   await expect(
@@ -446,6 +498,9 @@ test("glass, comfort preferences, mobile drawer and service error recovery", asy
   ).toBeFocused();
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/reduce-transparency/);
+  expect(
+    await page.locator(".st-content").evaluate((el) => el.getAnimations().length),
+  ).toBe(0);
   expect(
     await page
       .locator(".st-topbar")

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PremiumMotion } from "@/components/premium-motion";
 import { LocaleProvider } from "@/lib/i18n";
 import "./globals.css";
 // Order matters. tokens.css redefines the custom properties globals.css sets;
@@ -9,6 +10,7 @@ import "@/styles/primitives.css";
 import "@/styles/premium.css";
 import "@/styles/material.css";
 import "@/styles/liquid-glass.css";
+import "@/styles/motion.css";
 
 export const metadata: Metadata = {
   title: "CEO.ai — Executive Studio",
@@ -27,6 +29,8 @@ const noFlashScript = `
 
     var storedAccent = window.localStorage.getItem("ceoai-theme-accent");
     if (storedAccent) document.documentElement.style.setProperty("--color-accent", storedAccent);
+    var collection = window.localStorage.getItem("ceoai-theme-collection");
+    if (["sapphire", "petrol", "mulberry"].indexOf(collection) !== -1) document.documentElement.dataset.collection = collection;
 
     var storedSurfaceKey = mode === "dark" ? "ceoai-theme-surface-dark" : "ceoai-theme-surface-light";
     var storedSurface = window.localStorage.getItem(storedSurfaceKey);
@@ -60,7 +64,10 @@ export default function RootLayout({
           Skip to content
         </a>
         <LocaleProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <PremiumMotion />
+            {children}
+          </ThemeProvider>
         </LocaleProvider>
         <div className="grain-overlay" aria-hidden />
       </body>

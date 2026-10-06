@@ -33,6 +33,33 @@ export const ACCENT_OPTIONS: AccentOption[] = [
   { name: "Indigo", value: "76 75 151" },
 ];
 
+export const DESIGN_COLLECTIONS = [
+  {
+    id: "sapphire",
+    name: "Sapphire & Porcelain",
+    detail: "A precise executive classic.",
+    accent: "62 88 176",
+    light: "253 252 249",
+    dark: "23 31 46",
+  },
+  {
+    id: "petrol",
+    name: "Petrol & Mineral",
+    detail: "Quiet depth with a mineral tint.",
+    accent: "26 113 112",
+    light: "244 247 246",
+    dark: "18 24 22",
+  },
+  {
+    id: "mulberry",
+    name: "Mulberry & Linen",
+    detail: "Warm paper and considered color.",
+    accent: "139 70 115",
+    light: "250 247 240",
+    dark: "24 19 27",
+  },
+] as const;
+
 export const SURFACE_OPTIONS: { light: SurfaceOption[]; dark: SurfaceOption[] } = {
   light: [
     { name: "Porcelain", value: "253 252 249" },
@@ -78,6 +105,8 @@ type ThemeContextValue = {
   setAccent: (value: string) => void;
   surface: string;
   setSurface: (value: string) => void;
+  collection: string;
+  setCollection: (id: string) => void;
   comfort: VisualComfort;
   setComfort: (preference: keyof VisualComfort, enabled: boolean) => void;
 };
@@ -210,6 +239,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const collection =
+    DESIGN_COLLECTIONS.find(
+      (item) =>
+        item.accent === accent &&
+        item.light === surfaceLight &&
+        item.dark === surfaceDark,
+    )?.id ?? "custom";
+  const setCollection = useCallback((id: string) => {
+    const chosen = DESIGN_COLLECTIONS.find((item) => item.id === id);
+    if (!chosen) return;
+    setAccentState(chosen.accent);
+    setSurfaceLight(chosen.light);
+    setSurfaceDark(chosen.dark);
+  }, []);
+  useEffect(() => {
+    if (mounted) {
+      document.documentElement.dataset.collection = collection;
+      window.localStorage.setItem("ceoai-theme-collection", collection);
+    }
+  }, [collection, mounted]);
+
   const value = useMemo(
     () => ({
       appearance,
@@ -221,6 +271,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setAccent,
       surface: mode === "dark" ? surfaceDark : surfaceLight,
       setSurface,
+      collection,
+      setCollection,
       comfort,
       setComfort,
     }),
@@ -235,6 +287,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       surfaceDark,
       surfaceLight,
       setSurface,
+      collection,
+      setCollection,
       comfort,
       setComfort,
     ],

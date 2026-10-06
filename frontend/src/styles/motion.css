@@ -1,0 +1,205 @@
+/* Executive motion: a settled shell, a short content reveal and precise feedback. */
+:root {
+  --motion-control: 150ms;
+  --motion-panel: 280ms;
+  --motion-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+html[data-collection="petrol"] {
+  --color-fog: 237 243 240;
+  --color-ink: 27 44 43;
+  --color-steel: 82 105 101;
+}
+html.dark[data-collection="petrol"] {
+  --color-fog: 13 23 22;
+  --color-ink: 230 241 236;
+  --color-steel: 165 187 177;
+}
+html[data-collection="mulberry"] {
+  --color-fog: 245 239 233;
+  --color-ink: 49 33 45;
+  --color-steel: 111 93 103;
+}
+html.dark[data-collection="mulberry"] {
+  --color-fog: 22 15 24;
+  --color-ink: 244 233 239;
+  --color-steel: 189 172 186;
+}
+/* Comfort roles take precedence over each collection's ordinary muted text. */
+html.ceo-material.increase-contrast {
+  --color-steel: 43 57 81;
+}
+html.ceo-material.increase-contrast.dark {
+  --color-steel: 217 227 245;
+}
+@media (prefers-contrast: more) {
+  html.ceo-material:not(.dark) {
+    --color-steel: 43 57 81;
+  }
+  html.ceo-material.dark {
+    --color-steel: 217 227 245;
+  }
+}
+.ceo-material .st-card {
+  animation-duration: 260ms;
+  animation-timing-function: var(--motion-out);
+}
+.ceo-material .st-metrics .st-card:nth-child(2) {
+  animation-delay: 35ms;
+}
+.ceo-material .st-metrics .st-card:nth-child(3) {
+  animation-delay: 70ms;
+}
+.ceo-material .st-metrics .st-card:nth-child(4) {
+  animation-delay: 105ms;
+}
+.ceo-material
+  :is(
+    .st-primary,
+    .st-secondary,
+    .st-icon,
+    .st-sidebar nav a,
+    .material-cta,
+    .material-link
+  ) {
+  transition:
+    transform var(--motion-control) var(--motion-out),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+.ceo-material :is(.st-primary, .st-secondary, .material-cta, .material-link):active {
+  transform: translateY(1px) scale(0.985);
+}
+.ceo-material :is(.st-alert, .st-notice, .ui-toast) {
+  animation: executive-feedback 220ms var(--motion-out);
+}
+.ceo-material .st-nav-dot {
+  animation: executive-selection 240ms var(--motion-out);
+}
+.ceo-material :is(.ui-dialog, .st-search-modal) {
+  animation: executive-sheet 260ms var(--motion-out);
+}
+.ceo-material :is(input, textarea, select) {
+  transition:
+    border-color 150ms,
+    box-shadow 150ms,
+    background-color 180ms;
+}
+.ceo-material .st-page-heading h1 {
+  text-wrap: balance;
+}
+.ceo-material .st-hero h2 {
+  font-optical-sizing: auto;
+  text-wrap: balance;
+}
+.design-collections {
+  border: 0;
+  padding: 0 0 18px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid rgb(var(--color-ink) / 0.12);
+}
+.design-collections legend {
+  font-weight: 700;
+  font-size: 14px;
+  padding: 0;
+}
+.design-collections > p {
+  color: rgb(var(--color-steel));
+  font-size: 12px;
+  margin: 6px 0 12px;
+}
+.design-collection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin: 6px 0;
+  border: 1px solid rgb(var(--color-ink) / 0.1);
+  border-radius: 14px;
+  cursor: pointer;
+  transition:
+    border-color 160ms,
+    background-color 160ms;
+}
+.design-collection:has(input:checked) {
+  border-color: rgb(var(--color-accent) / 0.5);
+  background: rgb(var(--color-accent) / 0.06);
+}
+.design-collection > span:nth-child(2) {
+  flex: 1;
+}
+.design-collection strong {
+  display: block;
+  font-size: 12px;
+}
+.design-collection small {
+  display: block;
+  color: rgb(var(--color-steel));
+  font-size: 11px;
+  margin-top: 3px;
+}
+.collection-swatch {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 #ffffff45;
+}
+.design-collection input {
+  accent-color: rgb(var(--color-accent));
+}
+@keyframes executive-feedback {
+  from {
+    opacity: 0.2;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes executive-selection {
+  from {
+    transform: scale(0.5);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes executive-sheet {
+  from {
+    opacity: 0.4;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .ceo-material .st-sidebar nav a:hover {
+    transform: translateX(2px);
+  }
+  .ceo-material :is(.st-primary, .st-secondary):not(:disabled):not(:active):hover {
+    transform: translateY(-1px);
+  }
+}
+.ceo-material.reduce-motion *,
+.ceo-material.reduce-motion *::before,
+.ceo-material.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ceo-material *,
+  .ceo-material *::before,
+  .ceo-material *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
