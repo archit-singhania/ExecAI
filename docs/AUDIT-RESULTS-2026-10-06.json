@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "project": "CEO.ai",
+  "auditDate": "2026-10-06",
+  "auditPeriod": [
+    "2026-10-05",
+    "2026-10-06"
+  ],
+  "report": "docs/FULL-AUDIT-2026-10-05.md",
+  "backend": {
+    "date": "2026-10-05",
+    "passed": 247,
+    "failed": 0,
+    "durationSeconds": 66.59,
+    "reusedEvidence": true,
+    "sourceUnchangedOnOctober6": true
+  },
+  "frontend": {
+    "date": "2026-10-06",
+    "nodeVersion": "24.15.0",
+    "nextVersion": "15.5.27",
+    "typecheck": "passed",
+    "lint": "passed",
+    "productionBuild": "passed",
+    "routes": 16,
+    "buildId": "2L01kekq2WwLWiAeg9Dld",
+    "source": "frontend/src/components/studio/executive-studio.tsx",
+    "sourceSha256": "454890AA2F8FB67B92E55236058D1128184CB5C902AA62387FE1B537D72BFAD8",
+    "logs": [
+      "docs/evidence-2026-10-06/typecheck.log",
+      "docs/evidence-2026-10-06/lint.log",
+      "docs/evidence-2026-10-06/build.log"
+    ]
+  },
+  "browser": {
+    "date": "2026-10-06",
+    "channel": "chrome",
+    "production": true,
+    "passedJourneys": 5,
+    "execution": "Four regression journeys passed in the five-test run; the extended journey passed after a test-only selector correction. The production source and build were unchanged between those browser runs.",
+    "journeys": [
+      {
+        "name": "Extended studio operations, exports, roles and workspace isolation",
+        "durationSeconds": 71.648,
+        "result": "passed"
+      },
+      {
+        "name": "Glass, comfort, mobile drawer and service recovery",
+        "durationSeconds": 16.7,
+        "result": "passed"
+      },
+      {
+        "name": "Password revocation and new sign-in",
+        "durationSeconds": 8.8,
+        "result": "passed"
+      },
+      {
+        "name": "Core studio workflow, dark/mobile, keyboard and offline behavior",
+        "durationSeconds": 21.6,
+        "result": "passed"
+      },
+      {
+        "name": "Reduced-motion marketing",
+        "durationSeconds": 1.5,
+        "result": "passed"
+      }
+    ],
+    "logs": [
+      "docs/evidence-2026-10-06/browser-final.log",
+      "docs/evidence-2026-10-06/extended-final.log"
+    ],
+    "extendedReport": "docs/evidence-2026-10-06/extended-report.json",
+    "fixture": "New migrated temporary SQLite databases; example.com accounts; guarded local Pro entitlement",
+    "publicModels": "Unreachable local endpoint; local-template source; no hosted calls or downloads"
+  },
+  "npmAudit": {
+    "date": "2026-10-05",
+    "productionVulnerabilities": 0,
+    "fullHigh": 11,
+    "fullCritical": 0,
+    "unresolved": "One unpatched braces advisory propagated through development dependencies",
+    "record": "docs/npm-audit-2026-10-05.json",
+    "refreshedOnOctober6": false
+  },
+  "artifacts": [
+    {
+      "bytes": 654337,
+      "path": "docs/screenshots/agent-controls-2026-10-06.png",
+      "sha256": "97894EB99849D5AC265A3DEADC561D8A2E3B22730BF9EA48489B72E0107158F3"
+    },
+    {
+      "bytes": 1001048,
+      "path": "docs/screenshots/forecasts-2026-10-06.png",
+      "sha256": "3B9CFA8093BF85F694EA9B56509021961197F82D09674BA09DBA98D2D8DB3312"
+    },
+    {
+      "bytes": 374865,
+      "path": "docs/screenshots/mobile-navigation-2026-10-06.png",
+      "sha256": "48617E9F90C1A4D7BCE118846027385439493C8C88319F6A1308425134BBDB3A"
+    },
+    {
+      "bytes": 861746,
+      "path": "docs/screenshots/public-report-2026-10-06.png",
+      "sha256": "25DCF4BE38854FA37908B53C301B66C71C713993FAA61147074882C72C8A14A4"
+    },
+    {
+      "bytes": 1156304,
+      "path": "docs/screenshots/studio-dark-2026-10-06.png",
+      "sha256": "6B7759A74BC33351EA73AF918B56F7AE152F8C2B10B4275A55D5D27AE48D3ED7"
+    },
+    {
+      "bytes": 865107,
+      "path": "docs/screenshots/studio-light-2026-10-06.png",
+      "sha256": "47BB2C641C6ADC1EC4C990C952CBEF1776514C5B8A2DA86E1D3B5D397A015426"
+    },
+    {
+      "bytes": 217993,
+      "path": "docs/screenshots/studio-mobile-2026-10-06.png",
+      "sha256": "7C4C6B2AF03232DA18E42A8C7538DF64FABD7D5C7E6702DBAF38F616030F644B"
+    },
+    {
+      "bytes": 727955,
+      "path": "docs/screenshots/visual-comfort-2026-10-06.png",
+      "sha256": "745E9057404EAB7E0A0837449A36036B06A744AED145D916387BB1980CC9CF9C"
+    },
+    {
+      "bytes": 2186100,
+      "path": "docs/demo/ceoai-glass-workflow-2026-10-06.webm",
+      "sha256": "6B010F319F68F253C10796DC3A47D378B2F203257C751BECFBD9D3642D4EC342"
+    },
+    {
+      "bytes": 6652595,
+      "path": "docs/demo/ceoai-extended-workflow-2026-10-06.webm",
+      "sha256": "94E9FF23A9CD8AD8A8A699A12F720EEB95C1A8E9F11601322792139DC2FC41DF"
+    }
+  ],
+  "limits": [
+    "Configured model quality and availability",
+    "Tavily research",
+    "Physical microphone and speech playback",
+    "Stripe payments and webhooks",
+    "Email delivery and unattended cron",
+    "PostgreSQL/pgvector acceptance",
+    "Real-device performance",
+    "Hosted HTTPS",
+    "Native Unreal compilation and streaming"
+  ],
+  "deployment": "Deferred; no commit, push or deployment performed"
+}

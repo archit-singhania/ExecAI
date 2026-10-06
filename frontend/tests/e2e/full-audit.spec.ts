@@ -194,6 +194,9 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue(
       "700",
     );
+    await expect(page.getByLabel("Preferred provider")).toHaveValue("ollama");
+    await expect(page.getByRole("combobox", { name: "Privacy", exact: true })).toHaveValue("true");
+    await page.screenshot({ path: "test-results/agent-controls-2026-10-06.png", fullPage: true });
   });
 
   await test.step("exports decode, public sharing revokes, account schedule persists", async () => {
@@ -261,7 +264,11 @@ test("extended real studio operations, exports, roles and workspace isolation", 
       await page.getByRole("combobox", { name: "Access", exact: true }).selectOption(role);
       await page.getByRole("button", { name: "Add member", exact: true }).click();
       await expect(
-        page.locator(".st-compact-row").filter({ hasText: email }),
+        page
+          .locator("section.st-card")
+          .filter({ has: page.getByRole("heading", { name: "Workspace members", exact: true }) })
+          .locator(".st-compact-row")
+          .filter({ hasText: email }),
       ).toBeVisible();
     }
     await page.getByLabel("Topic", { exact: true }).fill("Inspect interview evidence");
@@ -311,13 +318,19 @@ test("extended real studio operations, exports, roles and workspace isolation", 
     await page.goto("/studio/analytics");
     const analytics = await call(page, `/api/analytics/overview?session_id=${second}`);
     expect(analytics.value.totals.reports).toBe(0);
+    await page.goto("/studio/controls");
+    await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue("900");
+    await expect(page.getByLabel("Preferred provider")).toHaveValue("");
     await page.getByLabel("Choose workspace").selectOption(workspace);
+    await expect(page.getByLabel("Maximum tokens per model response")).toHaveValue("700");
+    await expect(page.getByLabel("Preferred provider")).toHaveValue("ollama");
     await page.goto("/studio/forecasts");
     await expect(
       page.getByRole("button", { name: "Right", exact: true }).first(),
     ).toBeEnabled();
     await page.getByRole("button", { name: "Right", exact: true }).first().click();
     await expect(page.getByText("100% overall", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/forecasts-2026-10-06.png", fullPage: true });
   });
   expect(errors).toEqual([]);
 });

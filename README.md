@@ -4,7 +4,7 @@ An executive decision studio for turning company context, evidence and specialis
 
 The premium interface uses an original compass identity, light/dark/system appearance, translucent navigation, readable cards, responsive layouts, keyboard modal access and restrained motion. The new `/studio` has thirteen connected sections; the classic boardroom and Halcyon companion remain available.
 
-The [5 October full audit](docs/FULL-AUDIT-2026-10-05.md) records the refreshed Liquid Glass interface, functional repairs, current tests and exact manual expectations. **Visual comfort** in the studio toolbar or account settings saves reduced motion, solid surfaces and stronger contrast across all screens.
+The [5–6 October full audit](docs/FULL-AUDIT-2026-10-05.md) records the refreshed Liquid Glass interface, functional repairs, dated tests and exact manual expectations. **Visual comfort** in the studio toolbar or account settings saves reduced motion, solid surfaces and stronger contrast across all screens.
 
 ## Product workflows
 

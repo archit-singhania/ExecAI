@@ -1,6 +1,6 @@
 # CEO.ai recording provenance
 
-These recordings show the actual local CEO.ai application in Chrome, driven by the acceptance journey in [studio.spec.ts](../../frontend/tests/e2e/studio.spec.ts). They were captured on **1 October 2026** on Windows against an isolated SQLite test database. This provenance page was added on 3 October; the videos were not recorded again.
+The original recordings described below show the actual local CEO.ai application in Chrome, driven by the acceptance journey in [studio.spec.ts](../../frontend/tests/e2e/studio.spec.ts). They were captured on **1 October 2026** on Windows against an isolated SQLite test database. This provenance page was added on 3 October; those original videos were not recorded again.
 
 - [Short workflow](ceoai-workflow.webm): **64.52 seconds**, 1280 × 720 WebM, a trimmed excerpt of the actual browser recording. It is not a separate complete twenty-feature acceptance run.
 - [Full workflow](ceoai-workflow-full.webm): the complete recorded studio acceptance journey, including the later board, appearance, mobile and offline checks.
@@ -28,3 +28,11 @@ The acceptance environment deliberately points local model requests at an unreac
 This recording does not prove every capability or external integration. Live models, Tavily research, payments, email, unattended scheduling, actual microphone capture and optional Unreal streaming require their documented configured-service checks. The video demonstrates local browser behavior, not public deployment, commercial traction, model accuracy or reference-device performance.
 
 See [the twenty-capability matrix](../CAPABILITIES.md), [the dated validation record](../VALIDATION.md) and [the complete manual guide](../MANUAL_TEST.md) for persistence, permissions, cancellation and service-gate acceptance beyond the recorded excerpt.
+
+## Refreshed production recordings — 5–6 October 2026
+
+The [5 October glass workflow](ceoai-glass-workflow-2026-10-05.webm) remains preserved as captured. The [6 October core workflow](ceoai-glass-workflow-2026-10-06.webm) is the actual untrimmed successful production Chrome core journey after the saved-controls form repair. It uses the same Northstar Labs illustrative fixture inputs described above. The [6 October extended workflow](ceoai-extended-workflow-2026-10-06.webm) is the untrimmed successful extended test using **Northstar · Full audit fixture** and a second **Southstar · Empty fixture**. Its accounts are disposable example.com fixtures with a guarded local Pro entitlement; that entitlement does not demonstrate payment.
+
+The extended recording shows saved briefs, two durable board runs (one through typed voice), specialist debate, metric revisions, task dependency rejection/recovery, explicit Tavily unavailability, saved agent controls after reload, actual PDF/Markdown downloads, public sharing/revocation, account cadence, viewer/editor membership, comments, viewer write denial, separate-company forecast/analytics isolation, saved controls when switching companies and owner forecast resolution. The test passed in 71.648 seconds. Caption execution is accepted; physical microphone capture and spoken playback remain external device/provider checks.
+
+Five production browser journeys passed across the final regression invocation and the successful extended rerun on the same production build. The intermediate member-selector failure was corrected in the test, and the original controls initialization defect was repaired in the application. [The dated audit](../FULL-AUDIT-2026-10-05.md) and [results/hash record](../AUDIT-RESULTS-2026-10-06.json) contain the exact run history and 6 October screenshot paths. Reports remain labeled **local-template**; these media demonstrate connected local behavior, not live inference quality, research evidence, hosted deployment or a device performance benchmark.

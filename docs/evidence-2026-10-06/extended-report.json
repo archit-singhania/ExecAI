@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "actualWorkers": 1
+  },
+  "startTime": 1791265996941,
+  "duration": 73934.22,
+  "files": [
+    {
+      "fileId": "37c767e0be542eead5bf",
+      "fileName": "full-audit.spec.ts",
+      "tests": [
+        {
+          "testId": "37c767e0be542eead5bf-912629ed21ec8970e444",
+          "title": "extended real studio operations, exports, roles and workspace isolation",
+          "projectName": "desktop",
+          "location": {
+            "file": "full-audit.spec.ts",
+            "line": 33,
+            "column": 5
+          },
+          "duration": 71648,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [
+                {
+                  "name": "video",
+                  "contentType": "video/webm",
+                  "path": "data/ca9ea911596d6cdc9c8dfe330652e18fed68288a.webm"
+                },
+                {
+                  "name": "video",
+                  "contentType": "video/webm",
+                  "path": "data/b7b05601a0f5a9cfa91f26fe061e7b3882e05525.webm"
+                }
+              ],
+              "startTime": "2026-10-06T05:53:17.636Z",
+              "workerIndex": 0
+            }
+          ]
+        }
+      ],
+      "stats": {
+        "total": 1,
+        "expected": 1,
+        "unexpected": 0,
+        "flaky": 0,
+        "skipped": 0,
+        "ok": true
+      }
+    }
+  ],
+  "projectNames": [
+    "desktop"
+  ],
+  "stats": {
+    "total": 1,
+    "expected": 1,
+    "unexpected": 0,
+    "flaky": 0,
+    "skipped": 0,
+    "ok": true
+  },
+  "errors": [],
+  "options": {},
+  "machines": []
+}

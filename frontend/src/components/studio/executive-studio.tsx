@@ -168,6 +168,9 @@ export function ExecutiveStudio() {
   const role = members.find((m) => m.id === user?.id)?.role;
   const writable = workspace?.owned || role === "editor";
   const scoped = (path: string) => `/api/studio/${selected}${path}`;
+  const agentControls = records.find(
+    (record) => record.kind === "preferences" && record.title === "Agent controls",
+  );
 
   useEffect(() => {
     if (!menu) return;
@@ -1941,13 +1944,11 @@ export function ExecutiveStudio() {
                       availability is not a guarantee of model health.
                     </p>
                     <form
+                      key={`${selected}:${agentControls?.id ?? "new"}:${agentControls?.version ?? 0}`}
                       onSubmit={(e) => {
                         e.preventDefault();
                         const values = new FormData(e.currentTarget);
-                        const old = records.find(
-                          (r) =>
-                            r.kind === "preferences" && r.title === "Agent controls",
-                        );
+                        const old = agentControls;
                         void action(async () => {
                           await studioRequest(
                             scoped(`/records${old ? `/${old.id}` : ""}`),
@@ -1973,10 +1974,7 @@ export function ExecutiveStudio() {
                         <Field label="Preferred provider">
                           <select
                             name="provider"
-                            defaultValue={text(
-                              records.find((r) => r.title === "Agent controls")?.data
-                                .provider,
-                            )}
+                            defaultValue={text(agentControls?.data.provider)}
                           >
                             <option value="">Automatic configured routing</option>
                             {[
@@ -1994,10 +1992,7 @@ export function ExecutiveStudio() {
                         <Field label="Privacy">
                           <select
                             name="local_only"
-                            defaultValue={text(
-                              records.find((r) => r.title === "Agent controls")?.data
-                                .local_only ?? true,
-                            )}
+                            defaultValue={text(agentControls?.data.local_only ?? true)}
                           >
                             <option value="true">Local only</option>
                             <option value="false">
@@ -2012,10 +2007,7 @@ export function ExecutiveStudio() {
                             min={200}
                             max={2000}
                             required
-                            defaultValue={text(
-                              records.find((r) => r.title === "Agent controls")?.data
-                                .max_tokens ?? 900,
-                            )}
+                            defaultValue={text(agentControls?.data.max_tokens ?? 900)}
                           />
                         </Field>
                       </div>

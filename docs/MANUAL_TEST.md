@@ -2,7 +2,7 @@
 
 This guide tests actual local product behavior. Use hypothetical company data and the isolated accounts below. Keep a pass/fail note for each numbered capability, together with the screen, expected result and provider configuration used. A missing external service is an unavailable-state result, not a successful integration test.
 
-The [5 October audit](FULL-AUDIT-2026-10-05.md) includes refreshed screenshots and the current build/browser results. Visually expect a floating pearl/navy navigation rail, frosted toolbar, soft cobalt atmosphere, glossy control rims and clear reading surfaces. Use **Visual comfort** in the toolbar or Account settings: reduced transparency must remove blur, reduced motion must stop decorative transitions, and increased contrast must strengthen secondary text and outlines. Preferences survive reload. On a narrow screen, opening navigation must contain keyboard focus; Escape closes it and restores the menu button.
+The [5–6 October audit](FULL-AUDIT-2026-10-05.md) includes refreshed screenshots and dated build/browser results. Visually expect a floating pearl/navy navigation rail, frosted toolbar, soft cobalt atmosphere, glossy control rims and clear reading surfaces. Use **Visual comfort** in the toolbar or Account settings: reduced transparency must remove blur, reduced motion must stop decorative transitions, and increased contrast must strengthen secondary text and outlines. Preferences survive reload. On a narrow screen, opening navigation must contain keyboard focus; Escape closes it and restores the menu button.
 
 ## Start the existing checkout
 
@@ -37,7 +37,7 @@ Open `http://localhost:8000/health`: expect `{"status":"ok"}`. Open `http://loca
 
 When changing the API port for a production preview, set `NEXT_PUBLIC_API_URL` **before** building as well as before starting. Next.js includes this public origin in the compiled client.
 
-When running all four repositories together, use CEO.ai's reserved API/frontend ports **8012/3012**. In Terminal A, set `$env:CORS_ORIGINS='http://localhost:3012'` and `$env:APP_BASE_URL='http://localhost:3012'`, then start Uvicorn with `--port 8012`. In Terminal B, set `$env:NEXT_PUBLIC_API_URL='http://localhost:8012'`, then run `npm run dev --workspace frontend -- --port 3012`. Open `http://localhost:3012/studio`; the API health URL is `http://localhost:8012/health`. Keep the same chosen database in Terminal A. These session variables override the example files without editing other projects.
+When running all five repositories together, use CEO.ai's reserved API/frontend ports **8012/3012**. In Terminal A, set `$env:CORS_ORIGINS='http://localhost:3012'` and `$env:APP_BASE_URL='http://localhost:3012'`, then start Uvicorn with `--port 8012`. In Terminal B, set `$env:NEXT_PUBLIC_API_URL='http://localhost:8012'`, then run `npm run dev --workspace frontend -- --port 3012`. Open `http://localhost:3012/studio`; the API health URL is `http://localhost:8012/health`. Keep the same chosen database in Terminal A. These session variables override the example files without editing other projects.
 
 ## Isolated complete acceptance accounts
 
@@ -141,7 +141,7 @@ On fixture Pro owner, download **PDF** and **Markdown**. Open them: expect conte
 
 ### 20. Routing, budgets and traces
 
-In **Agent controls**, save provider, local-only preference and maximum response tokens; reload. Server `LLM_LOCAL_ONLY=true` overrides workspace hosted preference. Run and inspect source/progress traces and before/after plan usage. A repeated request while a workspace job is active reuses it without another quota charge. Configured cards are not health probes; served-call counters cover only the current process. For real routing, configure a provider, deliberately allow hosted processing and verify source/token cap. Monthly run usage persists; no invented dollar estimates are shown.
+In **Agent controls**, save provider, local-only preference and maximum response tokens; reload and verify all three saved values. Switch to a second workspace and verify its own controls, then return and verify the original values. Server `LLM_LOCAL_ONLY=true` overrides workspace hosted preference. Run and inspect source/progress traces and before/after plan usage. A repeated request while a workspace job is active reuses it without another quota charge. Configured cards are not health probes; served-call counters cover only the current process. For real routing, configure a provider, deliberately allow hosted processing and verify source/token cap. Monthly run usage persists; no invented dollar estimates are shown.
 
 ## Cross-cutting finish checks
 
