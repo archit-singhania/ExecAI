@@ -12,6 +12,7 @@ FIXTURES = (
     ("owner.fixture@example.com", "Local QA Owner · Illustrative", "pro"),
     ("editor.fixture@example.com", "Local QA Editor · Illustrative", "free"),
     ("viewer.fixture@example.com", "Local QA Viewer · Illustrative", "free"),
+    ("strategy.fixture@example.com", "Local Strategy QA · Illustrative", "pro"),
 )
 
 

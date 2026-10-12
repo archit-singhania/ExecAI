@@ -89,13 +89,18 @@ def view_shared_report(
 
     owner = db.get(User, shared.user_id)
 
+    presentation = None
+    if report.report_type == "presentation":
+        import json
+        presentation = json.loads(report.bullets)
     return {
         "title": report.title,
         "agent": report.agent,
         "report_type": report.report_type,
         "summary": report.summary,
-        "bullets": report.bullets.splitlines(),
-        "score": report.score,
+        "bullets": [s["title"] + ": " + s["body"] for s in presentation["slides"]] if presentation else report.bullets.splitlines(),
+        "presentation": presentation,
+        "score": None if presentation else report.score,
         "source": report.source,
         "created_at": report.created_at,
         "author": owner.name if owner else "A founder",

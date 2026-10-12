@@ -142,6 +142,16 @@ app.include_router(predictions_router)
 app.include_router(analytics_router)
 app.include_router(speech_router)
 app.include_router(studio_router)
+from app.decision_graph import router as decision_graph_router
+app.include_router(decision_graph_router)
+from app.premortem import router as premortem_router
+app.include_router(premortem_router)
+from app.freshness import router as freshness_router
+app.include_router(freshness_router)
+from app.negotiations import router as negotiations_router
+app.include_router(negotiations_router)
+from app.presentations import router as presentations_router
+app.include_router(presentations_router)
 
 configure_logging(as_json=settings.app_env != "development")
 app.add_middleware(RequestContextMiddleware)

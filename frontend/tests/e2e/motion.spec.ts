@@ -31,7 +31,7 @@ test("route motion renders then settles and system reduced motion stays immediat
     .poll(() =>
       page.evaluate(() =>
         (
-          window as Window & {
+          window as unknown as Window & {
             routeMotion: { start: number; end?: number; duration: number }[];
           }
         ).routeMotion.some(
@@ -48,7 +48,7 @@ test("route motion renders then settles and system reduced motion stays immediat
   await page.goto("/login");
   expect(
     await page.evaluate(
-      () => (window as Window & { routeMotion: unknown[] }).routeMotion.length,
+      () => (window as unknown as Window & { routeMotion: unknown[] }).routeMotion.length,
     ),
   ).toBe(0);
   await expect(page.getByRole("button", { name: "Log in", exact: true })).toBeVisible();

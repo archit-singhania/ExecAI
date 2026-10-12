@@ -11,6 +11,162 @@ from app.llm import _client as REAL_LLM_CLIENT
 
 client = TestClient(app)
 
+def test_board_deck_exports_real_files_and_revokes_public_notes_free_snapshots():
+    import zipfile
+    from pypdf import PdfReader
+    from pptx import Presentation
+    owner, _, _ = account(); outsider, _, _ = account(); sid = workspace(owner)
+    records = f"/api/studio/{sid}/records"; path = f"/api/studio/{sid}/presentations"
+    decision = client.post(records, headers=owner, json={"kind": "decision", "title": "Buyer validation", "body": "Interview before expansion", "data": {"alternatives": "Wait", "assumptions": "Demand unknown"}}).json()
+    scenario = client.post(records, headers=owner, json={"kind": "scenario", "title": "Conservative", "data": {"cash": 1000, "monthly_cost": 100, "monthly_revenue": 50}}).json()
+    result = client.post(path, headers=owner, json={"decision_id": decision["id"], "scenario_ids": [scenario["id"]]})
+    assert result.status_code == 201, result.text
+    deck = result.json()
+    assert client.get(path, headers=outsider).status_code == 404
+    slides = deck["data"]["slides"]
+    slides[0]["notes"] = "PRIVATE_SPEAKER_SECRET"
+    payload = {"title": deck["title"], "slides": slides, "version": deck["version"]}
+    saved = client.put(path + "/" + deck["id"], headers=owner, json=payload)
+    assert saved.status_code == 200
+    assert client.put(path + "/" + deck["id"], headers=owner, json=payload).status_code == 409
+    pdf = client.get(f"{path}/{deck['id']}/export/pdf", headers=owner)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    assert "Interview before expansion" in "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
+    pptx = client.get(f"{path}/{deck['id']}/export/pptx", headers=owner)
+    assert pptx.status_code == 200
+    presentation = Presentation(io.BytesIO(pptx.content))
+    assert len(presentation.slides) == len(slides) + 1
+    assert any(shape.has_chart for slide in presentation.slides for shape in slide.shapes)
+    with zipfile.ZipFile(io.BytesIO(pptx.content)) as archive:
+        assert all(b"PRIVATE_SPEAKER_SECRET" not in archive.read(name) for name in archive.namelist())
+    shared = client.post(f"{path}/{deck['id']}/share", headers=owner)
+    assert shared.status_code == 200, shared.text
+    slug = shared.json()["slug"]
+    public = client.get("/api/share/" + slug)
+    assert public.status_code == 200 and public.json()["presentation"]["slides"][0]["body"] == "Interview before expansion"
+    assert "PRIVATE_SPEAKER_SECRET" not in public.text
+    assert client.delete(f"{path}/{deck['id']}/share", headers=owner).status_code == 200
+    assert client.get("/api/share/" + slug).status_code == 404
+
+def test_negotiation_limits_missing_values_and_versioned_readback():
+    owner, _, _ = account(); other, _, _ = account(); sid = workspace(owner)
+    path = f"/api/studio/{sid}/negotiations"
+    payload = {"title": "Supplier terms", "objectives": "Control price and delivery", "alternative": "Use existing supplier", "constraints": [{"name": "Price", "unit": "USD", "maximum": 100}, {"name": "Delivery", "unit": "days", "maximum": 10}], "packages": [{"name": "A", "values": {"Price": 90, "Delivery": 8}}, {"name": "B", "values": {"Price": 105, "Delivery": 7}}]}
+    assert client.post(path, headers=other, json=payload).status_code == 404
+    result = client.post(path, headers=owner, json=payload)
+    assert result.status_code == 201, result.text
+    saved = result.json()
+    assert [p["within_limits"] for p in saved["data"]["comparison"]] == [True, False]
+    assert saved["data"]["comparison"][1]["checks"][0]["violated"]
+    payload["version"] = saved["version"]
+    payload["packages"][1]["values"]["Price"] = 100
+    updated = client.put(path + "/" + saved["id"], headers=owner, json=payload)
+    assert updated.status_code == 200 and updated.json()["data"]["comparison"][1]["within_limits"]
+    assert client.put(path + "/" + saved["id"], headers=owner, json=payload).status_code == 409
+    payload["packages"][0]["values"].pop("Delivery")
+    assert client.post(path, headers=owner, json=payload).status_code == 422
+    assert len(client.get(path, headers=owner).json()) == 1
+
+def test_freshness_baselines_compare_real_metrics_and_deduplicate_alerts():
+    owner, _, _ = account(); stranger, _, _ = account(); sid = workspace(owner)
+    records = f"/api/studio/{sid}/records"; path = f"/api/studio/{sid}/freshness"
+    decision = client.post(records, headers=owner, json={"kind": "decision", "title": "Scale carefully"}).json()
+    metric_payload = {"kind": "metric", "title": "Demand", "data": {"value": 2, "target": 10}}
+    metric = client.post(records, headers=owner, json=metric_payload).json()
+    baseline = {"confirmed": True, "decision_id": decision["id"], "evidence_ids": [metric["id"]]}
+    assert client.post(path + "/baselines", headers=stranger, json=baseline).status_code == 404
+    assert client.post(path + "/baselines", headers=owner, json={**baseline, "confirmed": False}).status_code == 422
+    assert client.post(path + "/baselines", headers=owner, json=baseline).status_code == 201
+    assert client.post(path + "/scan", headers=owner).json()["created"] == 0
+    metric_payload.update(version=metric["version"], data={"value": 3, "target": 10})
+    assert client.put(records + "/" + metric["id"], headers=owner, json=metric_payload).status_code == 200
+    state = client.get(path, headers=owner).json()
+    assert len(state["alerts"]) == 1
+    alert = state["alerts"][0]
+    assert alert["data"]["before"]["data"]["value"] == 2
+    assert alert["data"]["after"]["data"]["value"] == 3
+    assert client.post(path + "/scan", headers=owner).json()["created"] == 0
+    assert client.patch(path + "/alerts/" + alert["id"], headers=owner, json={"state": "acknowledged"}).status_code == 200
+    assert client.post(path + "/scan", headers=owner).json()["created"] == 0
+    client.delete(records + "/" + metric["id"], headers=owner)
+    assert client.post(path + "/scan", headers=owner).json()["created"] == 1
+    assert any(a["data"]["reason"] == "removed" for a in client.get(path, headers=owner).json()["alerts"])
+
+def test_research_review_dates_do_not_claim_external_changes():
+    owner, _, _ = account(); viewer, _, email = account(); sid = workspace(owner)
+    records = f"/api/studio/{sid}/records"; path = f"/api/studio/{sid}/freshness"
+    decision = client.post(records, headers=owner, json={"kind": "decision", "title": "Review research"}).json()
+    source = client.post(records, headers=owner, json={"kind": "research", "title": "Manual source", "body": "Saved excerpt"}).json()
+    baseline = {"confirmed": True, "decision_id": decision["id"], "evidence_ids": [source["id"]], "review_dates": {source["id"]: "2020-01-01"}}
+    client.post(path + "/baselines", headers=owner, json=baseline)
+    assert client.post(path + "/scan", headers=owner).json()["created"] == 1
+    alert = client.get(path, headers=owner).json()["alerts"][0]
+    assert alert["data"]["reason"] == "review_due"
+    assert "no claim" in alert["data"]["scope"]
+    client.post(f"/api/studio/{sid}/members", headers=owner, json={"email": email, "role": "viewer"})
+    assert client.get(path, headers=viewer).status_code == 200
+    assert client.post(path + "/scan", headers=viewer).status_code == 403
+
+def test_premortem_versioning_and_explicit_idempotent_task_conversion():
+    owner, _, _ = account(); other, _, _ = account(); sid = workspace(owner)
+    path = f"/api/studio/{sid}/premortems"
+    payload = {"title": "Launch risk", "strategy": "Validate before scaling", "risks": [{"failure": "No demand", "impact": "high", "mitigation": "Interview ten buyers", "warning": "No trial conversion"}]}
+    created = client.post(path, headers=owner, json=payload)
+    assert created.status_code == 201, created.text
+    row = created.json(); risk = row["data"]["risks"][0]
+    assert client.get(path, headers=other).status_code == 404
+    task_path = f"{path}/{row['id']}/risks/{risk['id']}/task"
+    assert client.post(task_path, headers=owner, json={"confirmed": False}).status_code == 422
+    task = client.post(task_path, headers=owner, json={"confirmed": True}).json()
+    assert task["created"] is True
+    again = client.post(task_path, headers=owner, json={"confirmed": True}).json()
+    assert again == {"task_id": task["task_id"], "created": False}
+    payload["version"] = row["version"]
+    assert client.put(path + "/" + row["id"], headers=owner, json=payload).status_code == 409
+    updated = client.get(path, headers=owner).json()[0]
+    payload.update(version=updated["version"], risks=updated["data"]["risks"])
+    payload["risks"][0]["warning"] = "Updated warning"
+    saved = client.put(path + "/" + row["id"], headers=owner, json=payload)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["data"]["risks"][0]["task_id"] == task["task_id"]
+    tasks = client.get(f"/api/studio/{sid}/tasks", headers=owner).json()
+    assert len(tasks) == 1 and tasks[0]["priority"] == "High"
+
+def test_decision_graph_rejects_cycles_preserves_records_and_reloads():
+    owner, _, _ = account(); sid = workspace(owner)
+    path = f"/api/studio/{sid}/decision-graph"
+    nodes = [client.post(path + "/assumptions", headers=owner, json={"title": title}).json() for title in ["Demand", "Retention", "Expansion"]]
+    edges = []
+    for a, b in [(0, 1), (1, 2)]:
+        result = client.post(path + "/edges", headers=owner, json={"source": nodes[a]["id"], "target": nodes[b]["id"]})
+        assert result.status_code == 201, result.text
+        edges.append(result.json())
+    closing = {"source": nodes[2]["id"], "target": nodes[0]["id"]}
+    assert client.post(path + "/edges", headers=owner, json=closing).status_code == 409
+    closing["relationship"] = "evidence"
+    assert client.post(path + "/edges", headers=owner, json=closing).status_code == 201
+    duplicate = client.post(path + "/edges", headers=owner, json={"source": nodes[0]["id"], "target": nodes[1]["id"]}).json()
+    assert duplicate["id"] == edges[0]["id"]
+    value = client.get(path, headers=owner, params={"changed": nodes[0]["id"]}).json()
+    assert set(value["affected"]) == {nodes[1]["id"], nodes[2]["id"]}
+    assert all(n["version"] == 1 for n in value["nodes"])
+    assert client.delete(path + "/edges/" + edges[0]["id"], headers=owner).status_code == 200
+    assert not client.get(path, headers=owner, params={"changed": nodes[0]["id"]}).json()["affected"]
+
+def test_decision_graph_enforces_workspace_and_viewer_boundaries():
+    owner, _, _ = account(); stranger, _, email = account()
+    sid = workspace(owner); foreign = workspace(stranger)
+    path = f"/api/studio/{sid}/decision-graph"
+    a = client.post(path + "/assumptions", headers=owner, json={"title": "Owned"}).json()
+    b = client.post(f"/api/studio/{foreign}/decision-graph/assumptions", headers=stranger, json={"title": "Private"}).json()
+    assert client.get(path, headers=stranger).status_code == 404
+    assert client.post(path + "/edges", headers=owner, json={"source": a["id"], "target": b["id"]}).status_code == 404
+    client.post(f"/api/studio/{sid}/members", headers=owner, json={"email": email, "role": "viewer"})
+    assert client.get(path, headers=stranger).status_code == 200
+    assert client.post(path + "/assumptions", headers=stranger, json={"title": "Denied"}).status_code == 403
+    assert client.post(path + "/edges", headers=stranger, json={"source": a["id"], "target": a["id"]}).status_code == 403
+    assert client.post(path + "/assumptions", headers=owner, json={"title": "  "}).status_code == 422
+
 def test_reading_review_settings_does_not_opt_in_to_scheduled_email():
     owner, _, _ = account()
     value = client.get("/api/review-schedule", headers=owner).json()

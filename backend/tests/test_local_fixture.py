@@ -33,7 +33,7 @@ def test_fixture_creates_real_local_accounts_and_refuses_overwrite(tmp_path):
         assert owner.tier == "pro" and owner.subscription_id is None
         assert verify_password(password, owner.hashed_password)
         assert owner.hashed_password != password
-        assert db.query(User).count() == 3
+        assert db.query(User).count() == len(FIXTURES)
     with pytest.raises(ValueError, match="already contains"):
         create_fixture_accounts(settings, "different-fixture-password")
     with Session(engine) as db:

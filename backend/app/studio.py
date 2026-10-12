@@ -238,6 +238,9 @@ def update_record(session_id: str, record_id: str, payload: RecordIn, db: Sessio
     if r.kind == "metric":
         db.add(StudioRecord(session_id=session_id, author_id=user.id, kind="metric_observation", title=r.title, body="Previous metric observation", data=json.dumps({"metric_id": r.id, **json.loads(r.data), "observed_at": r.updated_at.isoformat()})))
     r.title, r.body, r.data, r.version = payload.title.strip(), payload.body, json.dumps(payload.data), r.version + 1
+    if r.kind in {"research", "metric", "knowledge"}:
+        from app.freshness import scan
+        scan(db, session_id)
     record_activity(db, session_id, user, f"{r.kind.capitalize()} updated", r.title)
     if r.kind == "metric" and payload.data.get("target", 0) and payload.data.get("value", 0) >= payload.data["target"]:
         db.add(StudioRecord(session_id=session_id, author_id=user.id, kind="notification", title=f"Target reached: {r.title}"[:240], body=f"{payload.data['value']} / {payload.data['target']}", data=json.dumps({"recipient_id": user.id, "read": False})))

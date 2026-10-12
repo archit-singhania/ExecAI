@@ -52,11 +52,17 @@ import {
 import { TrackRecord } from "@/components/sections/track-record";
 import { Analytics } from "@/components/sections/analytics";
 import { ReviewCadenceCard } from "@/components/dashboard/review-cadence-card";
+import { DecisionGraph } from "@/components/studio/decision-graph";
+import { Premortem } from "@/components/studio/premortem";
+import { Freshness } from "@/components/studio/freshness";
+import { Negotiations } from "@/components/studio/negotiations";
+import { Presentations } from "@/components/studio/presentations";
 
 const NAV = [
   { id: "overview", name: "Overview", icon: Compass },
   { id: "boardroom", name: "Boardroom", icon: MessageSquare },
   { id: "decisions", name: "Decisions", icon: Layers3 },
+  { id: "strategy", name: "Strategy lab", icon: BriefcaseBusiness },
   { id: "execution", name: "Execution", icon: Check },
   { id: "knowledge", name: "Knowledge", icon: BookOpen },
   { id: "finance", name: "Scenario lab", icon: Wallet },
@@ -826,6 +832,8 @@ export function ExecutiveStudio() {
               {!writable && (
                 <div className="st-notice">You have read access to this workspace.</div>
               )}
+              {section === "strategy" && <Negotiations key={`negotiation-${selected}`} id={selected} writable={writable} />}
+              {section === "strategy" && <Presentations key={`presentations-${selected}`} id={selected} records={records} writable={writable} />}
               {section === "overview" && (
                 <>
                   <section className="st-hero">
@@ -1404,6 +1412,9 @@ export function ExecutiveStudio() {
                       detail="Your records are saved to this workspace and become part of its operating history."
                     />
                   )}
+                  {section === "decisions" && <DecisionGraph key={`graph-${selected}`} id={selected} writable={writable} />}
+                  {section === "decisions" && <Premortem key={`premortem-${selected}`} id={selected} writable={writable} />}
+                  {section === "decisions" && <Freshness key={`freshness-${selected}`} id={selected} records={records} writable={writable} />}
                   {section === "decisions" &&
                     records.some((r) => r.kind === "decision_revision") && (
                       <section className="st-card">
