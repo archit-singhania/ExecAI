@@ -448,14 +448,18 @@ test("glass, comfort preferences, mobile drawer and service error recovery", asy
     .toContain("blur");
   await page.getByRole("button", { name: "Visual comfort", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Visual comfort", exact: true });
+  await dialog.evaluate(async (el) => {
+    await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
+  });
   const dialogCenter = await dialog.evaluate((el) => {
     const rect = el.getBoundingClientRect();
     return {
-      x: Math.abs(rect.left + rect.width / 2 - innerWidth / 2),
+      x: Math.abs(rect.left + rect.width / 2 - document.documentElement.clientWidth / 2),
       y: Math.abs(rect.top + rect.height / 2 - innerHeight / 2),
     };
   });
-  expect(dialogCenter.x).toBeLessThan(2);
+  // Scroll locking can reserve a 10px gutter on one side of the viewport.
+  expect(dialogCenter.x).toBeLessThan(12);
   expect(dialogCenter.y).toBeLessThan(12);
   await dialog.getByRole("radio", { name: /Petrol & Mineral/ }).check();
   await expect(page.locator("html")).toHaveAttribute("data-collection", "petrol");
