@@ -2,6 +2,7 @@
 import io
 import json
 import math
+import textwrap
 from typing import Literal
 from xml.sax.saxutils import escape
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -17,6 +18,14 @@ from app.studio import record_out, record_activity
 from app.share import create_limit
 
 router = APIRouter(prefix="/api/studio", tags=["board-presentations"])
+
+def export_slides(slides):
+    """Bound text per page rather than clipping long editable slide bodies."""
+    for source in slides:
+        lines = [part for line in source["body"].split("\n") for part in (textwrap.wrap(line, width=85) or [""])]
+        chunks = [lines[i:i + 18] for i in range(0, len(lines), 18)] or [[]]
+        for index, chunk in enumerate(chunks):
+            yield {**source, "title": source["title"] + (f" · continued {index + 1}" if index else ""), "body": "\n".join(chunk), "notes": source["notes"] if index == 0 else ""}
 
 class GenerateIn(BaseModel):
     decision_id: str = Field(min_length=1, max_length=36)
@@ -129,10 +138,14 @@ def export(session_id: str, record_id: str, format: Literal["pdf", "pptx"], incl
     row = owned(db, session_id, record_id); value = json.loads(row.data); output = io.BytesIO()
     if format == "pdf":
         from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.colors import HexColor
         from reportlab.lib.pagesizes import landscape, A4
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
         styles = getSampleStyleSheet(); flow = []
-        for slide in value["slides"]:
+        styles["BodyText"].fontSize = 13; styles["BodyText"].leading = 18
+        styles["Title"].textColor = HexColor("#19273d")
+        styles["BodyText"].textColor = HexColor("#39465d")
+        for slide in export_slides(value["slides"]):
             if flow: flow.append(PageBreak())
             flow.extend([Paragraph(escape(slide["title"]), styles["Title"]), Spacer(1, 20), Paragraph(escape(slide["body"]).replace("\n", "<br/>"), styles["BodyText"])])
             if include_notes: flow.extend([Spacer(1, 20), Paragraph("Speaker notes: " + escape(slide["notes"]), styles["Normal"])])
@@ -143,6 +156,7 @@ def export(session_id: str, record_id: str, format: Literal["pdf", "pptx"], incl
             drawing = Drawing(650, 250); bars = VerticalBarChart()
             bars.x, bars.y, bars.width, bars.height = 60, 65, 550, 160
             bars.data = [chart["values"]]; bars.categoryAxis.categoryNames = [s[:25] for s in chart["labels"]]
+            bars.bars[0].fillColor = HexColor("#4968b5")
             bars.valueAxis.valueMin = min(0, min(chart["values"])); bars.valueAxis.valueMax = max(1, max(chart["values"]))
             drawing.add(bars)
             flow.extend([PageBreak(), Paragraph(escape(chart["label"]), styles["Title"]), Spacer(1, 20), drawing])
@@ -153,10 +167,10 @@ def export(session_id: str, record_id: str, format: Literal["pdf", "pptx"], incl
         from pptx.util import Inches, Pt
         from pptx.dml.color import RGBColor
         deck = Presentation(); deck.slide_width = Inches(13.333); deck.slide_height = Inches(7.5)
-        for source in value["slides"]:
+        for source in export_slides(value["slides"]):
             slide = deck.slides.add_slide(deck.slide_layouts[6]); slide.background.fill.solid(); slide.background.fill.fore_color.rgb = RGBColor(23, 31, 46)
-            for content, y, size in [(source["title"], .65, 30), (source["body"], 1.65, 18)]:
-                box = slide.shapes.add_textbox(Inches(.8), Inches(y), Inches(11.7), Inches(5 if y > 1 else .8))
+            for content, y, size in [(source["title"], .55, 24), (source["body"], 2.05, 16)]:
+                box = slide.shapes.add_textbox(Inches(.8), Inches(y), Inches(11.7), Inches(4.9 if y > 1 else 1.3))
                 box.text_frame.word_wrap = True; box.text_frame.text = content
                 for paragraph in box.text_frame.paragraphs:
                     paragraph.font.size = Pt(size); paragraph.font.color.rgb = RGBColor(245, 246, 250)

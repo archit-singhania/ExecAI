@@ -4,6 +4,7 @@ import Link from "next/link";
 import { studioRequest } from "@/lib/studio";
 type Level = "low" | "medium" | "high";
 type Risk = {
+  origin?: "user" | "ai_proposal";
   id?: string;
   failure: string;
   likelihood: Level;
@@ -59,6 +60,9 @@ export function Premortem({ id, writable }: { id: string; writable: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [proposal, setProposal] = useState<{ risks: Risk[]; provider: string } | null>(
+    null,
+  );
   const [confirm, setConfirm] = useState<{ analysis: Analysis; risk: Risk } | null>(
     null,
   );
@@ -80,6 +84,7 @@ export function Premortem({ id, writable }: { id: string; writable: boolean }) {
     };
   }, [path]);
   function open(item: Analysis) {
+    setProposal(null);
     setEditing(item);
     setTitle(item.title);
     setStrategy(item.body);
@@ -106,6 +111,24 @@ export function Premortem({ id, writable }: { id: string; writable: boolean }) {
       setNotice("Pre-mortem saved. Assessments remain qualitative judgments.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save pre-mortem.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function propose() {
+    setBusy(true);
+    setError("");
+    setProposal(null);
+    try {
+      setProposal(
+        await studioRequest<{ risks: Risk[]; provider: string }>(
+          path + "/proposals",
+          "POST",
+          { strategy },
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Provider failed; draft preserved.");
     } finally {
       setBusy(false);
     }
@@ -177,6 +200,9 @@ export function Premortem({ id, writable }: { id: string; writable: boolean }) {
             {item.data.risks.map((risk) => (
               <li key={risk.id}>
                 <strong>{risk.failure}</strong>
+                {risk.origin === "ai_proposal" && (
+                  <p>Reviewed AI proposal · qualitative judgment</p>
+                )}
                 <p>
                   Likelihood {risk.likelihood} · Impact {risk.impact}
                 </p>
@@ -256,6 +282,55 @@ export function Premortem({ id, writable }: { id: string; writable: boolean }) {
                   onChange={(e) => setStrategy(e.target.value)}
                 />
               </label>
+              <button
+                type="button"
+                disabled={busy || !strategy.trim()}
+                onClick={() => void propose()}
+              >
+                Request AI failure-path proposals
+              </button>
+              <p>
+                Optional configured provider. Proposals are reviewed before entering
+                your draft; saved work remains unchanged.
+              </p>
+              {proposal && (
+                <section aria-label="Review AI proposals">
+                  <h3>AI proposals · {proposal.provider}</h3>
+                  <ul>
+                    {proposal.risks.map((r, i) => (
+                      <li key={i}>
+                        <strong>{r.failure}</strong>
+                        <p>{r.warning}</p>
+                        <p>{r.mitigation}</p>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    disabled={
+                      busy ||
+                      risks.filter((r) => r.failure.trim()).length +
+                        proposal.risks.length >
+                        30
+                    }
+                    onClick={() => {
+                      setRisks([
+                        ...risks.filter((r) => r.failure.trim()),
+                        ...proposal.risks,
+                      ]);
+                      setProposal(null);
+                      setNotice(
+                        "AI proposals added to the editable draft. Review judgments and save explicitly.",
+                      );
+                    }}
+                  >
+                    Accept proposals into draft
+                  </button>
+                  <button type="button" onClick={() => setProposal(null)}>
+                    Discard AI proposals
+                  </button>
+                </section>
+              )}
               {risks.map((risk, index) => (
                 <fieldset key={risk.id || `draft-${index}`}>
                   <legend>Failure path {index + 1}</legend>

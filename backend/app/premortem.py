@@ -16,6 +16,7 @@ from app.studio import record_out, record_activity
 router = APIRouter(prefix="/api/studio", tags=["pre-mortem"])
 
 class RiskIn(BaseModel):
+    origin: Literal["user", "ai_proposal"] = "user"
     id: str | None = Field(default=None, max_length=36)
     failure: str = Field(min_length=1, max_length=2000)
     likelihood: Literal["low", "medium", "high"] = "medium"

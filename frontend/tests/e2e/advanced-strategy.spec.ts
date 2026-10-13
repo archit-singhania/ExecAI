@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
 async function call(page: Page, path: string, method = "GET", body?: unknown) {
   return page.evaluate(
     async ({ path, method, body }) => {
@@ -58,6 +58,16 @@ test("freshness review, concession comparison and exported revocable board deck"
     data: { cash: 10000, monthly_cost: 1000, monthly_revenue: 500 },
   });
   await page.goto("/studio/decisions");
+  await page
+    .getByRole("textbox", { name: "Proposed strategy", exact: true })
+    .fill("Keep this unsaved strategy when the provider fails");
+  await page
+    .getByRole("button", { name: "Request AI failure-path proposals", exact: true })
+    .click();
+  await expect(page.locator("p[role=alert]")).toContainText("Saved work is unchanged");
+  await expect(
+    page.getByRole("textbox", { name: "Proposed strategy", exact: true }),
+  ).toHaveValue("Keep this unsaved strategy when the provider fails");
   const freshness = page
     .locator("section")
     .filter({
@@ -115,6 +125,19 @@ test("freshness review, concession comparison and exported revocable board deck"
     .click();
   await expect(negotiation.getByRole("status")).toContainText("Comparison saved");
   await expect(negotiation).toContainText("Reservation limit violated");
+  await negotiation
+    .getByText("Negotiation practice · 0 saved rounds", { exact: true })
+    .click();
+  await negotiation
+    .getByRole("textbox", { name: "Practice message", exact: true })
+    .fill("Discuss price while preserving the comparison");
+  await negotiation
+    .getByRole("button", { name: "Send practice round", exact: true })
+    .click();
+  await expect(negotiation.getByRole("alert")).toContainText("Saved work is unchanged");
+  await expect(
+    negotiation.getByRole("textbox", { name: "Practice message", exact: true }),
+  ).toHaveValue("Discuss price while preserving the comparison");
   const deck = page
     .locator("section")
     .filter({
@@ -146,6 +169,11 @@ test("freshness review, concession comparison and exported revocable board deck"
     const bytes = await readFile(file!);
     expect(bytes.length).toBeGreaterThan(1000);
     expect(bytes.subarray(0, 2).toString()).toBe(name.includes("PDF") ? "%P" : "PK");
+    await mkdir("../docs/acceptance/execai-2026-10-13", { recursive: true });
+    await writeFile(
+      `../docs/acceptance/execai-2026-10-13/board.${name.includes("PDF") ? "pdf" : "pptx"}`,
+      bytes,
+    );
   }
   await deck.getByText("Publish a reviewed snapshot", { exact: true }).click();
   await deck

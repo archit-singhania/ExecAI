@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { studioRequest, StudioRecord } from "@/lib/studio";
+import { NegotiationPractice } from "./negotiation-practice";
 type Constraint = { name: string; unit: string; minimum: string; maximum: string };
 type Package = { name: string; values: string[] };
 type Check = {
@@ -172,6 +173,12 @@ export function Negotiations({ id, writable }: { id: string; writable: boolean }
               Edit negotiation: {item.title}
             </button>
           )}
+          <NegotiationPractice
+            workspace={id}
+            negotiation={item.id}
+            version={item.version}
+            writable={writable}
+          />
         </article>
       ))}
       {writable && (

@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 7
     cron_secret: str | None = None
+    freshness_interval_seconds: int = 300
+
+    @field_validator("freshness_interval_seconds")
+    @classmethod
+    def valid_freshness_interval(cls, value):
+        if not 15 <= value <= 86400:
+            raise ValueError("Freshness interval must be between 15 and 86400 seconds.")
+        return value
 
     resend_api_key: str | None = None
     email_from: str = "CEO.ai <onboarding@resend.dev>"

@@ -1,0 +1,152 @@
+{
+  "checkedAtUtc": "2026-10-13T05:02:09.7456067Z",
+  "scope": "All five ExecAI advanced implementations, including optional provider workflows and periodic freshness; live model and native office-reader verification remain unavailable",
+  "backendStudioTestsPassed": 30,
+  "productionBuildPassed": true,
+  "buildId": "HlT_tTqVIxP0EEthnxcfq",
+  "acceptanceApiOrigin": "http://127.0.0.1:8012",
+  "productionBrowserJourneysPassed": 8,
+  "lastRun": {
+    "status": "passed",
+    "failedTests": []
+  },
+  "checks": [
+    "Owned graph persistence, dependency cycles and downstream inspection",
+    "Confirmed mitigation tasks, retries and stale saves",
+    "Approved evidence snapshots, automatic metric changes, deduplication, review dates and acknowledgment",
+    "Persisted negotiation limits, explicit violations and stale-save rejection",
+    "Actual PDF and PPTX decoding, scenario charts and default speaker-note exclusion",
+    "Signed-out public deck viewing, frozen versions and revocation",
+    "Existing workspace, exports, roles, isolation, comfort, password and reduced-motion browser regressions",
+    "AI proposals with explicit review and saved origin labels",
+    "Owned revision-bound practice transcripts; invalid and missing providers preserve work",
+    "Periodic persisted baseline checks and repeat/restart deduplication",
+    "Long title/body and empty-body PDF/PPTX exports; continuation pagination",
+    "English PDFs rendered with Poppler and inspected visually",
+    "Actual browser provider failures preserve strategy and practice drafts"
+  ],
+  "sourceFiles": [
+    {
+      "path": "backend/app/decision_graph.py",
+      "sha256": "e7658264cc4e8b07c356e1039f3af2002f5f3d5634926134cbd52262f4d12af0"
+    },
+    {
+      "path": "backend/app/premortem.py",
+      "sha256": "67c985f789077ce178d8cba8af7371720f6bc0ed19f30de38e453c47230ad52c"
+    },
+    {
+      "path": "backend/app/freshness.py",
+      "sha256": "6cbec66b3dba7dd0231568ae4d0c806c5a3ca68d9f2cef7244d92509947183e0"
+    },
+    {
+      "path": "backend/app/negotiations.py",
+      "sha256": "96f7ab101a8c119ae39ab72ef800c46edef0992e21e47f62d3d92895609bef1c"
+    },
+    {
+      "path": "backend/app/presentations.py",
+      "sha256": "83a03c703c460f4a9f632c4154312b665147a3a8c8675f5f3b054b9a7d01560d"
+    },
+    {
+      "path": "backend/app/main.py",
+      "sha256": "e93a6098ab4514b6ad5c69ea44d4cd70af1e09989765d3ff1dcbb36b9539d965"
+    },
+    {
+      "path": "backend/app/studio.py",
+      "sha256": "091992df2234f342fc998595347e7c07ef2f82f3a678f69fb64452c611e2315f"
+    },
+    {
+      "path": "backend/app/share.py",
+      "sha256": "fa898a17d26c39418d1b4eaa1ba272ae707a93ca1cbc94d1711bfd5b43c10685"
+    },
+    {
+      "path": "backend/app/local_fixture.py",
+      "sha256": "0d9370b869d07f402f1bbb5e917ed7db4d592134a5c4b6eafa53ecd47e2428fb"
+    },
+    {
+      "path": "frontend/src/components/studio/decision-graph.tsx",
+      "sha256": "4f5bccd0cc71ea94fcd9c86ebfb3b0a8c443833026cde275f7ca9a45bd79cf36"
+    },
+    {
+      "path": "frontend/src/components/studio/premortem.tsx",
+      "sha256": "bccf66efd7420ce71b49e31b17c264c7262088d5d0de04adf0c417bb0f3549fa"
+    },
+    {
+      "path": "frontend/src/components/studio/freshness.tsx",
+      "sha256": "43a20f74132be84ec1f701810468769d46a8fce882c23e3da86203a023aaef69"
+    },
+    {
+      "path": "frontend/src/components/studio/negotiations.tsx",
+      "sha256": "300b15a491ca9fe4f0ce9007782ca2d65d6b85fab99a059920178a5a77132180"
+    },
+    {
+      "path": "frontend/src/components/studio/presentations.tsx",
+      "sha256": "79c7513686b263f1bef03c6759a8fdaf69b5d6f2c4d7ee3c8cebc5e1f076e229"
+    },
+    {
+      "path": "frontend/src/components/studio/executive-studio.tsx",
+      "sha256": "ca2dffe33379b16f58b4a35b363c391d7db94747b8e70186e45304323e254808"
+    },
+    {
+      "path": "frontend/src/app/p/[slug]/page.tsx",
+      "sha256": "c9092edec2d01ea6f9162db9a02e702ac8ed1259a6427dbdc9270d35b28590c7"
+    },
+    {
+      "path": "frontend/src/styles/studio.css",
+      "sha256": "c291266490e66ebbbc38fe031c58847a916f46831c4dee04f3eddd88186e1fe3"
+    },
+    {
+      "path": "backend/tests/test_studio.py",
+      "sha256": "52e14c82105c6d25388859c11fad5724b2d7b81cc645105046625d2da4461a31"
+    },
+    {
+      "path": "backend/tests/test_local_fixture.py",
+      "sha256": "d08c305234b66e57cb3e9c4d6ea056ff852d597615350979d9e53643a9efc52c"
+    },
+    {
+      "path": "frontend/tests/e2e/advanced-strategy.spec.ts",
+      "sha256": "b1c491db37b2c2bd76b3cabbb0667c3c938a93bd7a27c199b790794802e7a99b"
+    },
+    {
+      "path": "frontend/tests/e2e/decision-graph.spec.ts",
+      "sha256": "c40ee3c0b3a3064a00b9971538c0db30ae3da67a828ae1e70b0f4710a0d28505"
+    },
+    {
+      "path": "backend/app/strategy_ai.py",
+      "sha256": "5dfdf3587b27f0f845dbd7fb54175abb26cde21f59b0a48a42e8cfe2faf97f9f"
+    },
+    {
+      "path": "backend/app/freshness_worker.py",
+      "sha256": "b8a6dc6cff3ec997f4e9c5ee03063678f6dae8b4d2cc97d844fb289d755c27f3"
+    },
+    {
+      "path": "backend/app/config.py",
+      "sha256": "4d187e584b998d1141dea5a023286155c881ac4e6db238ee5e825dbc70ce42d1"
+    },
+    {
+      "path": "frontend/src/components/studio/negotiation-practice.tsx",
+      "sha256": "3afaa1f48cb49b689f9a1402d147d7cbb546790bdb218801f145635deb9b6bef"
+    }
+  ],
+  "screenshot": "docs/screenshots/advanced-features-2026-10-12/decision-graph-premortem.png",
+  "pending": [
+    "Live configured model verification unavailable",
+    "Native PowerPoint-reader and complex-script multilingual export checks unperformed",
+    "Other repositories: 25 unfinished additions; Aureon arrangement/automation foundations started",
+    "Final cross-product packages and portfolio release evidence"
+  ],
+  "fixtureTestsPassed": 5,
+  "strategyScreenshot": "docs/screenshots/advanced-features-2026-10-12/strategy-lab.png",
+  "finalSharingRegression": {
+    "command": "playwright test tests/e2e/advanced-strategy.spec.ts",
+    "status": "passed",
+    "passed": 1,
+    "change": "Presentation publishing uses existing share_create rate limit"
+  },
+  "finalAdvancedRegression": {
+    "passed": 8,
+    "status": "passed",
+    "command": "playwright test",
+    "apiTestsPassed": 30,
+    "exportFollowupTestsPassed": 5
+  }
+}

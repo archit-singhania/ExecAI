@@ -152,6 +152,8 @@ from app.negotiations import router as negotiations_router
 app.include_router(negotiations_router)
 from app.presentations import router as presentations_router
 app.include_router(presentations_router)
+from app.strategy_ai import router as strategy_ai_router
+app.include_router(strategy_ai_router)
 
 configure_logging(as_json=settings.app_env != "development")
 app.add_middleware(RequestContextMiddleware)
@@ -161,6 +163,23 @@ log_event("startup", env=settings.app_env, store=store_backend())
 def recover_queued_runs():
     from app.jobs import recover_runs
     recover_runs()
+
+@app.on_event("startup")
+async def start_freshness_worker():
+    import asyncio
+    from app.freshness_worker import run
+    app.state.freshness_task = asyncio.create_task(run(settings.freshness_interval_seconds))
+
+@app.on_event("shutdown")
+async def stop_freshness_worker():
+    import asyncio
+    task = getattr(app.state, "freshness_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 agent_run_limit = limit_by_user("agent_run", limit=10, window_seconds=60)
 board_limit = limit_by_user("board_meeting", limit=6, window_seconds=300)

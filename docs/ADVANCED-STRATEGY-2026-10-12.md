@@ -9,7 +9,11 @@ These extend the existing local CEO.ai studio. Start the backend and frontend us
 3. Edit the linked KPI or document. Return to freshness and check for changes. Expect a saved alert containing the previous and current versions and values.
 4. Acknowledge or mark reviewed. Repeat the check: the same change should not create duplicate alerts. Reload: states and approval baselines remain saved.
 
-An external source's review date produces a due-review reminder. It does not prove that the external page changed. Date checks currently run on explicit refresh; periodic background scheduling remains unfinished. Approval records preserve historical evidence rather than silently changing the decision.
+An external source's review date produces a due-review reminder. It does not prove that the external page changed. The application checks persisted baselines on startup and every 300 seconds by default; set `FRESHNESS_INTERVAL_SECONDS` between 15 and 86400 to change this. Explicit refresh remains available. Restart catches up with due dates, and repeated checks do not duplicate the same alert. Approval records preserve historical evidence rather than silently changing the decision.
+
+## Optional AI pre-mortem proposals
+
+In Decisions → Pre-mortem, enter a strategy and choose **Request AI failure-path proposals**. Configure the existing local Ollama service/model first, or explicitly enable and configure a supported hosted provider using the existing routing settings. Review the generated list, then accept into the editable draft or discard. Acceptance does not save or create tasks; edit judgments and save explicitly. Saved generated risks retain their AI-proposal label. Without a working provider, expect an error and an unchanged draft.
 
 ## Negotiation studio
 
@@ -18,7 +22,7 @@ An external source's review date produces a due-review reminder. It does not pro
 3. Save. Expect side-by-side package cards: 90 is within the entered limit; 110 displays a visible violation.
 4. Reopen, change the package, save and reload. Values persist; conflicting edits reject with a reload instruction.
 
-This evaluates entered constraints. It cannot approve or send agreements. Optional model-driven practice conversations remain unfinished.
+This evaluates entered constraints. It cannot approve or send agreements. Expand **Negotiation practice**, enter a message and send a round through the configured provider. Expect a saved, labeled role-play response with provider and comparison version. Reload to inspect earlier rounds. Failed or invalid provider replies do not save rounds or clear the draft. Changed comparison revisions reject stale requests. This cannot approve or transmit an agreement.
 
 ## Board presentations
 
@@ -28,7 +32,7 @@ This evaluates entered constraints. It cannot approve or send agreements. Option
 4. As the workspace owner, review the public contents and publish a link. Open it in a signed-out browser. Private speaker notes and raw source metadata must be absent.
 5. Revoke the link and reload the public page. Expect an unavailable-link message. Editing the private deck does not modify an already published snapshot; publish the new saved version explicitly.
 
-Exports omit notes by default. The API permits authenticated note-inclusive exports when explicitly requested. Current slide text is bounded; comprehensive long-text, multilingual and office-reader visual profiling remains pending. This is an implementation slice, not certification of all 30 planned additions.
+Exports omit notes by default. The API permits authenticated note-inclusive exports when explicitly requested. Long slide bodies paginate into continuation pages/slides. Normal, long-title, long-body, empty-body and chart exports were decoded; English PDF layouts were rendered and checked. Native PowerPoint-reader and complex-script multilingual layout verification remain unperformed. Controlled provider tests verified successful AI operations; no live configured model was available for this acceptance run. This does not certify all 30 planned additions.
 
 ## Visual expectations
 

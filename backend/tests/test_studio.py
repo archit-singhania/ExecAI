@@ -11,6 +11,54 @@ from app.llm import _client as REAL_LLM_CLIENT
 
 client = TestClient(app)
 
+def test_ai_proposals_require_review_and_validate_without_changing_saved_work(monkeypatch):
+    import json
+    from app import llm_router
+    h, _, _ = account(); other, _, _ = account(); sid = workspace(h)
+    path = f"/api/studio/{sid}/premortems/proposals"
+    monkeypatch.setattr(llm_router, "complete", lambda *a, **k: (json.dumps({"risks": [{"failure": "Supplier delay", "warning": "Missed milestones", "mitigation": "Validate backup"}]}), "fixture-model"))
+    assert client.post(path, headers=other, json={"strategy": "Launch"}).status_code == 404
+    reply = client.post(path, headers=h, json={"strategy": "Launch"})
+    assert reply.status_code == 200 and reply.json()["risks"][0]["origin"] == "ai_proposal"
+    assert client.get(f"/api/studio/{sid}/premortems", headers=h).json() == []
+    monkeypatch.setattr(llm_router, "complete", lambda *a, **k: ('{"risks":[{"failure":"x","likelihood":"certain"}]}', "fixture-model"))
+    assert client.post(path, headers=h, json={"strategy": "Launch"}).status_code == 502
+    monkeypatch.setattr(llm_router, "complete", lambda *a, **k: None)
+    assert client.post(path, headers=h, json={"strategy": "Launch"}).status_code == 503
+
+def test_practice_transcripts_are_owned_versioned_and_fail_without_saving(monkeypatch):
+    from app import llm_router
+    h, _, _ = account(); other, _, _ = account(); sid = workspace(h)
+    root = f"/api/studio/{sid}/negotiations"
+    row = client.post(root, headers=h, json={"title": "Terms", "objectives": "Stay under budget", "constraints": [{"name": "Cost", "maximum": 100}], "packages": [{"name": "A", "values": {"Cost": 90}}]}).json()
+    path = root + "/" + row["id"] + "/practice"
+    monkeypatch.setattr(llm_router, "complete", lambda *a, **k: ('{"reply":"Which concessions can you trade?"}', "fixture-model"))
+    payload = {"message": "Can we discuss price?", "version": row["version"]}
+    assert client.post(path, headers=other, json=payload).status_code == 404
+    assert client.post(path, headers=h, json={**payload, "version": 999}).status_code == 409
+    result = client.post(path, headers=h, json=payload)
+    assert result.status_code == 201 and result.json()["data"]["negotiation_version"] == row["version"]
+    assert len(client.get(path, headers=h).json()) == 1
+    monkeypatch.setattr(llm_router, "complete", lambda *a, **k: ('{"reply":false}', "fixture-model"))
+    assert client.post(path, headers=h, json=payload).status_code == 502
+    monkeypatch.setattr(llm_router, "complete", lambda *a, **k: None)
+    assert client.post(path, headers=h, json=payload).status_code == 503
+    assert len(client.get(path, headers=h).json()) == 1
+    assert client.get(root, headers=h).json()[0]["data"]["comparison"][0]["within_limits"]
+
+def test_periodic_freshness_catches_due_reviews_and_survives_repeated_ticks():
+    from app.freshness_worker import tick
+    h, _, _ = account(); sid = workspace(h)
+    root = f"/api/studio/{sid}"
+    decision = client.post(root + "/records", headers=h, json={"kind": "decision", "title": "Review"}).json()
+    research = client.post(root + "/records", headers=h, json={"kind": "research", "title": "Source", "body": "Entered research"}).json()
+    assert client.post(root + "/freshness/baselines", headers=h, json={"confirmed": True, "decision_id": decision["id"], "evidence_ids": [research["id"]], "review_dates": {research["id"]: "2000-01-01"}}).status_code == 201
+    tick()
+    alerts = client.get(root + "/freshness", headers=h).json()["alerts"]
+    assert len(alerts) == 1 and alerts[0]["data"]["reason"] == "review_due"
+    tick()
+    assert len(client.get(root + "/freshness", headers=h).json()["alerts"]) == 1
+
 def test_board_deck_exports_real_files_and_revokes_public_notes_free_snapshots():
     import zipfile
     from pypdf import PdfReader
@@ -47,6 +95,36 @@ def test_board_deck_exports_real_files_and_revokes_public_notes_free_snapshots()
     assert "PRIVATE_SPEAKER_SECRET" not in public.text
     assert client.delete(f"{path}/{deck['id']}/share", headers=owner).status_code == 200
     assert client.get("/api/share/" + slug).status_code == 404
+
+def test_deck_long_text_exports_paginate_without_losing_content():
+    import os
+    from pathlib import Path
+    from pypdf import PdfReader
+    from pptx import Presentation
+    from app.presentations import export_slides
+    h, _, _ = account(); sid = workspace(h)
+    decision = client.post(f"/api/studio/{sid}/records", headers=h, json={"kind": "decision", "title": "Long-form board review", "body": "Initial recommendation"}).json()
+    root = f"/api/studio/{sid}/presentations"
+    deck = client.post(root, headers=h, json={"decision_id": decision["id"]}).json()
+    body = "\n".join(f"Section {i}: validate adoption, costs and delivery before committing funds." for i in range(25))
+    slides = [{"title": "A long recommendation " * 6, "body": body, "notes": "PRIVATE_NOTES " * 100}, {"title": "Empty content is permitted", "body": "", "notes": ""}]
+    result = client.put(root + "/" + deck["id"], headers=h, json={"title": "Export limits", "slides": slides, "version": deck["version"]})
+    assert result.status_code == 200, result.text
+    pages = list(export_slides(slides))
+    assert len(pages) == 3 and all(len(p["body"].split("\n")) <= 18 for p in pages)
+    for format in ("pdf", "pptx"):
+        response = client.get(f"{root}/{deck['id']}/export/{format}", headers=h)
+        assert response.status_code == 200
+        if format == "pdf":
+            parsed = PdfReader(io.BytesIO(response.content)); assert len(parsed.pages) == 3
+            text = "\n".join(p.extract_text() for p in parsed.pages)
+        else:
+            parsed = Presentation(io.BytesIO(response.content)); assert len(parsed.slides) == 3
+            text = "\n".join(s.text for slide in parsed.slides for s in slide.shapes if s.has_text_frame)
+        assert "Section 0:" in text and "Section 24:" in text and "PRIVATE_NOTES" not in text
+        if os.getenv("EXEC_AI_QA_OUTPUT"):
+            directory = Path(os.environ["EXEC_AI_QA_OUTPUT"]); directory.mkdir(parents=True, exist_ok=True)
+            (directory / ("long-board." + format)).write_bytes(response.content)
 
 def test_negotiation_limits_missing_values_and_versioned_readback():
     owner, _, _ = account(); other, _, _ = account(); sid = workspace(owner)
