@@ -256,6 +256,8 @@ def delete_record(session_id: str, record_id: str, db: Session = Depends(get_db)
         raise HTTPException(404, "Record not found.")
     if r.kind == "archive" and session.user_id != user.id:
         raise HTTPException(403, "Only the owner can restore this workspace.")
+    if r.kind in {"outcome_review", "outcome_task"}:
+        raise HTTPException(409, "Outcome history is retained. Create a correction instead.")
     db.query(KnowledgeChunk).filter_by(record_id=r.id).delete()
     db.delete(r)
     db.commit()

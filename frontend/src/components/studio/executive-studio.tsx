@@ -54,6 +54,7 @@ import { Analytics } from "@/components/sections/analytics";
 import { ReviewCadenceCard } from "@/components/dashboard/review-cadence-card";
 import { DecisionGraph } from "@/components/studio/decision-graph";
 import { Premortem } from "@/components/studio/premortem";
+import { OutcomeReviews } from "@/components/studio/outcomes";
 import { Freshness } from "@/components/studio/freshness";
 import { Negotiations } from "@/components/studio/negotiations";
 import { Presentations } from "@/components/studio/presentations";
@@ -1414,6 +1415,7 @@ export function ExecutiveStudio() {
                   )}
                   {section === "decisions" && <DecisionGraph key={`graph-${selected}`} id={selected} writable={writable} />}
                   {section === "decisions" && <Premortem key={`premortem-${selected}`} id={selected} writable={writable} />}
+                  {section === "decisions" && <OutcomeReviews key={`outcomes-${selected}`} id={selected} writable={writable} />}
                   {section === "decisions" && <Freshness key={`freshness-${selected}`} id={selected} records={records} writable={writable} />}
                   {section === "decisions" &&
                     records.some((r) => r.kind === "decision_revision") && (

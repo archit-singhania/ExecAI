@@ -20,7 +20,7 @@ export default defineConfig({
     baseURL: web,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: { mode: "on", size: { width: 1280, height: 720 } },
+    video: process.env.PLAYWRIGHT_NO_VIDEO ? "off" : { mode: "on", size: { width: 1280, height: 720 } },
     channel: process.env.PLAYWRIGHT_CHANNEL || "chromium",
   },
   projects: [{ name: "desktop", use: { ...devices["Desktop Chrome"] } }],
@@ -30,7 +30,7 @@ export default defineConfig({
         {
           command: `"${process.env.CEOAI_PYTHON || "python"}" ../backend/scripts/e2e_server.py`,
           url: `${api}/health`,
-          timeout: 90000,
+          timeout: 180000,
           reuseExistingServer: false,
           env: {
             DATABASE_URL: `sqlite:///${join(testDirectory, "manual_acceptance.db").replaceAll("\\", "/")}`,
@@ -47,7 +47,7 @@ export default defineConfig({
         {
           command: `"${process.execPath}" "${require.resolve("next/dist/bin/next")}" ${process.env.CEOAI_E2E_PRODUCTION ? "start" : "dev"} --port 3012`,
           url: web,
-          timeout: 90000,
+          timeout: 180000,
           reuseExistingServer: false,
           env: { NEXT_PUBLIC_API_URL: api },
         },

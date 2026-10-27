@@ -146,6 +146,8 @@ from app.decision_graph import router as decision_graph_router
 app.include_router(decision_graph_router)
 from app.premortem import router as premortem_router
 app.include_router(premortem_router)
+from app.outcomes import router as outcomes_router
+app.include_router(outcomes_router)
 from app.freshness import router as freshness_router
 app.include_router(freshness_router)
 from app.negotiations import router as negotiations_router

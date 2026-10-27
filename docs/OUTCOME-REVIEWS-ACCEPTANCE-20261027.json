@@ -1,0 +1,22 @@
+{
+  "next_build_id": "FU3DSSuE-izshBPzmh1aT",
+  "source_sha256": {
+    "frontend/playwright.config.ts": "e9e0b31559b87dee39c201af20b4904301f566731df96ad65bd3c8a75dcc8faf",
+    "frontend/tests/e2e/outcomes.spec.ts": "20d407790c19dba83898c14c92b0cefc1e55157e198160f7ded5680424affc60",
+    "frontend/src/components/studio/outcomes.tsx": "5dd6176ff384628700b1e5b30b7b8202390ab2f1ad04f766bb055b3545fcd9b3",
+    "backend/tests/test_outcomes.py": "868ad9dab1580dc13a1fa04810c592a2f854f452b5e3a8e4f5ca761fa10165e5",
+    "backend/app/outcomes.py": "56d574a512ccda08ecf8a761214297eddfe9ad8e2a623780c43e0744f7814f1b"
+  },
+  "limitations": [
+    "Broader accessibility, performance and recovery verification pending",
+    "No live provider or deployed account checks"
+  ],
+  "backend_regressions_passed": 39,
+  "browser_journeys": [
+    "development lifecycle and draft recovery",
+    "production lifecycle and draft recovery"
+  ],
+  "checked_at_utc": "2026-10-27T11:33:08.4573988Z",
+  "api_origin": "http://127.0.0.1:8012",
+  "scope": "Outcome-review production browser journey; not whole-product release certification"
+}
