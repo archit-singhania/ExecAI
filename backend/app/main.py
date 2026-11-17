@@ -148,6 +148,14 @@ from app.premortem import router as premortem_router
 app.include_router(premortem_router)
 from app.outcomes import router as outcomes_router
 app.include_router(outcomes_router)
+from app.experiments import router as experiments_router
+app.include_router(experiments_router)
+from app.allocations import router as allocations_router
+app.include_router(allocations_router)
+from app.approvals import router as approvals_router
+app.include_router(approvals_router)
+from app.csv_imports import router as csv_imports_router
+app.include_router(csv_imports_router)
 from app.freshness import router as freshness_router
 app.include_router(freshness_router)
 from app.negotiations import router as negotiations_router
@@ -165,6 +173,8 @@ log_event("startup", env=settings.app_env, store=store_backend())
 def recover_queued_runs():
     from app.jobs import recover_runs
     recover_runs()
+    from app.allocations import recover_allocations
+    recover_allocations()
 
 @app.on_event("startup")
 async def start_freshness_worker():

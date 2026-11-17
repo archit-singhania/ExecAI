@@ -82,7 +82,7 @@ def approve(session_id: str, payload: ApprovalIn, db: Session = Depends(get_db),
         row = db.get(StudioRecord, rid)
         if not row or row.session_id != session_id or row.kind not in EVIDENCE:
             raise HTTPException(404, "Evidence not found in this workspace.")
-        snapshots.append({"id": row.id, "title": row.title, "body": row.body[:2000], "version": row.version, "data": json.loads(row.data),
+        snapshots.append({"kind": row.kind, "id": row.id, "title": row.title, "body": row.body[:2000], "version": row.version, "data": json.loads(row.data),
                           "fingerprint": fingerprint(row), "review_date": payload.review_dates[rid].isoformat() if rid in payload.review_dates else None})
     baseline = StudioRecord(session_id=session_id, author_id=user.id, kind="evidence_baseline", title=decision.id,
         body="User-approved evidence baseline", data=json.dumps({"decision_id": decision.id, "decision_title": decision.title, "decision_version": decision.version, "evidence": snapshots}))

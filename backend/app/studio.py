@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Literal
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field, EmailStr, field_validator
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 from app.access import workspace_access
 from app.auth import get_current_user, revoke_user_sessions
@@ -223,6 +223,7 @@ def create_record(session_id: str, payload: RecordIn, db: Session = Depends(get_
 @router.put("/{session_id}/records/{record_id}")
 def update_record(session_id: str, record_id: str, payload: RecordIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     workspace_access(db, session_id, user, write=True)
+    db.execute(update(BusinessSession).where(BusinessSession.id == session_id).values(title=BusinessSession.title))
     r = db.get(StudioRecord, record_id)
     if not r or r.session_id != session_id:
         raise HTTPException(404, "Record not found.")
@@ -238,6 +239,9 @@ def update_record(session_id: str, record_id: str, payload: RecordIn, db: Sessio
     if r.kind == "metric":
         db.add(StudioRecord(session_id=session_id, author_id=user.id, kind="metric_observation", title=r.title, body="Previous metric observation", data=json.dumps({"metric_id": r.id, **json.loads(r.data), "observed_at": r.updated_at.isoformat()})))
     r.title, r.body, r.data, r.version = payload.title.strip(), payload.body, json.dumps(payload.data), r.version + 1
+    if r.kind == "decision":
+        from app.approvals import invalidate
+        invalidate(db, r, user.id)
     if r.kind in {"research", "metric", "knowledge"}:
         from app.freshness import scan
         scan(db, session_id)
@@ -256,7 +260,7 @@ def delete_record(session_id: str, record_id: str, db: Session = Depends(get_db)
         raise HTTPException(404, "Record not found.")
     if r.kind == "archive" and session.user_id != user.id:
         raise HTTPException(403, "Only the owner can restore this workspace.")
-    if r.kind in {"outcome_review", "outcome_task"}:
+    if r.kind in {"outcome_review", "outcome_task", "experiment", "allocation", "allocation_plan", "approval", "approval_event", "approval_policy", "csv_batch", "csv_receipt"}:
         raise HTTPException(409, "Outcome history is retained. Create a correction instead.")
     db.query(KnowledgeChunk).filter_by(record_id=r.id).delete()
     db.delete(r)

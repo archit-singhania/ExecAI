@@ -54,6 +54,10 @@ import { Analytics } from "@/components/sections/analytics";
 import { ReviewCadenceCard } from "@/components/dashboard/review-cadence-card";
 import { DecisionGraph } from "@/components/studio/decision-graph";
 import { Premortem } from "@/components/studio/premortem";
+import { ResourceAllocations } from "@/components/studio/allocations";
+import { CsvImports } from "@/components/studio/csv-imports";
+import { ApprovalWorkspace } from "@/components/studio/approvals";
+import { StrategyExperiments } from "@/components/studio/experiments";
 import { OutcomeReviews } from "@/components/studio/outcomes";
 import { Freshness } from "@/components/studio/freshness";
 import { Negotiations } from "@/components/studio/negotiations";
@@ -833,6 +837,8 @@ export function ExecutiveStudio() {
               {!writable && (
                 <div className="st-notice">You have read access to this workspace.</div>
               )}
+              {section === "goals" && <CsvImports key={`csv-${selected}`} id={selected} writable={writable} />}
+              {section === "execution" && <ResourceAllocations key={`allocation-${selected}`} id={selected} writable={writable} />}
               {section === "strategy" && <Negotiations key={`negotiation-${selected}`} id={selected} writable={writable} />}
               {section === "strategy" && <Presentations key={`presentations-${selected}`} id={selected} records={records} writable={writable} />}
               {section === "overview" && (
@@ -1415,6 +1421,9 @@ export function ExecutiveStudio() {
                   )}
                   {section === "decisions" && <DecisionGraph key={`graph-${selected}`} id={selected} writable={writable} />}
                   {section === "decisions" && <Premortem key={`premortem-${selected}`} id={selected} writable={writable} />}
+
+                  {section === "decisions" && <ApprovalWorkspace key={`approvals-${selected}`} id={selected} records={records} writable={writable} />}
+                  {section === "decisions" && <StrategyExperiments key={`experiments-${selected}`} id={selected} writable={writable} />}
                   {section === "decisions" && <OutcomeReviews key={`outcomes-${selected}`} id={selected} writable={writable} />}
                   {section === "decisions" && <Freshness key={`freshness-${selected}`} id={selected} records={records} writable={writable} />}
                   {section === "decisions" &&
