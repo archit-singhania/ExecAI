@@ -156,6 +156,8 @@ from app.approvals import router as approvals_router
 app.include_router(approvals_router)
 from app.csv_imports import router as csv_imports_router
 app.include_router(csv_imports_router)
+from app.hubspot_imports import router as hubspot_imports_router
+app.include_router(hubspot_imports_router)
 from app.freshness import router as freshness_router
 app.include_router(freshness_router)
 from app.negotiations import router as negotiations_router

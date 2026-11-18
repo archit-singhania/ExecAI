@@ -56,3 +56,39 @@ def test_self_approval_policy_changes_rejection_and_audit_protection():
     assert row['data']['status']=='withdrawn'
     assert action(row,'submit').status_code == 409
     assert client.delete(root+'/records/'+row['id'],headers=owner).status_code == 409
+
+def test_concurrent_decision_edit_and_review_cannot_approve_unreviewed_revision():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    owner, root, decision, _, _ = setup_review()
+    reviewer, member, email = account()
+    assert client.post(root+'/members', headers=owner, json={'email':email,'role':'editor'}).is_success
+    evidence = client.get(root+'/freshness',headers=owner).json()['baselines'][0]['data']['evidence'][0]['id']
+    workflow = client.post(root+'/approvals',headers=owner,json={
+        'decision_id':decision['id'],'reviewers':[member['id']],'evidence_ids':[evidence],
+    }).json()
+    transitions = root+'/approvals/'+workflow['id']+'/transitions'
+    submitted = client.post(transitions,headers=owner,json={'version':workflow['version'],'action':'submit'}).json()
+    start = Barrier(2)
+
+    def edit():
+        start.wait(timeout=5)
+        return client.put(root+'/records/'+decision['id'],headers=owner,json={
+            'kind':'decision','title':'Concurrent revision','version':decision['version'],
+        })
+
+    def approve():
+        start.wait(timeout=5)
+        return client.post(transitions,headers=reviewer,json={'version':submitted['version'],'action':'approve'})
+
+    with ThreadPoolExecutor(2) as pool:
+        edit_job, approval_job = pool.submit(edit), pool.submit(approve)
+        edit_result, approval = edit_job.result(timeout=15), approval_job.result(timeout=15)
+    assert edit_result.is_success, edit_result.text
+    assert approval.status_code in (200,409), approval.text
+    current = client.get(root+'/approvals',headers=owner).json()['workflows'][0]['data']
+    recorded = [event for event in current['events'] if event['action']=='approve']
+    assert [event['decision_version'] for event in recorded] == ([decision['version']] if approval.is_success else [])
+    if not approval.is_success:
+        assert current['status'] == 'changes_requested'

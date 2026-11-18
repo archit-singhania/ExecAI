@@ -19,6 +19,16 @@ class StudioRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class HubSpotConnection(Base):
+    __tablename__ = "hubspot_connections"
+    session_id: Mapped[str] = mapped_column(ForeignKey("business_sessions.id", ondelete="CASCADE"), primary_key=True)
+    portal: Mapped[str] = mapped_column(String(30), default="")
+    credential: Mapped[str] = mapped_column(Text, default="")
+    state_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    state_owner: Mapped[str] = mapped_column(String(36), default="")
+    state_expires: Mapped[int] = mapped_column(Integer, default=0)
+
 class WorkspaceMember(Base):
     __tablename__ = "workspace_members"
     __table_args__ = (UniqueConstraint("session_id", "user_id"),)

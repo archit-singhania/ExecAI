@@ -108,6 +108,13 @@ def listing(sid: str, db: Session = Depends(get_db), user: User = Depends(get_cu
 @router.post("/{sid}/imports/csv", status_code=201)
 def stage(sid: str, payload: CsvInput, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     lock_workspace(db, sid, user, True)
+    batch = prepare_batch(sid, payload, db, user)
+    db.commit()
+    db.refresh(batch)
+    return record_out(batch)
+
+
+def prepare_batch(sid, payload, db, user):
     source = payload.source.strip()
     if not source:
         raise HTTPException(422, "Name the source so its identifiers can be reconciled on later imports.")
@@ -115,9 +122,7 @@ def stage(sid: str, payload: CsvInput, db: Session = Depends(get_db), user: User
     data = {"state": "staged", "source": source, "columns": payload.columns.model_dump(), "rows": rows, **reconcile(rows)}
     batch = StudioRecord(session_id=sid, author_id=user.id, kind="csv_batch", title=source, data=json.dumps(data))
     db.add(batch)
-    db.commit()
-    db.refresh(batch)
-    return record_out(batch)
+    return batch
 
 
 @router.post("/{sid}/imports/csv/{rid}/approve")

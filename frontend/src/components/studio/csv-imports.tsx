@@ -10,6 +10,11 @@ type Batch = { id: string; title: string; version: number; data: { state: string
 
 export function CsvImports({id,writable}:{id:string;writable:boolean}) {
   const path = `/api/studio/${id}/imports/csv`;
+  const hubspotPath = `/api/studio/${id}/imports/hubspot`;
+  type Connector = { available: boolean; oauth_linked: boolean; checkpoint: {since_ms:number;after:string|null}|null };
+  const [connector,setConnector] = useState<Connector|null>(null);
+  const [authorization,setAuthorization] = useState("");
+  const [syncMessage,setSyncMessage] = useState("");
   const [source,setSource] = useState("");
   const [csv,setCsv] = useState("");
   const [columns,setColumns] = useState(defaultColumns);
@@ -20,8 +25,40 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
   useEffect(() => {
     let current = true;
     studioRequest<Batch[]>(path).then(rows=>{if(current)setBatches(rows);}).catch(e=>{if(current)setError(e.message);}).finally(()=>{if(current)setLoading(false);});
+    studioRequest<Connector>(hubspotPath).then(value=>{if(current)setConnector(value);}).catch(e=>{if(current)setSyncMessage(e.message);});
     return ()=>{current=false;};
-  },[path]);
+  },[path,hubspotPath]);
+  async function syncHubSpot() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await studioRequest<{batch:Batch|null;checkpoint:Connector["checkpoint"];skipped:number}>(hubspotPath+"/sync","POST");
+      setConnector(value=>({available:true,oauth_linked:value?.oauth_linked??false,checkpoint:result.checkpoint}));
+      if(result.batch) {
+        const batch=result.batch;
+        setBatches(rows=>[batch,...rows.filter(row=>row.id!==batch.id)]);
+      }
+      setSyncMessage(`${result.batch?"HubSpot page staged for review.":"No observations staged."} ${result.skipped} skipped.`);
+    } catch(error) {
+      setError(error instanceof Error?error.message:"HubSpot synchronization failed.");
+    } finally { setBusy(false); }
+  }
+  async function manageHubSpot(action:"start"|"refresh"|"disconnect") {
+    setBusy(true);
+    setError("");
+    try {
+      if (action === "start") {
+        const result = await studioRequest<{url:string}>(hubspotPath+"/oauth/start","POST");
+        setAuthorization(result.url);
+      } else {
+        if (action === "disconnect") await studioRequest(hubspotPath+"/oauth","DELETE");
+        setConnector(await studioRequest<Connector>(hubspotPath));
+        setAuthorization("");
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "HubSpot connection request failed.");
+    } finally { setBusy(false); }
+  }
   async function submit(url:string, payload:unknown) {
     setBusy(true);setError("");
     try {
@@ -33,6 +70,16 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
   return <section className="st-card advanced-studio" aria-labelledby="csv-heading"><h2 id="csv-heading">Import KPI observations</h2>
     <p>Use the same source name and observation IDs on repeat imports. Preview the reconciliation before adding KPIs to this workspace.</p>
     {error && <p role="alert">{error}</p>}
+    <fieldset disabled={!writable||busy}>
+      <legend>HubSpot deals</legend>
+      <p>{connector?.available?"Read-only connection. Review each staged page before approval.":"Connect a HubSpot account to stage deal observations."}</p>
+      <button type="button" onClick={()=>manageHubSpot("start")}>Connect HubSpot</button>
+      {authorization && <a href={authorization} target="_blank" rel="noopener noreferrer">Continue to HubSpot</a>}
+      <button type="button" onClick={()=>manageHubSpot("refresh")}>Refresh connection</button>
+      {connector?.oauth_linked && <button type="button" onClick={()=>manageHubSpot("disconnect")}>Disconnect HubSpot</button>}
+      <button type="button" disabled={!connector?.available} onClick={syncHubSpot}>{connector?.checkpoint?.after?"Stage next HubSpot page":"Check HubSpot for updates"}</button>
+    </fieldset>
+    <p role="status">{syncMessage}</p>
     <fieldset disabled={!writable||busy}><legend>CSV source and mapping</legend>
       <label>Source name<input value={source} onChange={e=>setSource(e.target.value)}/></label>
       <label>Open CSV file<input type="file" accept=".csv,text/csv" onChange={async e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>500000){setError("Choose a file smaller than 500 KB.");return;}try{setCsv(await file.text());setError("");}catch{setError("Could not read the selected file.");}}}/></label>
