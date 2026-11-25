@@ -63,6 +63,22 @@ def test_hubspot_incremental_page_preserves_window_and_maps_deals():
     assert cursor == '400' and skipped == 0
     assert '45,USD,2026-11-18' in payload.csv_text
 
+def test_hubspot_pages_detect_invalid_and_nonprogressing_cursors():
+    import httpx
+    import pytest
+    from app.hubspot_observations import HubSpotWindowTooLarge, fetch_deal_page
+
+    for paging, error in (
+        ({'next': {'after': '200'}}, HubSpotWindowTooLarge),
+        ({'next': {'after': '10000'}}, HubSpotWindowTooLarge),
+        ({'next': {}}, RuntimeError),
+    ):
+        def provider(_):
+            return httpx.Response(200, json={'results': [], 'paging': paging})
+
+        with httpx.Client(transport=httpx.MockTransport(provider)) as client, pytest.raises(error):
+            fetch_deal_page(client, 'fixture', since_ms=1000, until_ms=2000, after='200')
+
 def test_hubspot_workspace_stages_pages_without_publishing_and_resumes(monkeypatch):
     from app import hubspot_imports
 
@@ -99,6 +115,24 @@ def test_hubspot_workspace_stages_pages_without_publishing_and_resumes(monkeypat
     assert second['checkpoint']['since_ms'] == first['checkpoint']['until_ms']
     assert calls[1] == calls[2]
 
+    # An oversized first window is narrowed without advancing its lower bound.
+    monkeypatch.setattr(hubspot_imports.time, 'time', lambda: (second['checkpoint']['since_ms'] + 900_000) / 1000)
+    oversized = []
+    def dense(*args, **window):
+        oversized.append(window)
+        if len(oversized) == 1:
+            raise hubspot_imports.HubSpotWindowTooLarge()
+        return [], None
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', dense)
+    split = client.post(endpoint+'/sync',headers=owner).json()
+    assert split['window_narrowed'] and split['batch'] is None
+    assert split['checkpoint']['since_ms'] == second['checkpoint']['since_ms']
+    assert client.get(endpoint,headers=owner).json()['checkpoint'] == split['checkpoint']
+    resumed = client.post(endpoint+'/sync',headers=owner).json()
+    assert oversized[1]['until_ms'] == split['checkpoint']['until_ms']
+    assert resumed['checkpoint']['since_ms'] == split['checkpoint']['until_ms']
+
 def test_hubspot_oauth_connect_refresh_and_disconnect(monkeypatch):
     from urllib.parse import parse_qs, urlsplit
     from cryptography.fernet import Fernet
@@ -114,9 +148,11 @@ def test_hubspot_oauth_connect_refresh_and_disconnect(monkeypatch):
     }.items():
         monkeypatch.setenv('EXECAI_HUBSPOT_'+name,value)
 
+    refreshes = []
     def exchange(fields):
         if fields['grant_type'] == 'refresh_token':
-            assert fields['refresh_token'] == 'private-refresh'
+            refreshes.append(fields['refresh_token'])
+            return {'hub_id':78,'refresh_token':f'rotated-{len(refreshes)}','access_token':'short-lived'}
         return {'hub_id':78,'refresh_token':'private-refresh','access_token':'short-lived'}
 
     monkeypatch.setattr(hubspot_imports,'exchange_token',exchange)
@@ -131,6 +167,34 @@ def test_hubspot_oauth_connect_refresh_and_disconnect(monkeypatch):
     assert 'private-refresh' not in result.text
     assert client.get(callback,params=params).status_code == 400
     assert client.get(root,headers=owner).json()['oauth_linked']
+    def failed_page(*args, **kwargs):
+        raise RuntimeError('Provider unavailable')
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', failed_page)
+    assert client.post(root+'/sync',headers=owner).status_code == 502
+    assert client.get(root,headers=owner).json()['checkpoint'] is None
+
+    def valid_page(*args, **kwargs):
+        return [{'id':'77','updatedAt':'2026-01-01T12:00:00Z',
+                 'properties':{'amount':'50','deal_currency_code':'USD'}}],None
+
+    prepare = hubspot_imports.prepare_batch
+    def failed_staging(sid, payload, db, user):
+        from sqlalchemy.exc import IntegrityError
+        batch = prepare(sid, payload, db, user)
+        db.flush()
+        assert batch.id is not None
+        raise IntegrityError('fixture staging failure', {}, Exception('fixture'))
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', valid_page)
+    monkeypatch.setattr(hubspot_imports, 'prepare_batch', failed_staging)
+    assert client.post(root+'/sync',headers=owner).status_code == 502
+    assert client.get(root,headers=owner).json()['checkpoint'] is None
+    assert client.get(f'/api/studio/{sid}/imports/csv',headers=owner).json() == []
+
+    monkeypatch.setattr(hubspot_imports, 'prepare_batch', prepare)
+    monkeypatch.setattr(hubspot_imports,'fetch_deal_page',lambda client,token,**window: ([],None))
     assert client.post(root+'/sync',headers=owner).status_code == 200
+    assert refreshes == ['private-refresh', 'rotated-1', 'rotated-2']
     assert client.delete(root+'/oauth',headers=owner).status_code == 200
     assert not client.get(root,headers=owner).json()['available']

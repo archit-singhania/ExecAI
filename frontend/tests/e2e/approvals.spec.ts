@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-test("decision approval policy and persisted review history", async ({
-  page,
+test("assigned reviewer approves in a separate browser context", async ({
+  page, browser,
 }) => {
   test.setTimeout(300000);
   await page.goto("/login");
@@ -37,6 +37,7 @@ test("decision approval policy and persisted review history", async ({
       title: "Test launch",
       body: "Validate before spending",
     });
+    await post("/members", {email:"editor.fixture@example.com", role:"editor"});
     const metric = await post("/records", {
       kind: "metric",
       title: "Orders",
@@ -50,16 +51,41 @@ test("decision approval policy and persisted review history", async ({
   }, sid);
   await page.goto("/studio/decisions");
   const panel=page.getByRole("region",{name:"Decision approvals"});
-  const policy = panel.getByLabel("Allow self-approval in this workspace");
-  await policy.click(); await expect(policy).toBeChecked();
   await panel.getByLabel("Decision to review").selectOption({label:"Test launch"});
   await panel.getByLabel("Orders · revision 1").check();
-  await panel.getByLabel("Stage 1 reviewer").selectOption({index:1});
+  await panel.getByLabel("Stage 1 reviewer").selectOption({label:"Local QA Editor · Illustrative"});
   await panel.getByRole("button",{name:"Create approval draft"}).click();
   await panel.getByRole("button",{name:"Submit revision for approval"}).click();
-  await panel.getByLabel("Reviewer comment").fill("Reviewed fixture evidence");
-  await panel.getByRole("button",{name:"approve",exact:true}).click();
+  await expect(panel.getByRole("button",{name:"approve",exact:true})).toHaveCount(0);
+  const reviewerContext = await browser.newContext();
+  try {
+    const reviewer = await reviewerContext.newPage();
+    await reviewer.goto(new URL("/login",page.url()).href);
+    await reviewer.locator('input[type="email"]').fill("editor.fixture@example.com");
+    await reviewer.locator('input[autocomplete="current-password"]').fill("Correct-Horse-Browser-2026!");
+    await reviewer.getByRole("button",{name:"Log in",exact:true}).click();
+    await expect(reviewer).toHaveURL(/\/studio$/);
+    await reviewer.getByLabel("Choose workspace").selectOption(sid);
+    await reviewer.goto(new URL("/studio/decisions",page.url()).href);
+    const reviewPanel = reviewer.getByRole("region",{name:"Decision approvals"});
+    await reviewPanel.getByLabel("Reviewer comment").fill("Reviewed fixture evidence");
+    let competingStatuses: number[] = [];
+    await reviewer.route("**/approvals/*/transitions", async (route) => {
+      const responses = await Promise.all([route.fetch(), route.fetch()]);
+      competingStatuses = responses.map(response => response.status()).sort();
+      const accepted = responses.find(response => response.ok());
+      await route.fulfill({ response: accepted ?? responses[0] });
+    }, { times: 1 });
+    await reviewPanel.getByRole("button",{name:"approve",exact:true}).click();
+    await expect(reviewPanel.getByText("approved · Decision revision 1")).toBeVisible();
+    expect(competingStatuses).toEqual([200, 409]);
+  } finally {
+    await reviewerContext.close();
+  }
+  await page.reload();
   await expect(panel.getByText("approved · Decision revision 1",{exact:false})).toBeVisible();
   await page.reload();await panel.getByText("Review history",{exact:true}).click();
-  await expect(panel.getByText("Reviewed fixture evidence",{exact:false})).toBeVisible();
+  const receipt = panel.getByText("Reviewed fixture evidence",{exact:false});
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toHaveCount(1);
 });

@@ -10,12 +10,13 @@ from urllib.parse import urlencode
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.csv_imports import prepare_batch
 from app.database import get_db
-from app.hubspot_observations import fetch_deal_page, stageable_deals
+from app.hubspot_observations import HubSpotWindowTooLarge, fetch_deal_page, stageable_deals
 from app.models import User
 from app.outcomes import lock_workspace
 from app.studio import record_out
@@ -169,19 +170,37 @@ def sync(sid: str, db: Session = Depends(get_db), user: User = Depends(get_curre
     since = state["since_ms"]
     until = state["until_ms"] or min(cutoff, since + DAY_MS)
     if until <= since:
+        db.commit()  # Preserve a rotated refresh credential even when caught up.
         return {"batch": None, "checkpoint": state, "skipped": 0}
+    narrowed = False
     try:
         with httpx.Client() as client:
             deals, cursor = fetch_deal_page(client, token, since_ms=since, until_ms=until, after=state["after"])
         payload, skipped = stageable_deals(portal, deals)
+    except HubSpotWindowTooLarge:
+        if until - since <= 1:
+            db.commit()
+            raise HTTPException(502, "HubSpot exceeded its result limit in a single millisecond. Checkpoint kept.") from None
+        until = since + (until - since) // 2
+        payload, skipped, cursor, narrowed = None, 0, None, True
     except (ValueError, RuntimeError, KeyError, TypeError):
+        # Token rotation has already happened upstream. No batch or checkpoint
+        # was modified, so persist the replacement before returning a retryable error.
+        db.commit()
         raise HTTPException(502, "HubSpot page could not be staged. The checkpoint was kept.") from None
-    batch = prepare_batch(sid, payload, db, user) if payload else None
-    state = ({"since_ms": since, "until_ms": until, "after": cursor} if cursor is not None
+    state = ({"since_ms": since, "until_ms": until, "after": cursor} if narrowed or cursor is not None
              else {"since_ms": until, "until_ms": None, "after": None})
-    if row is None:
-        row = StudioRecord(session_id=sid, author_id=user.id, kind="hubspot_checkpoint", title=portal)
-        db.add(row)
-    row.data = json.dumps(state)
+    try:
+        # The savepoint flushes credential rotation first and isolates the batch
+        # and checkpoint so both roll back together if staging fails.
+        with db.begin_nested():
+            batch = prepare_batch(sid, payload, db, user) if payload else None
+            if row is None:
+                row = StudioRecord(session_id=sid, author_id=user.id, kind="hubspot_checkpoint", title=portal)
+                db.add(row)
+            row.data = json.dumps(state)
+    except (HTTPException, SQLAlchemyError):
+        db.commit()
+        raise HTTPException(502, "HubSpot page could not be staged. The checkpoint was kept.") from None
     db.commit()
-    return {"batch": record_out(batch) if batch else None, "checkpoint": state, "skipped": skipped}
+    return {"batch": record_out(batch) if batch else None, "checkpoint": state, "skipped": skipped, "window_narrowed": narrowed}

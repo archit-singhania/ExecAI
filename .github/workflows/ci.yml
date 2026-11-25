@@ -98,7 +98,7 @@ jobs:
             frontend/test-results
 
   postgres-migrations:
-    name: PostgreSQL migration smoke
+    name: PostgreSQL migrations and browser permissions
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -106,10 +106,10 @@ jobs:
         env:
           POSTGRES_USER: ceoai
           POSTGRES_PASSWORD: ci-only-password
-          POSTGRES_DB: ceoai_ci
+          POSTGRES_DB: ceoai_browser_fixture
         ports: [5432:5432]
         options: >-
-          --health-cmd "pg_isready -U ceoai -d ceoai_ci"
+          --health-cmd "pg_isready -U ceoai -d ceoai_browser_fixture"
           --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v4
@@ -117,10 +117,24 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -r backend/requirements.txt
-      - name: Upgrade PostgreSQL with vector index
-        working-directory: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Migrate pgvector and exercise browser permissions
+        working-directory: frontend
         env:
-          DATABASE_URL: postgresql+psycopg://ceoai:ci-only-password@localhost:5432/ceoai_ci
-          APP_ENV: test
-          JWT_SECRET: ci-only-not-a-real-secret
-        run: alembic upgrade head
+          CEOAI_E2E_POSTGRES: "1"
+          CEOAI_E2E_HUBSPOT: "1"
+          CEOAI_E2E_DATABASE_URL: postgresql+psycopg://ceoai:ci-only-password@127.0.0.1:5432/ceoai_browser_fixture
+        run: npm run test:e2e -- approvals.spec.ts experiments.spec.ts csv-imports.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-postgres-browser-results
+          path: |
+            frontend/playwright-report
+            frontend/test-results

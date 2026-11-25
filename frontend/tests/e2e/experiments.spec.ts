@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("strategy experiment draft recovery and approved KPI closure", async ({
   page,
+  browser,
 }) => {
   test.setTimeout(300000);
   await page.goto("/login");
@@ -11,12 +12,13 @@ test("strategy experiment draft recovery and approved KPI closure", async ({
     .fill("Correct-Horse-Browser-2026!");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page).toHaveURL(/\/studio$/, { timeout: 90000 });
-  await page.getByLabel("Company name", { exact: true }).fill("Outcome acceptance");
+  await page.getByRole("button",{name:"New workspace",exact:true}).click();
+  await page.getByLabel("Company name", { exact: true }).fill("Experiment ownership acceptance");
   await page
     .getByLabel("Business goal & context")
     .fill("Illustrative outcome-review acceptance workspace.");
   await page.getByRole("button", { name: "Create workspace", exact: true }).click();
-  await expect(page.getByLabel("Choose workspace")).toContainText("Outcome acceptance");
+  await page.getByLabel("Choose workspace").selectOption({label:"Experiment ownership acceptance"});
   const sid = await page.getByLabel("Choose workspace").inputValue();
   await page.evaluate(async (sid) => {
     const headers = {
@@ -37,6 +39,7 @@ test("strategy experiment draft recovery and approved KPI closure", async ({
       title: "Test launch",
       body: "Validate before spending",
     });
+    await post("/members",{email:"editor.fixture@example.com",role:"editor"});
     const metric = await post("/records", {
       kind: "metric",
       title: "Orders",
@@ -59,6 +62,25 @@ test("strategy experiment draft recovery and approved KPI closure", async ({
   await panel.getByLabel("Observation end").fill("2026-11-30");
   await panel.getByLabel("Stop conditions").fill("Stop if costs exceed budget");
   await panel.getByRole("button",{name:"Plan experiment",exact:true}).click();
+  await panel.getByLabel("New experiment owner").selectOption({label:"Local QA Editor · Illustrative · editor"});
+  await panel.getByRole("button",{name:"Reassign experiment owner"}).click();
+  await expect(panel.getByText("Responsible owner: Local QA Editor · Illustrative")).toBeVisible();
+  const editorContext = await browser.newContext();
+  try {
+    const editor = await editorContext.newPage();
+    await editor.goto(new URL("/login", page.url()).href);
+    await editor.locator('input[type="email"]').fill("editor.fixture@example.com");
+    await editor.locator('input[autocomplete="current-password"]').fill("Correct-Horse-Browser-2026!");
+    await editor.getByRole("button", { name: "Log in", exact: true }).click();
+    await expect(editor).toHaveURL(/\/studio$/);
+    await editor.getByLabel("Choose workspace").selectOption(sid);
+    await editor.goto(new URL("/studio/decisions", page.url()).href);
+    const editorPanel = editor.getByRole("region", {name: "Strategy experiments"});
+    await editorPanel.getByLabel("Saved experiment").selectOption({label:"Evidence-based launch · planned"});
+    await expect(editorPanel.getByText("Responsible owner: Local QA Editor · Illustrative")).toBeVisible();
+  } finally {
+    await editorContext.close();
+  }
   await panel.getByRole("button",{name:"Activate saved experiment"}).click();
   await panel.getByLabel("Observation or closure summary").fill("Orders reviewed");
   await panel.getByLabel("Approved KPI snapshot").selectOption({label:"Orders · revision 1"});
@@ -66,7 +88,7 @@ test("strategy experiment draft recovery and approved KPI closure", async ({
   await page.reload();
   await expect(panel.getByLabel("Observation or closure summary")).toHaveValue("Orders reviewed");
   await panel.getByRole("button",{name:"Record checkpoint"}).click();
-  await expect(panel.getByText("Saved revision: 3.",{exact:false})).toBeVisible();
+  await expect(panel.getByText("Saved revision: 4.",{exact:false})).toBeVisible();
   await panel.getByRole("button",{name:"Complete and create review draft"}).click();
   await expect(panel.getByText("Outcome review draft created:",{exact:false})).toBeVisible();
   await page.setViewportSize({width:390,height:844});

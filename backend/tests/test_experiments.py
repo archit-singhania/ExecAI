@@ -82,3 +82,28 @@ def test_owner_reassignment_requires_workspace_owner_and_eligible_member():
     assert response.json()["data"]["owner_id"]==editor_user["id"]
     assert len(response.json()["data"]["owner_history"])==1
     assert client.post(path,headers=owner,json=payload).status_code==409
+
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    ready = Barrier(2)
+
+    def reassign(member_id):
+        ready.wait(timeout=5)
+        return client.post(path, headers=owner, json={
+            "version": response.json()["version"], "owner_id": member_id,
+        })
+
+    _, alternate, alternate_email = account()
+    assert client.post(root+"/members", headers=owner, json={
+        "email": alternate_email, "role": "editor",
+    }).is_success
+    with ThreadPoolExecutor(2) as pool:
+        first = pool.submit(reassign, row["data"]["owner_id"])
+        second = pool.submit(reassign, alternate["id"])
+        results = [first.result(timeout=15), second.result(timeout=15)]
+    assert sorted(result.status_code for result in results) == [200, 409]
+    winner = next(result.json() for result in results if result.is_success)
+    current = client.get(root+"/experiments", headers=owner).json()[0]
+    assert current["data"]["owner_id"] == winner["data"]["owner_id"]
+    assert len(current["data"]["owner_history"]) == 2

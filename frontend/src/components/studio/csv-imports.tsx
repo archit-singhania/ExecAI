@@ -32,13 +32,15 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
     setBusy(true);
     setError("");
     try {
-      const result = await studioRequest<{batch:Batch|null;checkpoint:Connector["checkpoint"];skipped:number}>(hubspotPath+"/sync","POST");
+      const result = await studioRequest<{batch:Batch|null;checkpoint:Connector["checkpoint"];skipped:number;window_narrowed?:boolean}>(hubspotPath+"/sync","POST");
       setConnector(value=>({available:true,oauth_linked:value?.oauth_linked??false,checkpoint:result.checkpoint}));
       if(result.batch) {
         const batch=result.batch;
         setBatches(rows=>[batch,...rows.filter(row=>row.id!==batch.id)]);
       }
-      setSyncMessage(`${result.batch?"HubSpot page staged for review.":"No observations staged."} ${result.skipped} skipped.`);
+      setSyncMessage(result.window_narrowed
+        ? "HubSpot could not page through all deals. The time window was narrowed. Check for updates again to continue."
+        : `${result.batch?"HubSpot page staged for review.":"No observations staged."} ${result.skipped} skipped.`);
     } catch(error) {
       setError(error instanceof Error?error.message:"HubSpot synchronization failed.");
     } finally { setBusy(false); }

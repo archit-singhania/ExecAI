@@ -33,7 +33,9 @@ export default defineConfig({
           timeout: 180000,
           reuseExistingServer: false,
           env: {
-            DATABASE_URL: `sqlite:///${join(testDirectory, "manual_acceptance.db").replaceAll("\\", "/")}`,
+            DATABASE_URL: process.env.CEOAI_E2E_POSTGRES === "1"
+              ? process.env.CEOAI_E2E_DATABASE_URL ?? ""
+              : `sqlite:///${join(testDirectory, "manual_acceptance.db").replaceAll("\\", "/")}`,
             JWT_SECRET: "isolated-e2e-secret",
             APP_ENV: "test",
             CORS_ORIGINS: web,

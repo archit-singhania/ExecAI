@@ -10,6 +10,11 @@ from app.csv_imports import Columns, CsvInput
 
 
 DEALS_SEARCH = "https://api.hubapi.com/crm/v3/objects/deals/search"
+SEARCH_RESULT_LIMIT = 10_000
+
+
+class HubSpotWindowTooLarge(RuntimeError):
+    """The search window contains more results than HubSpot can page."""
 
 
 def fetch_deal_page(client, access_token, *, since_ms, until_ms, after=None):
@@ -38,12 +43,20 @@ def fetch_deal_page(client, access_token, *, since_ms, until_ms, after=None):
         raise RuntimeError("HubSpot could not return this synchronization page") from None
     if not isinstance(page, dict) or not isinstance(page.get("results"), list):
         raise RuntimeError("HubSpot returned an invalid deal page")
-    if isinstance(page.get("total"), int) and page["total"] > 10_000:
-        raise RuntimeError("Split the HubSpot synchronization window before continuing")
-    paging = page.get("paging", {}).get("next", {})
-    cursor = paging.get("after")
+    if isinstance(page.get("total"), int) and page["total"] > SEARCH_RESULT_LIMIT:
+        raise HubSpotWindowTooLarge("Split the HubSpot synchronization window before continuing")
+    paging = page.get("paging") or {}
+    next_page = paging.get("next") if isinstance(paging, dict) else None
+    if not isinstance(paging, dict) or (next_page is not None and not isinstance(next_page, dict)):
+        raise RuntimeError("HubSpot returned invalid paging metadata")
+    cursor = next_page.get("after") if next_page is not None else None
+    if next_page is not None and (not isinstance(cursor, (str, int)) or not str(cursor)):
+        raise RuntimeError("HubSpot omitted the next page cursor")
     if cursor is not None and str(cursor) == str(after):
-        raise RuntimeError("HubSpot returned a repeated page cursor")
+        raise HubSpotWindowTooLarge("HubSpot repeated a cursor; restart with a narrower window")
+    if cursor is not None and str(cursor).isascii() and str(cursor).isdecimal() and len(str(cursor)) <= 20:
+        if int(cursor) >= SEARCH_RESULT_LIMIT:
+            raise HubSpotWindowTooLarge("HubSpot reached the paging limit before completing the window")
     return page["results"], cursor
 
 
