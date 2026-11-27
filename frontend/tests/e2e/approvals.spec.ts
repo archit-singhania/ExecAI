@@ -11,12 +11,13 @@ test("assigned reviewer approves in a separate browser context", async ({
     .fill("Correct-Horse-Browser-2026!");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page).toHaveURL(/\/studio$/, { timeout: 90000 });
-  await page.getByLabel("Company name", { exact: true }).fill("Outcome acceptance");
+  await page.getByRole("button", { name: "New workspace", exact: true }).click();
+  await page.getByLabel("Company name", { exact: true }).fill("Approval permissions acceptance");
   await page
     .getByLabel("Business goal & context")
     .fill("Illustrative outcome-review acceptance workspace.");
   await page.getByRole("button", { name: "Create workspace", exact: true }).click();
-  await expect(page.getByLabel("Choose workspace")).toContainText("Outcome acceptance");
+  await page.getByLabel("Choose workspace").selectOption({label:"Approval permissions acceptance"});
   const sid = await page.getByLabel("Choose workspace").inputValue();
   await page.evaluate(async (sid) => {
     const headers = {
@@ -88,4 +89,19 @@ test("assigned reviewer approves in a separate browser context", async ({
   const receipt = panel.getByText("Reviewed fixture evidence",{exact:false});
   await expect(receipt).toBeVisible();
   await expect(receipt).toHaveCount(1);
+
+  // The PostgreSQL CI run executes the real vector distance query here.
+  await page.goto("/studio/knowledge");
+  await page.getByLabel("Choose document").setInputFiles({
+    name: "allocation-evidence.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("Apportionment requires a signed procurement worksheet."),
+  });
+  await page.getByRole("button", { name: "Upload & index" }).click();
+  await expect(page.getByRole("heading", { name: "allocation-evidence.md" })).toBeVisible();
+  await page.getByLabel("Search your documents").fill("apportionment");
+  await page.getByRole("button", { name: "Search knowledge" }).click();
+  await expect(page.getByRole("article").getByText(
+    "Apportionment requires a signed procurement worksheet.", { exact: true },
+  )).toBeVisible();
 });

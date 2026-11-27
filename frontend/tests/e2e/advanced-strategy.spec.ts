@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 async function call(page: Page, path: string, method = "GET", body?: unknown) {
   return page.evaluate(
     async ({ path, method, body }) => {
@@ -21,7 +21,7 @@ async function call(page: Page, path: string, method = "GET", body?: unknown) {
 test("freshness review, concession comparison and exported revocable board deck", async ({
   page,
   browser,
-}) => {
+}, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/login");
@@ -169,9 +169,8 @@ test("freshness review, concession comparison and exported revocable board deck"
     const bytes = await readFile(file!);
     expect(bytes.length).toBeGreaterThan(1000);
     expect(bytes.subarray(0, 2).toString()).toBe(name.includes("PDF") ? "%P" : "PK");
-    await mkdir("../docs/acceptance/execai-2026-10-13", { recursive: true });
     await writeFile(
-      `../docs/acceptance/execai-2026-10-13/board.${name.includes("PDF") ? "pdf" : "pptx"}`,
+      testInfo.outputPath(`board.${name.includes("PDF") ? "pdf" : "pptx"}`),
       bytes,
     );
   }
@@ -199,7 +198,7 @@ test("freshness review, concession comparison and exported revocable board deck"
   await page.reload();
   await expect(negotiation).toContainText("Supplier comparison");
   await page.screenshot({
-    path: "../docs/screenshots/advanced-features-2026-10-12/strategy-lab.png",
+    path: testInfo.outputPath("strategy-lab.png"),
     fullPage: true,
   });
   expect(errors).toEqual([]);

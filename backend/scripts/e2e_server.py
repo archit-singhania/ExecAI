@@ -50,7 +50,8 @@ from alembic.config import Config
 config = Config(str(backend / "alembic.ini"))
 config.set_main_option("script_location", str(backend / "alembic"))
 command.upgrade(config, "head")
-create_fixture_accounts(settings, "Correct-Horse-Browser-2026!")
+create_fixture_accounts(settings, "Correct-Horse-Browser-2026!",
+                        browser_postgres=url.get_backend_name() == "postgresql")
 
 if os.environ.get("CEOAI_E2E_HUBSPOT") == "1":
     from cryptography.fernet import Fernet
@@ -77,6 +78,12 @@ if os.environ.get("CEOAI_E2E_HUBSPOT") == "1":
 
     hubspot_imports.exchange_token = exchange_fixture
     hubspot_imports.fetch_deal_page = fetch_fixture
+    def fetch_company_fixture(client, token, **window):
+        assert token == "fixture-access"
+        return [{"id": "1", "updatedAt": "2026-01-01T12:00:00Z",
+                 "properties": {"name": "Fixture company", "numberofemployees": "24"}}], None
+
+    hubspot_imports.fetch_company_page = fetch_company_fixture
 
 import uvicorn
 uvicorn.run("app.main:app", host="127.0.0.1", port=8012)

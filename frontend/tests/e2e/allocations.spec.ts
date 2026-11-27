@@ -11,12 +11,13 @@ test("allocation proposal optimizes and saves a durable plan", async ({
     .fill("Correct-Horse-Browser-2026!");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page).toHaveURL(/\/studio$/, { timeout: 90000 });
-  await page.getByLabel("Company name", { exact: true }).fill("Allocation acceptance");
+  await page.getByRole("button", { name: "New workspace", exact: true }).click();
+  await page.getByLabel("Company name", { exact: true }).fill("Resource allocation acceptance");
   await page
     .getByLabel("Business goal & context")
     .fill("Illustrative outcome-review acceptance workspace.");
   await page.getByRole("button", { name: "Create workspace", exact: true }).click();
-  await expect(page.getByLabel("Choose workspace")).toContainText("Allocation acceptance");
+  await page.getByLabel("Choose workspace").selectOption({label:"Resource allocation acceptance"});
   await page.goto("/studio/execution");
   const panel=page.locator('section[aria-labelledby="allocation-heading"]');
   await panel.getByLabel("Scenario name").fill("Local capacity");

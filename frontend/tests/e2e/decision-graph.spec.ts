@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("decision relationships persist, reject cycles and inspect downstream impact", async ({
   page,
-}) => {
+}, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/signup");
@@ -110,7 +110,7 @@ test("decision relationships persist, reject cycles and inspect downstream impac
   await page.reload();
   await expect(premortem).toContainText("Linked task");
   await page.screenshot({
-    path: "../docs/screenshots/advanced-features-2026-10-12/decision-graph-premortem.png",
+    path: testInfo.outputPath("decision-graph-premortem.png"),
     fullPage: true,
   });
   await page.goto("/studio/execution");

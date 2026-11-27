@@ -52,6 +52,7 @@ test("HubSpot fixture can connect, stage two pages, approve and disconnect", asy
   const authorization = new URL((await consent.getAttribute("href"))!);
   expect(authorization.hostname).toBe("app.hubspot.com");
   expect(authorization.searchParams.get("scope")).toBe("crm.objects.deals.read");
+  expect(authorization.searchParams.get("optional_scope")).toBe("crm.objects.companies.read");
   const callback = new URL(authorization.searchParams.get("redirect_uri")!);
   expect(callback.hostname).toBe("127.0.0.1");
   callback.searchParams.set("state", authorization.searchParams.get("state")!);
@@ -70,6 +71,9 @@ test("HubSpot fixture can connect, stage two pages, approve and disconnect", asy
   await expect(panel.getByText("1 ready", { exact: true })).toHaveCount(2);
   await panel.getByRole("button", { name: "Approve eligible observations" }).first().click();
   await expect(panel.getByText("1 imported", { exact: true })).toBeVisible();
+  await panel.getByLabel("HubSpot object").selectOption("companies");
+  await panel.getByRole("button", { name: "Check HubSpot for updates" }).click();
+  await expect(panel.getByText(/HubSpot company 1 headcount · Fixture company/).first()).toBeVisible();
   await panel.getByRole("button", { name: "Disconnect HubSpot" }).click();
   await expect(panel.getByRole("button", { name: "Check HubSpot for updates" })).toBeDisabled();
 });

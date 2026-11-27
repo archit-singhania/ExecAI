@@ -131,6 +131,54 @@ jobs:
           CEOAI_E2E_HUBSPOT: "1"
           CEOAI_E2E_DATABASE_URL: postgresql+psycopg://ceoai:ci-only-password@127.0.0.1:5432/ceoai_browser_fixture
         run: npm run test:e2e -- approvals.spec.ts experiments.spec.ts csv-imports.spec.ts
+      - name: Verify stored pgvector embeddings
+        working-directory: backend
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: ceoai
+          PGPASSWORD: ci-only-password
+          PGDATABASE: ceoai_browser_fixture
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          import psycopg
+          from app.embeddings import _hashing_embedding
+
+          fixture = "Apportionment requires a signed procurement worksheet."
+          query = json.dumps(_hashing_embedding("apportionment"))
+          with psycopg.connect() as db:
+              extension = db.execute("SELECT extversion FROM pg_extension WHERE extname = 'vector'").fetchone()
+              assert extension, "The vector extension was not installed by the migrations"
+              index = db.execute("""
+                  SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema()
+                  AND tablename = 'knowledge_chunks' AND indexname = 'ix_knowledge_chunks_vector'
+              """).fetchone()
+              assert index and "USING hnsw" in index[0] and "vector_cosine_ops" in index[0], index
+              session = db.execute("""
+                  SELECT session_id FROM knowledge_chunks WHERE content = %s
+              """, (fixture,)).fetchone()
+              assert session, "The browser fixture did not persist its document chunk"
+              chunk = db.execute("""
+                  SELECT content, vector_dims(embedding), embedding <=> %s::vector AS distance
+                  FROM knowledge_chunks WHERE session_id = %s
+                  ORDER BY distance LIMIT 1
+              """, (query, session[0])).fetchone()
+              assert chunk and chunk[0] == fixture and chunk[1] == 256 and 0 <= chunk[2] < 1, chunk
+              receipt = {
+                  "extension_version": extension[0],
+                  "embedding_dimensions": chunk[1],
+                  "cosine_distance": chunk[2],
+                  "browser_fixture_rank": 1,
+                  "hnsw_cosine_index_present": True,
+              }
+              output = Path("../frontend/test-results/pgvector-receipt.json")
+              output.parent.mkdir(parents=True, exist_ok=True)
+              output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+              print(json.dumps(receipt))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

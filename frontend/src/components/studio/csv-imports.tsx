@@ -13,6 +13,8 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
   const hubspotPath = `/api/studio/${id}/imports/hubspot`;
   type Connector = { available: boolean; oauth_linked: boolean; checkpoint: {since_ms:number;after:string|null}|null };
   const [connector,setConnector] = useState<Connector|null>(null);
+  const [objectType,setObjectType] = useState<"deals"|"companies">("deals");
+  const objectQuery = `?object_type=${objectType}`;
   const [authorization,setAuthorization] = useState("");
   const [syncMessage,setSyncMessage] = useState("");
   const [source,setSource] = useState("");
@@ -25,21 +27,21 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
   useEffect(() => {
     let current = true;
     studioRequest<Batch[]>(path).then(rows=>{if(current)setBatches(rows);}).catch(e=>{if(current)setError(e.message);}).finally(()=>{if(current)setLoading(false);});
-    studioRequest<Connector>(hubspotPath).then(value=>{if(current)setConnector(value);}).catch(e=>{if(current)setSyncMessage(e.message);});
+    studioRequest<Connector>(hubspotPath+objectQuery).then(value=>{if(current)setConnector(value);}).catch(e=>{if(current)setSyncMessage(e.message);});
     return ()=>{current=false;};
-  },[path,hubspotPath]);
+  },[path,hubspotPath,objectQuery]);
   async function syncHubSpot() {
     setBusy(true);
     setError("");
     try {
-      const result = await studioRequest<{batch:Batch|null;checkpoint:Connector["checkpoint"];skipped:number;window_narrowed?:boolean}>(hubspotPath+"/sync","POST");
+      const result = await studioRequest<{batch:Batch|null;checkpoint:Connector["checkpoint"];skipped:number;window_narrowed?:boolean}>(hubspotPath+"/sync"+objectQuery,"POST");
       setConnector(value=>({available:true,oauth_linked:value?.oauth_linked??false,checkpoint:result.checkpoint}));
       if(result.batch) {
         const batch=result.batch;
         setBatches(rows=>[batch,...rows.filter(row=>row.id!==batch.id)]);
       }
       setSyncMessage(result.window_narrowed
-        ? "HubSpot could not page through all deals. The time window was narrowed. Check for updates again to continue."
+        ? "HubSpot could not page through all records. The time window was narrowed. Check for updates again to continue."
         : `${result.batch?"HubSpot page staged for review.":"No observations staged."} ${result.skipped} skipped.`);
     } catch(error) {
       setError(error instanceof Error?error.message:"HubSpot synchronization failed.");
@@ -54,7 +56,7 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
         setAuthorization(result.url);
       } else {
         if (action === "disconnect") await studioRequest(hubspotPath+"/oauth","DELETE");
-        setConnector(await studioRequest<Connector>(hubspotPath));
+        setConnector(await studioRequest<Connector>(hubspotPath+objectQuery));
         setAuthorization("");
       }
     } catch (error) {
@@ -73,8 +75,13 @@ export function CsvImports({id,writable}:{id:string;writable:boolean}) {
     <p>Use the same source name and observation IDs on repeat imports. Preview the reconciliation before adding KPIs to this workspace.</p>
     {error && <p role="alert">{error}</p>}
     <fieldset disabled={!writable||busy}>
-      <legend>HubSpot deals</legend>
-      <p>{connector?.available?"Read-only connection. Review each staged page before approval.":"Connect a HubSpot account to stage deal observations."}</p>
+      <legend>HubSpot imports</legend>
+      <p>{connector?.available?"Read-only connection. Review each staged page before approval.":"Connect a HubSpot account to stage observations."}</p>
+      <label>HubSpot object<select value={objectType} onChange={event=>{
+        setConnector(null);
+        setSyncMessage("");
+        setObjectType(event.target.value === "companies" ? "companies" : "deals");
+      }}><option value="deals">Deal amounts</option><option value="companies">Company headcount</option></select></label>
       <button type="button" onClick={()=>manageHubSpot("start")}>Connect HubSpot</button>
       {authorization && <a href={authorization} target="_blank" rel="noopener noreferrer">Continue to HubSpot</a>}
       <button type="button" onClick={()=>manageHubSpot("refresh")}>Refresh connection</button>

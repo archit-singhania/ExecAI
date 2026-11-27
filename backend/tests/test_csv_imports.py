@@ -1,3 +1,5 @@
+import pytest
+
 from test_studio import account, client, workspace
 
 
@@ -108,6 +110,17 @@ def test_hubspot_workspace_stages_pages_without_publishing_and_resumes(monkeypat
     assert first['batch']['data']['state'] == 'staged'
     assert first['checkpoint']['after'] == '200'
     assert client.get(root+'/records?kind=metric',headers=owner).json() == []
+    def denied(*args, **window):
+        assert window['after'] == '200'
+        raise hubspot_imports.HubSpotAccessDenied()
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', denied)
+    revoked = client.post(endpoint+'/sync', headers=owner)
+    assert revoked.status_code == 409, revoked.text
+    assert 'crm.objects.deals.read' in revoked.json()['detail']
+    assert client.get(endpoint, headers=owner).json()['checkpoint'] == first['checkpoint']
+    assert client.get(root+'/records?kind=metric', headers=owner).json() == []
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', fetch)
     assert client.post(endpoint+'/sync',headers=owner).status_code == 502
     assert client.get(endpoint,headers=owner).json()['checkpoint'] == first['checkpoint']
     second = client.post(endpoint+'/sync',headers=owner).json()
@@ -134,6 +147,8 @@ def test_hubspot_workspace_stages_pages_without_publishing_and_resumes(monkeypat
     assert resumed['checkpoint']['since_ms'] == split['checkpoint']['until_ms']
 
 def test_hubspot_oauth_connect_refresh_and_disconnect(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
     from urllib.parse import parse_qs, urlsplit
     from cryptography.fernet import Fernet
     from app import hubspot_imports
@@ -196,5 +211,103 @@ def test_hubspot_oauth_connect_refresh_and_disconnect(monkeypatch):
     monkeypatch.setattr(hubspot_imports,'fetch_deal_page',lambda client,token,**window: ([],None))
     assert client.post(root+'/sync',headers=owner).status_code == 200
     assert refreshes == ['private-refresh', 'rotated-1', 'rotated-2']
-    assert client.delete(root+'/oauth',headers=owner).status_code == 200
+    original_checkpoint = client.get(root, headers=owner).json()['checkpoint']
+
+    def different_portal(fields):
+        assert fields['refresh_token'] == 'rotated-3'
+        return {'hub_id': 79, 'refresh_token': 'wrong-portal', 'access_token': 'wrong-portal'}
+
+    def never_fetch(*args, **kwargs):
+        pytest.fail('A different portal must be rejected before fetching data')
+
+    monkeypatch.setattr(hubspot_imports, 'exchange_token', different_portal)
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', never_fetch)
+    mismatch = client.post(root+'/sync', headers=owner)
+    assert mismatch.status_code == 502, mismatch.text
+    assert mismatch.json()['detail'] == 'HubSpot returned a different portal'
+    assert client.get(root, headers=owner).json()['checkpoint'] == original_checkpoint
+
+    monkeypatch.setattr(hubspot_imports, 'exchange_token', exchange)
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', lambda *args, **kwargs: ([], None))
+    assert client.post(root+'/sync', headers=owner).status_code == 200
+    assert refreshes[-1] == 'rotated-3'
+    checkpoint = client.get(root, headers=owner).json()['checkpoint']
+    monkeypatch.setattr(hubspot_imports.time, 'time', lambda: (checkpoint['since_ms'] + 600_000) / 1000)
+    fetching, release_page, disconnect_waiting = Event(), Event(), Event()
+    workspace_lock = hubspot_imports.lock_workspace
+
+    def slow_page(*args, **kwargs):
+        fetching.set()
+        assert release_page.wait(5), 'Test did not release the provider response'
+        return valid_page(*args, **kwargs)
+
+    def observe_lock(*args, **kwargs):
+        if fetching.is_set():
+            disconnect_waiting.set()
+        return workspace_lock(*args, **kwargs)
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_deal_page', slow_page)
+    monkeypatch.setattr(hubspot_imports, 'lock_workspace', observe_lock)
+    with ThreadPoolExecutor(2) as pool:
+        in_flight = pool.submit(client.post, root+'/sync', headers=owner)
+        try:
+            assert fetching.wait(5), 'Sync never reached the provider'
+            disconnecting = pool.submit(client.delete, root+'/oauth', headers=owner)
+            assert disconnect_waiting.wait(5), 'Disconnect never attempted to lock the workspace'
+        finally:
+            release_page.set()
+        staged = in_flight.result(timeout=10)
+        assert staged.status_code == 200, staged.text
+        assert staged.json()['batch']['data']['state'] == 'staged'
+        disconnected = disconnecting.result(timeout=10)
+        assert disconnected.status_code == 200, disconnected.text
     assert not client.get(root,headers=owner).json()['available']
+    assert client.post(root+'/sync',headers=owner).status_code == 409
+    assert client.get(f'/api/studio/{sid}/records?kind=metric',headers=owner).json() == []
+
+
+def test_hubspot_company_headcount_is_staged_with_separate_checkpoint(monkeypatch):
+    from app import hubspot_imports
+
+    owner, _, _ = account()
+    sid = workspace(owner)
+    root = f'/api/studio/{sid}'
+    monkeypatch.setenv('EXECAI_HUBSPOT_WORKSPACE', sid)
+    monkeypatch.setenv('EXECAI_HUBSPOT_PORTAL_ID', '78')
+    monkeypatch.setenv('EXECAI_HUBSPOT_ACCESS_TOKEN', 'fixture-only')
+
+    def companies(api_client, token, **window):
+        assert token == 'fixture-only'
+        assert window['after'] is None
+        return [
+            {'id': '77', 'updatedAt': '2026-11-18T12:00:00Z',
+             'properties': {'name': 'Fixture company', 'numberofemployees': '0'}},
+            {'id': '78', 'properties': {'name': 'Unknown headcount'}},
+        ], 'next-company'
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_company_page', companies)
+    response = client.post(root+'/imports/hubspot/sync?object_type=companies', headers=owner)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['skipped'] == 1
+    batch = result['batch']
+    observation = batch['data']['rows'][0]['observation']
+    assert (observation['value'], observation['unit']) == ('0', 'employees')
+    assert 'Fixture company' in observation['metric']
+    assert client.get(root+'/imports/hubspot', headers=owner).json()['checkpoint'] is None
+    companies_status = client.get(root+'/imports/hubspot?object_type=companies', headers=owner)
+    assert companies_status.json()['checkpoint']['after'] == 'next-company'
+    def denied(*args, **kwargs):
+        raise hubspot_imports.HubSpotAccessDenied()
+
+    monkeypatch.setattr(hubspot_imports, 'fetch_company_page', denied)
+    rejected = client.post(root+'/imports/hubspot/sync?object_type=companies', headers=owner)
+    assert rejected.status_code == 409
+    assert 'crm.objects.companies.read' in rejected.json()['detail']
+    assert client.get(root+'/imports/hubspot?object_type=companies', headers=owner).json() == companies_status.json()
+    assert len(client.get(root+'/imports/csv', headers=owner).json()) == 1
+    assert client.get(root+'/records?kind=metric', headers=owner).json() == []
+    approved = client.post(root+f"/imports/csv/{batch['id']}/approve",
+                           headers=owner, json={'version': batch['version'], 'confirmed': True})
+    assert approved.status_code == 200, approved.text
+    assert len(client.get(root+'/records?kind=metric', headers=owner).json()) == 1

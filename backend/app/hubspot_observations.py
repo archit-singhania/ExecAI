@@ -10,6 +10,7 @@ from app.csv_imports import Columns, CsvInput
 
 
 DEALS_SEARCH = "https://api.hubapi.com/crm/v3/objects/deals/search"
+COMPANIES_SEARCH = "https://api.hubapi.com/crm/v3/objects/companies/search"
 SEARCH_RESULT_LIMIT = 10_000
 
 
@@ -17,7 +18,21 @@ class HubSpotWindowTooLarge(RuntimeError):
     """The search window contains more results than HubSpot can page."""
 
 
+class HubSpotAccessDenied(RuntimeError):
+    """The current grant cannot read the requested object."""
+
+
 def fetch_deal_page(client, access_token, *, since_ms, until_ms, after=None):
+    return fetch_page(client, access_token, DEALS_SEARCH, ["amount", "deal_currency_code"],
+                      since_ms=since_ms, until_ms=until_ms, after=after)
+
+
+def fetch_company_page(client, access_token, *, since_ms, until_ms, after=None):
+    return fetch_page(client, access_token, COMPANIES_SEARCH, ["name", "numberofemployees"],
+                      since_ms=since_ms, until_ms=until_ms, after=after)
+
+
+def fetch_page(client, access_token, endpoint, properties, *, since_ms, until_ms, after):
     """Read one page from a fixed, half-open modification window."""
     if since_ms < 0 or until_ms <= since_ms:
         raise ValueError("Expected a valid HubSpot synchronization window")
@@ -26,7 +41,7 @@ def fetch_deal_page(client, access_token, *, since_ms, until_ms, after=None):
             {"propertyName": "hs_lastmodifieddate", "operator": "GTE", "value": str(since_ms)},
             {"propertyName": "hs_lastmodifieddate", "operator": "LT", "value": str(until_ms)},
         ]}],
-        "properties": ["amount", "deal_currency_code"],
+        "properties": properties,
         "sorts": ["hs_lastmodifieddate"],
         "limit": 200,
     }
@@ -34,15 +49,17 @@ def fetch_deal_page(client, access_token, *, since_ms, until_ms, after=None):
         query["after"] = str(after)
     try:
         response = client.post(
-            DEALS_SEARCH, json=query, headers={"Authorization": f"Bearer {access_token}"},
+            endpoint, json=query, headers={"Authorization": f"Bearer {access_token}"},
             timeout=15, follow_redirects=False,
         )
+        if response.status_code in {401, 403}:
+            raise HubSpotAccessDenied()
         response.raise_for_status()
         page = response.json()
     except (httpx.HTTPError, ValueError):
         raise RuntimeError("HubSpot could not return this synchronization page") from None
     if not isinstance(page, dict) or not isinstance(page.get("results"), list):
-        raise RuntimeError("HubSpot returned an invalid deal page")
+        raise RuntimeError("HubSpot returned an invalid search page")
     if isinstance(page.get("total"), int) and page["total"] > SEARCH_RESULT_LIMIT:
         raise HubSpotWindowTooLarge("Split the HubSpot synchronization window before continuing")
     paging = page.get("paging") or {}
@@ -62,6 +79,15 @@ def fetch_deal_page(client, access_token, *, since_ms, until_ms, after=None):
 
 def stageable_deals(portal_id, deals):
     """Return a staging payload and a count of deals missing financial data."""
+    return stage_observations(portal_id, deals, "deals")
+
+
+def stageable_companies(portal_id, companies):
+    """Stage actual reported headcount, without estimating missing values."""
+    return stage_observations(portal_id, companies, "companies")
+
+
+def stage_observations(portal_id, records, object_type):
     if not isinstance(portal_id, str) or not portal_id.isascii() or not portal_id.isdecimal() or len(portal_id) > 30:
         raise ValueError("Expected a numeric HubSpot portal ID")
     output = io.StringIO(newline="")
@@ -70,30 +96,33 @@ def stageable_deals(portal_id, deals):
     writer.writeheader()
     skipped = 0
     count = 0
-    for deal in deals:
-        properties = deal.get("properties") or {}
-        amount = properties.get("amount")
-        currency = properties.get("deal_currency_code")
-        if deal.get("archived") or amount in (None, "") or not currency:
+    companies = object_type == "companies"
+    for record in records:
+        properties = record.get("properties") or {}
+        amount = properties.get("numberofemployees" if companies else "amount")
+        unit = "employees" if companies else properties.get("deal_currency_code")
+        if record.get("archived") or amount in (None, "") or not unit:
             skipped += 1
             continue
-        modified = datetime.fromisoformat(deal["updatedAt"].replace("Z", "+00:00"))
+        modified = datetime.fromisoformat(record["updatedAt"].replace("Z", "+00:00"))
         if modified.tzinfo is None:
             raise ValueError("HubSpot update timestamps must include a timezone")
         modified = modified.astimezone(timezone.utc)
-        deal_id = str(deal["id"])
-        if not deal_id.isascii() or not deal_id.isdecimal() or len(deal_id) > 30:
-            raise ValueError("Expected a numeric HubSpot deal ID")
+        identity = str(record["id"])
+        if not identity.isascii() or not identity.isdecimal() or len(identity) > 30:
+            raise ValueError("Expected a numeric HubSpot record ID")
         count += 1
         if count > 500:
             raise ValueError("Stage no more than 500 observations per batch")
         writer.writerow({
-            "source_id": f"{deal_id}:{modified.isoformat()}",
-            "metric": "HubSpot deal amount snapshot",
+            "source_id": f"{identity}:{modified.isoformat()}",
+            "metric": (f"HubSpot company {identity} headcount · {str(properties.get('name') or 'Unnamed company')[:120]}"
+                       if companies else "HubSpot deal amount snapshot"),
             "value": amount,
-            "unit": currency,
+            "unit": unit,
             "observed_on": modified.date().isoformat(),
         })
     if not count:
         return None, skipped
-    return CsvInput(source=f"HubSpot portal {portal_id}", csv_text=output.getvalue(), columns=columns), skipped
+    source = f"HubSpot portal {portal_id}" + (" companies" if companies else "")
+    return CsvInput(source=source, csv_text=output.getvalue(), columns=columns), skipped

@@ -11,12 +11,13 @@ test("outcome review records actual zero, freezes snapshots and creates selected
     .fill("Correct-Horse-Browser-2026!");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page).toHaveURL(/\/studio$/, { timeout: 90000 });
-  await page.getByLabel("Company name", { exact: true }).fill("Outcome acceptance");
+  await page.getByRole("button", { name: "New workspace", exact: true }).click();
+  await page.getByLabel("Company name", { exact: true }).fill("Decision outcome acceptance");
   await page
     .getByLabel("Business goal & context")
     .fill("Illustrative outcome-review acceptance workspace.");
   await page.getByRole("button", { name: "Create workspace", exact: true }).click();
-  await expect(page.getByLabel("Choose workspace")).toContainText("Outcome acceptance");
+  await page.getByLabel("Choose workspace").selectOption({label:"Decision outcome acceptance"});
   const sid = await page.getByLabel("Choose workspace").inputValue();
   await page.evaluate(async (sid) => {
     const headers = {

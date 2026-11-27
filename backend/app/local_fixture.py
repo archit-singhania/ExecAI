@@ -12,7 +12,7 @@ FIXTURES = (
     ("owner.fixture@example.com", "Local QA Owner · Illustrative", "pro"),
     ("editor.fixture@example.com", "Local QA Editor · Illustrative", "free"),
     ("viewer.fixture@example.com", "Local QA Viewer · Illustrative", "free"),
-    ("strategy.fixture@example.com", "Local Strategy QA · Illustrative", "pro"),
+    ("strategy.fixture@example.com", "Local Strategy QA · Illustrative", "team"),
 )
 
 
@@ -26,9 +26,16 @@ def fixture_allowed(settings: Settings) -> bool:
     )
 
 
-def create_fixture_accounts(settings: Settings, password: str) -> list[str]:
-    if not fixture_allowed(settings):
-        raise ValueError("Use development/test mode and a dedicated manual_acceptance.db SQLite database.")
+def create_fixture_accounts(settings: Settings, password: str, *, browser_postgres: bool = False) -> list[str]:
+    url = make_url(settings.database_url)
+    dedicated_postgres = (
+        browser_postgres and settings.app_env == "test"
+        and url.get_backend_name() == "postgresql"
+        and url.host in {"localhost", "127.0.0.1", "::1"}
+        and url.database == "ceoai_browser_fixture"
+    )
+    if not fixture_allowed(settings) and not dedicated_postgres:
+        raise ValueError("Select a dedicated local acceptance database.")
     if len(password) < 12:
         raise ValueError("Choose a fixture password with at least 12 characters.")
     from app.auth import hash_password

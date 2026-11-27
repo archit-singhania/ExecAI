@@ -5,6 +5,7 @@ import os
 import time
 import hashlib
 import secrets
+from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
@@ -16,7 +17,10 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.csv_imports import prepare_batch
 from app.database import get_db
-from app.hubspot_observations import HubSpotWindowTooLarge, fetch_deal_page, stageable_deals
+from app.hubspot_observations import (
+    HubSpotAccessDenied, HubSpotWindowTooLarge, fetch_company_page, fetch_deal_page,
+    stageable_companies, stageable_deals,
+)
 from app.models import User
 from app.outcomes import lock_workspace
 from app.studio import record_out
@@ -63,7 +67,8 @@ def oauth_start(sid: str, db: Session = Depends(get_db), user: User = Depends(ge
     row.state_expires = int(time.time()) + 600
     db.commit()
     url = "https://app.hubspot.com/oauth/authorize?" + urlencode(
-        dict(client_id=client_id, redirect_uri=redirect, scope="crm.objects.deals.read", state=state))
+        dict(client_id=client_id, redirect_uri=redirect, scope="crm.objects.deals.read",
+             optional_scope="crm.objects.companies.read", state=state))
     return {"url": url}
 
 
@@ -133,12 +138,15 @@ def checkpoint(db, sid, portal):
 
 
 @router.get("/{sid}/imports/hubspot")
-def status(sid: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def status(sid: str, object_type: Literal["deals", "companies"] = "deals",
+           db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     lock_workspace(db, sid, user)
     connection = host_connection(sid)
     oauth = db.get(HubSpotConnection, sid)
     linked = bool(oauth and oauth.credential)
     portal = oauth.portal if linked else connection[1] if connection else None
+    if portal and object_type == "companies":
+        portal = f"companies:{portal}"
     row = checkpoint(db, sid, portal) if portal else None
     return {"available": bool(portal), "oauth_linked": linked, "checkpoint": json.loads(row.data) if row else None}
 
@@ -155,14 +163,17 @@ def disconnect(sid: str, db: Session = Depends(get_db), user: User = Depends(get
 
 
 @router.post("/{sid}/imports/hubspot/sync")
-def sync(sid: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def sync(sid: str, object_type: Literal["deals", "companies"] = "deals",
+         db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     lock_workspace(db, sid, user, True)
     oauth = db.get(HubSpotConnection, sid)
     connection = refresh_access(oauth) if oauth and oauth.credential else host_connection(sid)
     if not connection:
         raise HTTPException(409, "HubSpot is not configured for this workspace")
     token, portal = connection
-    row = checkpoint(db, sid, portal)
+    companies = object_type == "companies"
+    checkpoint_key = f"companies:{portal}" if companies else portal
+    row = checkpoint(db, sid, checkpoint_key)
     now = int(time.time() * 1000)
     state = json.loads(row.data) if row else {"since_ms": now - DAY_MS, "until_ms": None, "after": None}
     # Allow time for recent provider changes to become searchable.
@@ -174,15 +185,21 @@ def sync(sid: str, db: Session = Depends(get_db), user: User = Depends(get_curre
         return {"batch": None, "checkpoint": state, "skipped": 0}
     narrowed = False
     try:
+        fetch = fetch_company_page if companies else fetch_deal_page
+        stage = stageable_companies if companies else stageable_deals
         with httpx.Client() as client:
-            deals, cursor = fetch_deal_page(client, token, since_ms=since, until_ms=until, after=state["after"])
-        payload, skipped = stageable_deals(portal, deals)
+            records, cursor = fetch(client, token, since_ms=since, until_ms=until, after=state["after"])
+        payload, skipped = stage(portal, records)
     except HubSpotWindowTooLarge:
         if until - since <= 1:
             db.commit()
             raise HTTPException(502, "HubSpot exceeded its result limit in a single millisecond. Checkpoint kept.") from None
         until = since + (until - since) // 2
         payload, skipped, cursor, narrowed = None, 0, None, True
+    except HubSpotAccessDenied:
+        db.commit()
+        scope = "crm.objects.companies.read" if companies else "crm.objects.deals.read"
+        raise HTTPException(409, f"Reconnect HubSpot and grant {scope}. The checkpoint was kept.") from None
     except (ValueError, RuntimeError, KeyError, TypeError):
         # Token rotation has already happened upstream. No batch or checkpoint
         # was modified, so persist the replacement before returning a retryable error.
@@ -196,7 +213,7 @@ def sync(sid: str, db: Session = Depends(get_db), user: User = Depends(get_curre
         with db.begin_nested():
             batch = prepare_batch(sid, payload, db, user) if payload else None
             if row is None:
-                row = StudioRecord(session_id=sid, author_id=user.id, kind="hubspot_checkpoint", title=portal)
+                row = StudioRecord(session_id=sid, author_id=user.id, kind="hubspot_checkpoint", title=checkpoint_key)
                 db.add(row)
             row.data = json.dumps(state)
     except (HTTPException, SQLAlchemyError):
